@@ -1,11 +1,21 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 
-export default function SuccessPage() {
+// Loading component for Suspense fallback
+function LoadingState() {
+    return (
+        <div className="min-h-screen h-full bg-[#F8F8F9] flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#004AAD]"></div>
+        </div>
+    )
+}
+
+// Main content component that uses useSearchParams
+function SuccessContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const [countdown, setCountdown] = useState(5)
@@ -161,5 +171,14 @@ export default function SuccessPage() {
                 </div>
             </div>
         </div>
+    )
+}
+
+// Main page component with Suspense boundary
+export default function SuccessPage() {
+    return (
+        <Suspense fallback={<LoadingState />}>
+            <SuccessContent />
+        </Suspense>
     )
 }
