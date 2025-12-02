@@ -1,12 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/contexts/AuthContext'
 
-export default function CheckoutPage() {
+// Loading component for Suspense fallback
+function LoadingState() {
+    return (
+        <div className="min-h-screen h-full bg-[#F8F8F9] flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#004AAD]"></div>
+        </div>
+    )
+}
+
+// Main checkout content component
+function CheckoutContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const { user } = useAuth()
@@ -405,5 +414,14 @@ export default function CheckoutPage() {
                 <div className="h-96"></div>
 
         </div>
+    )
+}
+
+// Main page component with Suspense boundary
+export default function CheckoutPage() {
+    return (
+        <Suspense fallback={<LoadingState />}>
+            <CheckoutContent />
+        </Suspense>
     )
 }
