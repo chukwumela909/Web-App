@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { useCallback, useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { 
   CubeIcon,
   PlusIcon,
@@ -142,6 +143,8 @@ function ProductsPageContent() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [branchesLoading, setBranchesLoading] = useState(true)
   const { user } = useAuth()
+  const currency = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -588,7 +591,7 @@ function ProductsPageContent() {
                 </div>
                 
                 <p className="text-3xl font-bold text-card-foreground mb-2">
-                  KSh {Math.round(showSellingValue ? totalSellingValue : totalCostValue).toLocaleString()}
+                  {currencySymbol} {Math.round(showSellingValue ? totalSellingValue : totalCostValue).toLocaleString()}
                 </p>
                 
                 {/* Profit/Potential indicator */}
@@ -683,7 +686,7 @@ function ProductsPageContent() {
                           <p className="text-sm text-muted-foreground">{product.quantity} {product.unitOfMeasure || 'pcs'} - {product.category}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-[#66BB6A]">KSh {product.sellingPrice.toLocaleString()}</p>
+                          <p className="font-semibold text-[#66BB6A]">{currencySymbol} {product.sellingPrice.toLocaleString()}</p>
                           <p className="text-sm text-muted-foreground mb-2">
                             {product.quantity <= product.minStockLevel ? (
                               <span className="text-[#F29F05]">Low Stock</span>
@@ -1100,7 +1103,7 @@ function ProductsPageContent() {
                                 <div className="flex items-center justify-between">
                                   <span className="text-sm font-medium text-green-800">Profit Margin:</span>
                                   <span className="text-lg font-bold text-green-900">
-                                    KSh {(Number(productForm.sellingPrice) - Number(productForm.costPrice)).toFixed(2)} 
+                                    {currencySymbol} {(Number(productForm.sellingPrice) - Number(productForm.costPrice)).toFixed(2)} 
                                     ({Math.round(((Number(productForm.sellingPrice) - Number(productForm.costPrice)) / Number(productForm.costPrice)) * 100)}%)
                                   </span>
                                 </div>

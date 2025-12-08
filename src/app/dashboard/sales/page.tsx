@@ -6,6 +6,7 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect, useMemo, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { 
   XMarkIcon,
   CheckIcon,
@@ -40,6 +41,8 @@ const staggerChildren = {
 
 function SalesPageContent() {
   const PAYMENT_METHODS: PaymentMethod[] = ['CASH','MPESA','BANK_TRANSFER','CARD','CREDIT','CHEQUE','OTHER']
+  const currency = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const [showReceiptModal, setShowReceiptModal] = useState<Sale | null>(null)
   const [showMultiItemReceiptModal, setShowMultiItemReceiptModal] = useState<any | null>(null)
   const [sales, setSales] = useState<Sale[]>([])
@@ -346,7 +349,7 @@ function SalesPageContent() {
                   <div className="text-center">
                     <p className="text-sm font-medium text-muted-foreground">Today&apos;s Revenue</p>
                     <p className="text-2xl font-bold text-[#2196F3] mt-2">
-                      KSh {allSales.filter(sale => {
+                      {currencySymbol} {allSales.filter(sale => {
                         const today = new Date()
                         const saleDate = new Date(sale.timestamp)
                         return saleDate.toDateString() === today.toDateString()
@@ -359,7 +362,7 @@ function SalesPageContent() {
                   <div className="text-center">
                     <p className="text-sm font-medium text-muted-foreground">Today&apos;s Profit</p>
                     <p className="text-2xl font-bold text-[#FF9800] mt-2">
-                      KSh {allSales.filter(sale => {
+                      {currencySymbol} {allSales.filter(sale => {
                         const today = new Date()
                         const saleDate = new Date(sale.timestamp)
                         return saleDate.toDateString() === today.toDateString()
@@ -391,7 +394,7 @@ function SalesPageContent() {
                 <div className="bg-card p-6 rounded-xl border border-border shadow-sm">
                   <div className="text-center">
                     <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
-                    <p className="text-3xl font-bold text-[#2196F3] mt-2">KSh {totalRevenue.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-[#2196F3] mt-2">{currencySymbol} {totalRevenue.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -440,7 +443,7 @@ function SalesPageContent() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-[#4CAF50]">KSh {sale.totalAmount.toLocaleString()}</p>
+                          <p className="font-semibold text-[#4CAF50]">{currencySymbol} {sale.totalAmount.toLocaleString()}</p>
                           <p className="text-sm text-muted-foreground">{formatPaymentMethod(sale.paymentMethod)}</p>
                         </div>
                       </div>
@@ -495,11 +498,11 @@ function SalesPageContent() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Unit Price:</span>
-                        <span className="font-medium text-card-foreground">KSh {showReceiptModal.unitPrice?.toLocaleString()}</span>
+                        <span className="font-medium text-card-foreground">{currencySymbol} {showReceiptModal.unitPrice?.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between border-t border-border pt-3">
                         <span className="text-muted-foreground">Total Amount:</span>
-                        <span className="font-bold text-card-foreground text-lg">KSh {showReceiptModal.totalAmount.toLocaleString()}</span>
+                        <span className="font-bold text-card-foreground text-lg">{currencySymbol} {showReceiptModal.totalAmount.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Payment Method:</span>
@@ -607,10 +610,10 @@ function SalesPageContent() {
                           <div key={index} className="flex justify-between text-sm">
                             <div className="flex-1">
                               <div className="font-medium text-card-foreground">{item.productName}</div>
-                              <div className="text-muted-foreground">{item.quantity} x KSh {item.unitPrice?.toLocaleString()}</div>
+                              <div className="text-muted-foreground">{item.quantity} x {currencySymbol} {item.unitPrice?.toLocaleString()}</div>
                             </div>
                             <div className="font-medium text-card-foreground">
-                              KSh {item.lineTotal?.toLocaleString()}
+                              {currencySymbol} {item.lineTotal?.toLocaleString()}
                             </div>
                           </div>
                         ))}
@@ -620,26 +623,26 @@ function SalesPageContent() {
                     <div className="border-t border-border pt-4 space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Subtotal:</span>
-                        <span className="font-medium text-card-foreground">KSh {showMultiItemReceiptModal.subtotal?.toLocaleString()}</span>
+                        <span className="font-medium text-card-foreground">{currencySymbol} {showMultiItemReceiptModal.subtotal?.toLocaleString()}</span>
                       </div>
                       
                       {showMultiItemReceiptModal.tax && showMultiItemReceiptModal.tax > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Tax ({showMultiItemReceiptModal.taxRate}%):</span>
-                          <span className="font-medium text-card-foreground">KSh {showMultiItemReceiptModal.tax.toLocaleString()}</span>
+                          <span className="font-medium text-card-foreground">{currencySymbol} {showMultiItemReceiptModal.tax.toLocaleString()}</span>
                         </div>
                       )}
                       
                       {showMultiItemReceiptModal.discount && showMultiItemReceiptModal.discount > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Discount:</span>
-                          <span className="font-medium text-card-foreground">-KSh {showMultiItemReceiptModal.discount.toLocaleString()}</span>
+                          <span className="font-medium text-card-foreground">-{currencySymbol} {showMultiItemReceiptModal.discount.toLocaleString()}</span>
                         </div>
                       )}
                       
                       <div className="flex justify-between text-lg font-bold border-t border-border pt-2">
                         <span className="text-card-foreground">Total:</span>
-                        <span className="text-card-foreground">KSh {showMultiItemReceiptModal.totalAmount?.toLocaleString()}</span>
+                        <span className="text-card-foreground">{currencySymbol} {showMultiItemReceiptModal.totalAmount?.toLocaleString()}</span>
                       </div>
                     </div>
 

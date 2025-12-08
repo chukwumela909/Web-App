@@ -6,6 +6,7 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { 
   ArrowLeftIcon,
   CheckIcon,
@@ -31,6 +32,8 @@ function EditSalePageContent() {
   
   const { user } = useAuth()
   const { staff } = useStaff()
+  const currency = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const router = useRouter()
   const params = useParams()
   const saleId = params.id as string
@@ -318,7 +321,7 @@ function EditSalePageContent() {
                       <option value="">Select a product...</option>
                       {products.map(product => (
                         <option key={product.id} value={product.id}>
-                          {product.name} - KSh {product.sellingPrice?.toLocaleString()}
+                          {product.name} - {currencySymbol} {product.sellingPrice?.toLocaleString()}
                         </option>
                       ))}
                     </select>
@@ -418,7 +421,7 @@ function EditSalePageContent() {
                                 <option value="">Select product...</option>
                                 {products.map(product => (
                                   <option key={product.id} value={product.id}>
-                                    {product.name} - KSh {product.sellingPrice?.toLocaleString()}
+                                    {product.name} - {currencySymbol} {product.sellingPrice?.toLocaleString()}
                                   </option>
                                 ))}
                               </select>
@@ -441,7 +444,7 @@ function EditSalePageContent() {
                             {/* Unit Price */}
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Unit Price (KSh)
+                                Unit Price ({currencySymbol})
                               </label>
                               <input
                                 type="number"
@@ -456,7 +459,7 @@ function EditSalePageContent() {
                             {/* Cost Price */}
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Cost Price (KSh)
+                                Cost Price ({currencySymbol})
                               </label>
                               <input
                                 type="number"
@@ -472,10 +475,10 @@ function EditSalePageContent() {
                           {/* Line Total and Profit */}
                           <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between text-sm">
                             <span className="text-gray-600">
-                              Line Total: KSh {((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
+                              Line Total: {currencySymbol} {((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
                             </span>
                             <span className="text-green-600 font-medium">
-                              Profit: KSh {(((item.unitPrice || 0) - (item.costPrice || 0)) * (item.quantity || 0)).toLocaleString()}
+                              Profit: {currencySymbol} {(((item.unitPrice || 0) - (item.costPrice || 0)) * (item.quantity || 0)).toLocaleString()}
                             </span>
                           </div>
                         </div>

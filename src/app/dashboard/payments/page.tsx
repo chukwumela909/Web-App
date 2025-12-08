@@ -6,6 +6,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import Image from 'next/image'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
@@ -24,6 +25,8 @@ interface SubscriptionHistory {
 function PaymentsPageContent() {
   const { user } = useAuth()
   const router = useRouter()
+  const currency = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const [subscriptions, setSubscriptions] = useState<SubscriptionHistory[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentPlan, setCurrentPlan] = useState<'free' | 'monthly' | 'yearly'>('free')
@@ -178,7 +181,7 @@ function PaymentsPageContent() {
                     Free Plan
                   </p>
                   <p className="font-dm-sans text-sm text-[#717171]">
-                    KSH 0 / month
+                    {currencySymbol} 0 / month
                   </p>
                 </div>
               </div>
@@ -207,7 +210,7 @@ function PaymentsPageContent() {
                     1 Month Pro Plan
                   </p>
                   <p className="font-dm-sans text-sm text-[#717171]">
-                    KSH 2,000 / month
+                    {currency === 'USD' ? '$20' : 'KSH 2,000'} / month
                   </p>
                 </div>
               </div>
@@ -236,7 +239,7 @@ function PaymentsPageContent() {
                     1 Year Pro Plan
                   </p>
                   <p className="font-dm-sans text-sm text-[#717171]">
-                    KSH 20,000 / year
+                    {currency === 'USD' ? '$200' : 'KSH 20,000'} / year
                   </p>
                 </div>
               </div>

@@ -26,6 +26,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo } from 'react'
 import type { Product as FPProduct, Sale, Expense, Debtor } from '@/lib/firestore'
 import { getProducts, getSales, getExpenses, getDebtors } from '@/lib/firestore'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { Line, Bar } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -72,6 +73,8 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const { staff } = useStaff()
   const router = useRouter()
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const [products, setProducts] = useState<FPProduct[]>([])
   const [sales, setSales] = useState<Sale[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -218,7 +221,7 @@ export default function DashboardPage() {
           id: `overdue-${debtor.id}`,
           type: 'overdue-debt',
           title: 'Overdue Payment',
-          message: `${debtor.name} is ${daysOverdue} days overdue (KSh ${debtor.currentDebt.toLocaleString()})`,
+          message: `${debtor.name} is ${daysOverdue} days overdue (${currencySymbol} ${debtor.currentDebt.toLocaleString()})`,
           severity: daysOverdue > 30 ? 'high' : daysOverdue > 7 ? 'medium' : 'low'
         })
       }
@@ -332,7 +335,7 @@ export default function DashboardPage() {
           },
           color: '#6B7280',
           callback: function(value) {
-            return 'KSh ' + Number(value).toLocaleString()
+            return currencySymbol + ' ' + Number(value).toLocaleString()
           }
         }
       }
@@ -462,8 +465,8 @@ export default function DashboardPage() {
                     <div className="bg-blue-600 p-3 rounded-lg mb-4">
                       <ShoppingCartIcon className="h-5 w-5 text-white" />
                     </div>
-                    <p className="text-2xl font-bold text-gray-900">
-                      KSh {todaysSalesTotal.toLocaleString()}
+                    <p className="text-xl font-bold text-gray-900 mt-1">
+                      {currencySymbol} {todaysSalesTotal.toLocaleString()}
                     </p>
                     <p className="text-sm text-gray-600 font-medium">Today's Sales</p>
                   </div>
@@ -480,8 +483,8 @@ export default function DashboardPage() {
                     <div className="bg-red-600 p-3 rounded-lg mb-4">
                       <ReceiptPercentIcon className="h-5 w-5 text-white" />
                     </div>
-                    <p className="text-2xl font-bold text-gray-900">
-                      KSh {todaysExpensesTotal.toLocaleString()}
+                    <p className="text-xl font-bold text-gray-900 mt-1">
+                      {currencySymbol} {todaysExpensesTotal.toLocaleString()}
                     </p>
                     <p className="text-sm text-gray-600 font-medium">Today's Expenses</p>
                   </div>
@@ -495,8 +498,8 @@ export default function DashboardPage() {
                     <div className="bg-secondary p-3 rounded-lg mb-4">
                       <ArrowTrendingUpIcon className="h-5 w-5 text-white" />
                     </div>
-                    <p className="text-2xl font-bold text-gray-900">
-                      KSh {todaysProfit.toLocaleString()}
+                    <p className="text-xl font-bold text-gray-900 mt-1">
+                      {currencySymbol} {todaysProfit.toLocaleString()}
                     </p>
                     <p className="text-sm text-gray-600 font-medium">Today's Profit</p>
                   </div>
@@ -603,7 +606,7 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-700 font-medium">Sales</p>
-                      <p className="text-xl font-bold text-gray-900">KSh {weeklySalesTotal.toLocaleString()}</p>
+                      <p className="text-xl font-bold text-gray-900">{currencySymbol} {weeklySalesTotal.toLocaleString()}</p>
                     </div>
                   </div>
                 </div>
@@ -614,7 +617,7 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-700 font-medium">Expenses</p>
-                      <p className="text-xl font-bold text-gray-900">KSh {weeklyExpensesTotal.toLocaleString()}</p>
+                      <p className="text-xl font-bold text-gray-900">{currencySymbol} {weeklyExpensesTotal.toLocaleString()}</p>
                     </div>
                   </div>
                 </div>
@@ -632,7 +635,7 @@ export default function DashboardPage() {
                     <div>
                       <p className="text-sm text-gray-700 font-medium">Net Balance</p>
                       <p className="text-xl font-bold text-gray-900">
-                        {weeklyBalance >= 0 ? '+' : ''}KSh {weeklyBalance.toLocaleString()}
+                        {weeklyBalance >= 0 ? '+' : ''}{currencySymbol} {weeklyBalance.toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -686,7 +689,7 @@ export default function DashboardPage() {
                           <p className="text-xs text-gray-600">{item.totalSold} units sold</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-semibold text-gray-900">KSh {item.revenue.toLocaleString()}</p>
+                          <p className="text-sm font-semibold text-gray-900">{currencySymbol} {item.revenue.toLocaleString()}</p>
                         </div>
                       </div>
                     ))

@@ -3,6 +3,7 @@
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { 
   ChartBarIcon,
   CurrencyDollarIcon,
@@ -64,6 +65,8 @@ const fadeInUp = {
 export default function ReportsPage() {
   const { user } = useAuth()
   const { staff } = useStaff()
+  const currency = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const [loading, setLoading] = useState(true)
   const [summaries, setSummaries] = useState<DailySummary[]>([])
   const [recentSales, setRecentSales] = useState<Sale[]>([])
@@ -211,12 +214,12 @@ export default function ReportsPage() {
         <div class="metrics-grid">
             <div class="metric-card">
                 <div class="metric-label">Total Sales</div>
-                <div class="metric-value">KSh ${Math.round(metrics.totalSales).toLocaleString()}</div>
+                <div class="metric-value">${currencySymbol} ${Math.round(metrics.totalSales).toLocaleString()}</div>
                 <div class="growth-indicator">+${growth.salesGrowth}% growth</div>
             </div>
             <div class="metric-card">
                 <div class="metric-label">Total Profit</div>
-                <div class="metric-value">KSh ${Math.round(metrics.totalProfit).toLocaleString()}</div>
+                <div class="metric-value">${currencySymbol} ${Math.round(metrics.totalProfit).toLocaleString()}</div>
                 <div class="growth-indicator">+${growth.profitGrowth}% growth</div>
             </div>
             <div class="metric-card">
@@ -226,7 +229,7 @@ export default function ReportsPage() {
             </div>
             <div class="metric-card">
                 <div class="metric-label">Average Value</div>
-                <div class="metric-value">KSh ${Math.round(metrics.averageValue).toLocaleString()}</div>
+                <div class="metric-value">${currencySymbol} ${Math.round(metrics.averageValue).toLocaleString()}</div>
                 <div class="growth-indicator">Per Transaction</div>
             </div>
         </div>
@@ -238,7 +241,7 @@ export default function ReportsPage() {
             ${bestPerformingDays.map((day, idx) => `
                 <li class="performance-item">
                     <strong>#${idx + 1} - ${new Date(day.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</strong><br>
-                    Sales: KSh ${day.sales.toLocaleString()} | Transactions: ${day.transactions} | Top Product: ${day.topProduct}
+                    Sales: ${currencySymbol} ${day.sales.toLocaleString()} | Transactions: ${day.transactions} | Top Product: ${day.topProduct}
                 </li>
             `).join('')}
         </ul>
@@ -283,10 +286,10 @@ export default function ReportsPage() {
         ['Generated:', new Date().toLocaleDateString()],
         [''],
         ['Metrics'],
-        ['Total Sales', `KSh ${metrics.totalSales.toLocaleString()}`],
-        ['Total Profit', `KSh ${metrics.totalProfit.toLocaleString()}`],
+        ['Total Sales', `${currencySymbol} ${metrics.totalSales.toLocaleString()}`],
+        ['Total Profit', `${currencySymbol} ${metrics.totalProfit.toLocaleString()}`],
         ['Transactions', metrics.totalTransactions.toString()],
-        ['Average Value', `KSh ${metrics.averageValue.toLocaleString()}`],
+        ['Average Value', `${currencySymbol} ${metrics.averageValue.toLocaleString()}`],
         [''],
         ['Growth Rates'],
         ['Sales Growth', `${growth.salesGrowth}%`],
@@ -297,7 +300,7 @@ export default function ReportsPage() {
         ['Date', 'Sales', 'Transactions', 'Top Product'],
         ...bestPerformingDays.map(day => [
           day.date,
-          `KSh ${day.sales.toLocaleString()}`,
+          `${currencySymbol} ${day.sales.toLocaleString()}`,
           day.transactions.toString(),
           day.topProduct
         ])
@@ -329,7 +332,7 @@ export default function ReportsPage() {
   // Share Functions
   const handleShareEmail = () => {
     const subject = `FahamPesa Business Report - ${selectedPeriod}`
-    const body = `Hi,\n\nI'm sharing my business report for ${selectedPeriod}.\n\nKey Metrics:\n- Total Sales: KSh ${metrics.totalSales.toLocaleString()}\n- Total Profit: KSh ${metrics.totalProfit.toLocaleString()}\n- Transactions: ${metrics.totalTransactions}\n- Growth Rate: ${growth.salesGrowth}%\n\nGenerated from FahamPesa Dashboard\n${window.location.href}`
+    const body = `Hi,\n\nI'm sharing my business report for ${selectedPeriod}.\n\nKey Metrics:\n- Total Sales: ${currencySymbol} ${metrics.totalSales.toLocaleString()}\n- Total Profit: ${currencySymbol} ${metrics.totalProfit.toLocaleString()}\n- Transactions: ${metrics.totalTransactions}\n- Growth Rate: ${growth.salesGrowth}%\n\nGenerated from FahamPesa Dashboard\n${window.location.href}`
     
     const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
     window.location.href = mailtoLink
@@ -348,7 +351,7 @@ export default function ReportsPage() {
   }
 
   const handleShareWhatsApp = () => {
-    const text = `Check out my business report! Total Sales: KSh ${metrics.totalSales.toLocaleString()}, Growth: ${growth.salesGrowth}% - ${window.location.href}`
+    const text = `Check out my business report! Total Sales: ${currencySymbol} ${metrics.totalSales.toLocaleString()}, Growth: ${growth.salesGrowth}% - ${window.location.href}`
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`
     window.open(whatsappUrl, '_blank')
     setShowShareDropdown(false)
@@ -448,7 +451,7 @@ export default function ReportsPage() {
       labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
       datasets: [
         {
-          label: 'Sales (KSh)',
+          label: `Sales (${currencySymbol})`,
           data: [
             metrics.totalSales * 0.8,
             metrics.totalSales * 1.1,
@@ -464,7 +467,7 @@ export default function ReportsPage() {
           borderSkipped: false
         },
         {
-          label: 'Expenses (KSh)',
+          label: `Expenses (${currencySymbol})`,
           data: [
             (metrics.totalSales - metrics.totalProfit) * 0.8,
             (metrics.totalSales - metrics.totalProfit) * 1.1,
@@ -534,7 +537,7 @@ export default function ReportsPage() {
                 </div>
                 
                 <div className="flex items-center gap-8 text-sm text-gray-500">
-                  <span>KSh {Math.round(metrics.totalSales).toLocaleString()} Sales</span>
+                  <span>{currencySymbol} {Math.round(metrics.totalSales).toLocaleString()} Sales</span>
                   <span>{metrics.totalTransactions} Transactions</span>
                   <span>+{growth.salesGrowth}% Growth</span>
                 </div>
@@ -672,7 +675,7 @@ export default function ReportsPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-gray-500 text-sm font-medium">Total Sales</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">KSh {Math.round(metrics.totalSales).toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{currencySymbol} {Math.round(metrics.totalSales).toLocaleString()}</p>
                         <div className="flex items-center mt-2">
                           <ArrowTrendingUpIcon className="w-3 h-3 mr-1 text-green-600" />
                           <span className="text-xs text-gray-400">+{growth.salesGrowth}% this period</span>
@@ -692,7 +695,7 @@ export default function ReportsPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-gray-500 text-sm font-medium">Total Profit</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">KSh {Math.round(metrics.totalProfit).toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{currencySymbol} {Math.round(metrics.totalProfit).toLocaleString()}</p>
                         <div className="flex items-center mt-2">
                           <ArrowTrendingUpIcon className="w-3 h-3 mr-1 text-green-600" />
                           <span className="text-xs text-gray-400">+{growth.profitGrowth}% growth</span>
@@ -732,7 +735,7 @@ export default function ReportsPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-gray-500 text-sm font-medium">Avg. Value</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">KSh {Math.round(metrics.averageValue).toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{currencySymbol} {Math.round(metrics.averageValue).toLocaleString()}</p>
                         <div className="flex items-center mt-2">
                           <CalculatorIcon className="w-3 h-3 mr-1 text-slate-600" />
                           <span className="text-xs text-gray-400">Per Transaction</span>
@@ -765,7 +768,7 @@ export default function ReportsPage() {
                     <div>
                       <p className="font-semibold text-gray-900">Sales Growth</p>
                       <p className="text-sm text-gray-600">
-                        KSh {Math.round(metrics.totalSales).toLocaleString()} vs KSh 8,500
+                        {currencySymbol} {Math.round(metrics.totalSales).toLocaleString()} vs {currencySymbol} 8,500
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -783,7 +786,7 @@ export default function ReportsPage() {
                     <div>
                       <p className="font-semibold text-gray-900">Profit Growth</p>
                       <p className="text-sm text-gray-600">
-                        KSh {Math.round(metrics.totalProfit).toLocaleString()} vs KSh 2,550
+                        {currencySymbol} {Math.round(metrics.totalProfit).toLocaleString()} vs {currencySymbol} 2,550
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -1073,7 +1076,7 @@ export default function ReportsPage() {
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-bold text-blue-600">
-                            KSh {day.sales.toLocaleString()}
+                            {currencySymbol} {day.sales.toLocaleString()}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">

@@ -5,6 +5,7 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { 
   TruckIcon,
   UserGroupIcon,
@@ -78,6 +79,8 @@ const staggerChildren = {
 
 function SuppliersContent() {
   const { user } = useAuth()
+  const currency = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -197,9 +200,9 @@ function SuppliersContent() {
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-KE', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'KES'
+      currency: currency
     }).format(amount)
   }
 

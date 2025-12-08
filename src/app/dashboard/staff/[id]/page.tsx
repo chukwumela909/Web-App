@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { getBranches } from '@/lib/branches-service'
@@ -80,6 +81,8 @@ export default function StaffDetailsPage({}: StaffDetailsPageProps) {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
+  const currency = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   
   const [staff, setStaff] = useState<Staff | null>(null)
   const [branches, setBranches] = useState<Branch[]>([])
@@ -659,7 +662,7 @@ export default function StaffDetailsPage({}: StaffDetailsPageProps) {
                         <div>
                           <label className="text-sm text-gray-500">Salary</label>
                           <p className="font-medium">
-                            {staff.salary ? `Ksh ${staff.salary.toLocaleString()}` : 'Not set'}
+                            {staff.salary ? `${currencySymbol} ${staff.salary.toLocaleString()}` : 'Not set'}
                           </p>
                         </div>
                       </div>
