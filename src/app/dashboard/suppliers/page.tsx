@@ -26,6 +26,8 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { UpgradeModal } from '@/components/UpgradeModal'
 
 interface Supplier {
   id: string
@@ -89,6 +91,14 @@ function SuppliersContent() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState<Supplier | null>(null)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [upgradeModalData, setUpgradeModalData] = useState<{
+    feature: 'suppliers'
+    currentCount: number
+    limit: number
+    message: string
+  } | null>(null)
+  const { canAddSupplier } = usePlanLimits()
 
   // Load dashboard data
   const loadDashboard = async () => {
@@ -219,6 +229,14 @@ function SuppliersContent() {
 
   return (
     <div className="space-y-6">
+      <UpgradeModal
+        open={showUpgradeModal}
+        onOpenChange={setShowUpgradeModal}
+        feature={upgradeModalData?.feature}
+        currentCount={upgradeModalData?.currentCount}
+        limit={upgradeModalData?.limit}
+        message={upgradeModalData?.message}
+      />
       {/* Consistent Header */}
       <div className="bg-white rounded-xl p-8 shadow-lg border-0">
         <motion.div {...fadeInUp} className="flex justify-between items-start">
@@ -257,7 +275,20 @@ function SuppliersContent() {
             </Button>
             
             <Button
-              onClick={() => setShowAddModal(true)}
+              onClick={async () => {
+                const limitCheck = await canAddSupplier()
+                if (!limitCheck.allowed) {
+                  setUpgradeModalData({
+                    feature: 'suppliers',
+                    currentCount: limitCheck.currentCount,
+                    limit: typeof limitCheck.limit === 'number' ? limitCheck.limit : 0,
+                    message: limitCheck.message || 'Supplier limit reached'
+                  })
+                  setShowUpgradeModal(true)
+                } else {
+                  setShowAddModal(true)
+                }
+              }}
               className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
             >
               <PlusIcon className="h-4 w-4 mr-2" />

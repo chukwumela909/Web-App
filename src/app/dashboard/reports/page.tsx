@@ -25,6 +25,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
 import { useEffect, useMemo, useState } from 'react'
 import { DailySummary, getDailySummaries, getSales, Sale } from '@/lib/firestore'
+import { PlanGate } from '@/components/PlanGate'
 import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -519,7 +520,8 @@ export default function ReportsPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="space-y-6">
+        <PlanGate feature="reports">
+          <div className="space-y-6">
           {/* Consistent Header */}
           <div className="bg-white rounded-xl p-8 shadow-lg border-0">
             <motion.div initial="initial" animate="animate" variants={fadeInUp} className="flex justify-between items-start">
@@ -1182,6 +1184,7 @@ export default function ReportsPage() {
 
           </motion.div>
         </div>
+        </PlanGate>
       </DashboardLayout>
     </ProtectedRoute>
   )

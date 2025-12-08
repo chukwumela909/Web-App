@@ -26,6 +26,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { PlanGate } from '@/components/PlanGate'
 
 interface Branch {
   id: string
@@ -1312,7 +1313,9 @@ export default function BranchesPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <BranchesContent />
+        <PlanGate feature="branches">
+          <BranchesContent />
+        </PlanGate>
       </DashboardLayout>
     </ProtectedRoute>
   )

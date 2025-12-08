@@ -36,6 +36,8 @@ import { useEffect, useMemo, useState, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { Debtor, DebtorPayment, PaymentMethod, PaymentStatus, InstallmentFrequency, createDebtor, getDebtors, recordDebtorPayment } from '@/lib/firestore'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { UpgradeModal } from '@/components/UpgradeModal'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 60 },
@@ -392,6 +394,14 @@ export default function DebtorsPage() {
   const [existingDebtorId, setExistingDebtorId] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
   const receiptRef = useRef<HTMLDivElement>(null)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [upgradeModalData, setUpgradeModalData] = useState<{
+    feature: 'debtors'
+    currentCount: number
+    limit: number
+    message: string
+  } | null>(null)
+  const { canAddDebtor } = usePlanLimits()
   const [debtorForm, setDebtorForm] = useState({
     name: '',
     phone: '',
@@ -658,12 +668,33 @@ export default function DebtorsPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
+        <UpgradeModal
+          open={showUpgradeModal}
+          onOpenChange={setShowUpgradeModal}
+          feature={upgradeModalData?.feature}
+          currentCount={upgradeModalData?.currentCount}
+          limit={upgradeModalData?.limit}
+          message={upgradeModalData?.message}
+        />
         <motion.div initial="initial" animate="animate" variants={fadeInUp} className="space-y-8">
           {/* Add New Debtor Button */}
           <motion.div variants={fadeInUp}>
             <div className="bg-[#2175C7] rounded-2xl p-6 shadow-lg border border-blue-200/50">
               <button 
-                onClick={() => setShowAdd(true)}
+                onClick={async () => {
+                  const limitCheck = await canAddDebtor()
+                  if (!limitCheck.allowed) {
+                    setUpgradeModalData({
+                      feature: 'debtors',
+                      currentCount: limitCheck.currentCount,
+                      limit: typeof limitCheck.limit === 'number' ? limitCheck.limit : 0,
+                      message: limitCheck.message || 'Debtor limit reached'
+                    })
+                    setShowUpgradeModal(true)
+                  } else {
+                    setShowAdd(true)
+                  }
+                }}
                 className="w-full flex items-center justify-center space-x-3 text-white hover:bg-white/10 rounded-xl p-4 transition-all duration-200"
               >
                 <PlusIcon className="h-6 w-6" />

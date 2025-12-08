@@ -18,6 +18,7 @@ import { Branch } from '@/lib/branches-types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { PlanGate } from '@/components/PlanGate'
 import {
   Users,
   UserPlus,
@@ -257,10 +258,11 @@ export default function StaffPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <motion.div 
-          className="space-y-6"
-          {...fadeInUp}
-        >
+        <PlanGate feature="staff">
+          <motion.div 
+            className="space-y-6"
+            {...fadeInUp}
+          >
           {/* Consistent Header */}
           <div className="bg-white rounded-xl p-8 shadow-lg border-0">
             <motion.div {...fadeInUp} className="flex justify-between items-start">
@@ -836,7 +838,7 @@ export default function StaffPage() {
             </motion.div>
           </div>
         )}
-
+        </PlanGate>
       </DashboardLayout>
     </ProtectedRoute>
   )

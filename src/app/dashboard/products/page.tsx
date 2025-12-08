@@ -30,6 +30,8 @@ import EnhancedProductDetail from '@/components/products/EnhancedProductDetail'
 import BulkUpload from '@/components/products/BulkUpload'
 import { getBranches } from '@/lib/branches-service'
 import { Branch } from '@/lib/branches-types'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { UpgradeModal } from '@/components/UpgradeModal'
 
 const categories = [
   "All Categories",
@@ -142,11 +144,19 @@ function ProductsPageContent() {
   const [showBulkUpload, setShowBulkUpload] = useState(false)
   const [branches, setBranches] = useState<Branch[]>([])
   const [branchesLoading, setBranchesLoading] = useState(true)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [upgradeModalData, setUpgradeModalData] = useState<{
+    feature: 'products'
+    currentCount: number
+    limit: number
+    message: string
+  } | null>(null)
   const { user } = useAuth()
   const currency = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { canAddProduct } = usePlanLimits()
 
   // Enhanced Product Form State
   const [productForm, setProductForm] = useState<ProductFormData>({
@@ -390,6 +400,21 @@ function ProductsPageContent() {
     e.preventDefault()
     if (!user) return
 
+    // Check product limit for new products only (not when editing)
+    if (!editingProduct) {
+      const limitCheck = await canAddProduct()
+      if (!limitCheck.allowed) {
+        setUpgradeModalData({
+          feature: 'products',
+          currentCount: limitCheck.currentCount,
+          limit: typeof limitCheck.limit === 'number' ? limitCheck.limit : 0,
+          message: limitCheck.message || 'Product limit reached'
+        })
+        setShowUpgradeModal(true)
+        return
+      }
+    }
+
     const primaryImage = productForm.images.find(img => img.isPrimary)
     
     // Convert selected suppliers to supplier links format
@@ -549,6 +574,14 @@ function ProductsPageContent() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
+        <UpgradeModal
+          open={showUpgradeModal}
+          onOpenChange={setShowUpgradeModal}
+          feature={upgradeModalData?.feature}
+          currentCount={upgradeModalData?.currentCount}
+          limit={upgradeModalData?.limit}
+          message={upgradeModalData?.message}
+        />
         <motion.div
           initial="initial"
           animate="animate"
@@ -632,7 +665,20 @@ function ProductsPageContent() {
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <button 
-                onClick={() => setShowAddProduct(true)}
+                onClick={async () => {
+                  const limitCheck = await canAddProduct()
+                  if (!limitCheck.allowed) {
+                    setUpgradeModalData({
+                      feature: 'products',
+                      currentCount: limitCheck.currentCount,
+                      limit: typeof limitCheck.limit === 'number' ? limitCheck.limit : 0,
+                      message: limitCheck.message || 'Product limit reached'
+                    })
+                    setShowUpgradeModal(true)
+                  } else {
+                    setShowAddProduct(true)
+                  }
+                }}
                 className="bg-[#E3F2FD] hover:bg-[#d9edfc] text-card-foreground rounded-xl p-6 transition-all duration-200 shadow-sm hover:shadow-md border border-border"
               >
                 <div className="flex items-center justify-center space-x-3">

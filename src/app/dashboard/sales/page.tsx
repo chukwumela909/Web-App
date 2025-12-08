@@ -24,6 +24,8 @@ import type { Product, Sale, PaymentMethod, SaleType } from '@/lib/firestore'
 import { createSale, getProducts, getSales, updateSale, getMultiItemSales } from '@/lib/firestore'
 import MultiItemSalesForm from '@/components/sales/MultiItemSalesForm'
 import type { MultiItemSale } from '@/lib/multi-item-sales-types'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { UpgradeModal } from '@/components/UpgradeModal'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 60 },
@@ -51,11 +53,19 @@ function SalesPageContent() {
   const [showMultiItemForm, setShowMultiItemForm] = useState(false)
   const [showRecordSale, setShowRecordSale] = useState(false)
   const [multiItemSales, setMultiItemSales] = useState<MultiItemSale[]>([])
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [upgradeModalData, setUpgradeModalData] = useState<{
+    feature: 'dailySales'
+    currentCount: number
+    limit: number
+    message: string
+  } | null>(null)
   const receiptRef = useRef<HTMLDivElement>(null)
   const { user } = useAuth()
   const { staff } = useStaff()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { canRecordSale } = usePlanLimits()
 
   // Determine the effective user ID for data loading
   const effectiveUserId = staff ? staff.userId : user?.uid
@@ -186,6 +196,19 @@ function SalesPageContent() {
 
   const handleSubmitSale = async () => {
     if (!effectiveUserId) return
+
+    // Check daily sales limit
+    const limitCheck = await canRecordSale()
+    if (!limitCheck.allowed) {
+      setUpgradeModalData({
+        feature: 'dailySales',
+        currentCount: limitCheck.currentCount,
+        limit: typeof limitCheck.limit === 'number' ? limitCheck.limit : 0,
+        message: limitCheck.message || 'Daily sales limit reached'
+      })
+      setShowUpgradeModal(true)
+      return
+    }
     
     try {
       const product = selectedProduct
@@ -275,6 +298,14 @@ function SalesPageContent() {
     <ProtectedRoute>
       <StaffProtectedRoute requiredPermission="sales:read">
         <DashboardLayout>
+          <UpgradeModal
+            open={showUpgradeModal}
+            onOpenChange={setShowUpgradeModal}
+            feature={upgradeModalData?.feature}
+            currentCount={upgradeModalData?.currentCount}
+            limit={upgradeModalData?.limit}
+            message={upgradeModalData?.message}
+          />
           <motion.div 
             initial="initial" 
             animate="animate" 
@@ -307,7 +338,20 @@ function SalesPageContent() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button 
-                  onClick={() => setShowMultiItemForm(true)}
+                  onClick={async () => {
+                    const limitCheck = await canRecordSale()
+                    if (!limitCheck.allowed) {
+                      setUpgradeModalData({
+                        feature: 'dailySales',
+                        currentCount: limitCheck.currentCount,
+                        limit: typeof limitCheck.limit === 'number' ? limitCheck.limit : 0,
+                        message: limitCheck.message || 'Daily sales limit reached'
+                      })
+                      setShowUpgradeModal(true)
+                    } else {
+                      setShowMultiItemForm(true)
+                    }
+                  }}
                   className="flex items-center justify-center space-x-3 bg-gradient-to-r from-orange-500 to-amber-600 text-white font-semibold py-4 px-6 rounded-xl hover:from-orange-600 hover:to-amber-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                 >
                   <TagIcon className="h-5 w-5" />
