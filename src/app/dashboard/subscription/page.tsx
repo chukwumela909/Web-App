@@ -5,10 +5,12 @@ import { Check, X } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 
 export default function SubscriptionPage() {
     const [isYearly, setIsYearly] = useState(false)
     const router = useRouter()
+    const { currency, isLoading } = useCurrency()
 
     const scrollToCompareFeatures = () => {
         const element = document.getElementById('compare-features')
@@ -23,15 +25,21 @@ export default function SubscriptionPage() {
 
     const handleGetPro = () => {
         const plan = isYearly ? 'yearly' : 'monthly'
-        const currency = 'KSH' // Default to KSH, can be made dynamic based on location
         router.push(`/dashboard/subscription/checkout?plan=${plan}&currency=${currency}`)
     }
 
-    // pricing (display depends on toggle)
-    const monthlyPro = 2000
-    const yearlyPro = 20000
-    const proPrice = isYearly ? yearlyPro : monthlyPro
+    // pricing (display depends on toggle and currency)
+    const getProPrice = () => {
+        if (currency === 'KSH') {
+            return isYearly ? 20000 : 2000
+        } else {
+            return isYearly ? 100 : 10
+        }
+    }
+    
+    const proPrice = getProPrice()
     const proUnit = isYearly ? '/ Year' : '/ Month'
+    const currencySymbol = getCurrencySymbol(currency)
     
     // Free plan is always 0 but unit changes
     const freePrice = 0
@@ -259,10 +267,10 @@ export default function SubscriptionPage() {
                             <div className="flex flex-col gap-6">
                                 <div className="flex items-center gap-1">
                                     <span className="text-[48px] leading-[65.57px] font-semibold font-manrope text-[#191D23] transition-all duration-300 ease-in-out">
-                                        KSH 0
+                                        {isLoading ? '...' : `${currencySymbol} 0`}
                                     </span>
                                     <span className="text-base leading-[20.83px] font-dm-sans text-[#4B5768] transition-all duration-300 ease-in-out">
-                                        {freeUnit}
+                                        {proUnit}
                                     </span>
                                 </div>
 
@@ -307,7 +315,7 @@ export default function SubscriptionPage() {
                             <div className="flex flex-col gap-6">
                                 <div className="flex items-center gap-1">
                                     <span className="text-[48px] leading-[62.5px] font-semibold font-dm-sans text-[#191D23] transition-all duration-300 ease-in-out">
-                                        {`KSH ${proPrice.toLocaleString()}`}
+                                        {isLoading ? '...' : `${currencySymbol} ${proPrice.toLocaleString()}`}
                                     </span>
                                     <span className="text-base leading-[20.83px] font-dm-sans text-[#4B5768] transition-all duration-300 ease-in-out">
                                         {proUnit}

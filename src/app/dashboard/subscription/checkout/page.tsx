@@ -4,6 +4,7 @@ import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/contexts/AuthContext'
+import { getCurrencySymbol } from '@/hooks/useCurrency'
 
 // Loading component for Suspense fallback
 function LoadingState() {
@@ -28,7 +29,7 @@ function CheckoutContent() {
     
     // Get plan details from URL params
     const plan = searchParams.get('plan') || 'yearly' // monthly or yearly
-    const currency = searchParams.get('currency') || 'KSH'
+    const currency = searchParams.get('currency') || 'USD' // Default to USD
     
     // Calculate amount based on plan and currency
     const getAmount = () => {
@@ -41,6 +42,7 @@ function CheckoutContent() {
     
     const amount = getAmount()
     const planName = plan === 'yearly' ? 'Yearly' : 'Monthly'
+    const currencySymbol = getCurrencySymbol(currency as 'KSH' | 'USD')
 
     const handleWhatsAppClick = () => {
         if (expandedPayment === 'whatsapp') {
@@ -208,7 +210,7 @@ function CheckoutContent() {
                                     Order summary
                                 </p>
                                 <p className="font-dm-sans font-normal text-[16px] leading-normal h-11">
-                                    You are subscribing to <span className="font-semibold">FahamPesa Pro {planName} plan</span>. You will be charged {currency} {amount.toLocaleString()} for the subscription.
+                                    You are subscribing to <span className="font-semibold">FahamPesa Pro {planName} plan</span>. You will be charged {currencySymbol} {amount.toLocaleString()} for the subscription.
                                 </p>
                             </div>
 
@@ -217,19 +219,19 @@ function CheckoutContent() {
                                 {/* Line Item */}
                                 <div className="flex items-center justify-between w-full pb-4 border-b border-[#8698B2] font-dm-sans font-normal text-[16px] text-[#191D23] leading-normal">
                                     <p>{plan === 'yearly' ? '1 Year Pro Plan + 2 Months Free' : '1 Month Pro Plan'}</p>
-                                    <p>{currency} {amount.toLocaleString()}</p>
+                                    <p>{currencySymbol} {amount.toLocaleString()}</p>
                                 </div>
 
                                 {/* Tax */}
                                 <div className="flex items-center justify-between w-full font-dm-sans font-normal text-[16px] text-[#191D23] leading-normal">
                                     <p>Sales tax/VAT 0%</p>
-                                    <p>{currency} 0</p>
+                                    <p>{currencySymbol} 0</p>
                                 </div>
 
                                 {/* Total */}
                                 <div className="flex items-center justify-between w-full pb-5 border-b border-[#8698B2] font-dm-sans font-bold text-[20px] text-[#191D23] leading-normal">
                                     <p>Order Total</p>
-                                    <p>{currency} {amount.toLocaleString()}</p>
+                                    <p>{currencySymbol} {amount.toLocaleString()}</p>
                                 </div>
                             </div>
 

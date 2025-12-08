@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
+import { getCurrencySymbol } from '@/hooks/useCurrency'
 
 // Loading component for Suspense fallback
 function LoadingState() {
@@ -21,9 +22,10 @@ function SuccessContent() {
     const [countdown, setCountdown] = useState(5)
 
     const plan = searchParams.get('plan') || 'yearly'
-    const amount = searchParams.get('amount') || '20000'
-    const currency = searchParams.get('currency') || 'KSH'
+    const amount = searchParams.get('amount') || '100'
+    const currency = searchParams.get('currency') || 'USD'
     const planName = plan === 'yearly' ? 'Yearly' : 'Monthly'
+    const currencySymbol = getCurrencySymbol(currency as 'KSH' | 'USD')
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -125,7 +127,7 @@ function SuccessContent() {
                                 Amount Paid
                             </p>
                             <p className="font-dm-sans font-semibold text-[18px] text-[#004AAD]">
-                                {currency} {Number(amount).toLocaleString()}
+                                {currencySymbol} {Number(amount).toLocaleString()}
                             </p>
                         </div>
                         <div className="flex items-center justify-between">

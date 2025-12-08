@@ -1,48 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 
 function PricingPageContent() {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
-    const [currency, setCurrency] = useState<'KSH' | '$'>('KSH')
-    const [isLoading, setIsLoading] = useState(true)
+    const { currency, isLoading } = useCurrency()
     const router = useRouter()
 
     const handleGetPro = () => {
         router.push(`/dashboard/subscription/checkout?plan=${billingCycle}&currency=${currency}`)
     }
-
-    // Detect user location on component mount
-    useEffect(() => {
-        const detectLocation = async () => {
-            try {
-                // Try using ipapi.co for geolocation
-                const response = await fetch('https://ipapi.co/json/')
-                const data = await response.json()
-                
-                console.log('Location data:', data) // Debug log
-                
-                // Check if user is in Kenya
-                if (data.country_code === 'KE') {
-                    setCurrency('KSH')
-                } else {
-                    setCurrency('$')
-                }
-            } catch (error) {
-                // Fallback to USD for international users if geolocation fails
-                console.log('Location detection failed, using default currency USD', error)
-                setCurrency('$')
-            } finally {
-                setIsLoading(false)
-            }
-        }
-
-        detectLocation()
-    }, [])
 
     // Get price based on currency and billing cycle
     const getPrice = () => {
@@ -52,6 +24,8 @@ function PricingPageContent() {
             return billingCycle === 'monthly' ? '10' : '100'
         }
     }
+    
+    const currencySymbol = getCurrencySymbol(currency)
 
     return (
         <div className="min-h-screen bg-[#f8f8f9]">
@@ -123,7 +97,7 @@ function PricingPageContent() {
                         {/* Price */}
                         <div className="flex gap-1 items-center">
                             <p className="font-dm-sans font-semibold text-[48px] text-[#191d23] transition-all duration-300 ease-in-out">
-                                {isLoading ? '...' : `${currency} ${getPrice()}`}
+                                {isLoading ? '...' : `${currencySymbol} ${getPrice()}`}
                             </p>
                             <p className="font-dm-sans font-normal text-[16px] text-[#4b5768] transition-all duration-300 ease-in-out">
                                 / {billingCycle === 'monthly' ? 'Month' : 'Year'}
@@ -412,7 +386,7 @@ function PricingPageContent() {
                         {/* Price */}
                         <div className="flex gap-1 items-center">
                             <p className="font-dm-sans font-semibold text-[48px] text-[#191d23] transition-all duration-300 ease-in-out">
-                                {isLoading ? '...' : `${currency} ${getPrice()}`}
+                                {isLoading ? '...' : `${currencySymbol} ${getPrice()}`}
                             </p>
                             <p className="font-dm-sans font-normal text-[16px] text-[#4b5768] transition-all duration-300 ease-in-out">
                                 / {billingCycle === 'monthly' ? 'Month' : 'Year'}
