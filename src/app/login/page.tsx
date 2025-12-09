@@ -265,7 +265,7 @@ export default function LoginPage() {
       
 
       {/* Back to Home */}
-      <motion.div
+      {/* <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
@@ -280,7 +280,7 @@ export default function LoginPage() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Home
         </Button>
-      </motion.div>
+      </motion.div> */}
       
       <div className="relative z-10 w-full max-w-md">
         <motion.div
