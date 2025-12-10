@@ -43,7 +43,7 @@ function CheckoutContent() {
         }
     }
     
-    const amount = 20
+    const amount = getAmount()
     const planName = plan === 'yearly' ? 'Yearly' : 'Monthly'
     const currencySymbol = getCurrencySymbol(currency as 'KSH' | 'USD')
 
