@@ -25,7 +25,10 @@ function CheckoutContent() {
     const [expandedPayment, setExpandedPayment] = useState<'mpesa' | 'whatsapp' | null>(null)
     const [phoneNumber, setPhoneNumber] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
+    const [isWaitingConfirmation, setIsWaitingConfirmation] = useState(false)
     const [error, setError] = useState('')
+    const [pollCount, setPollCount] = useState(0)
+    const MAX_POLL_ATTEMPTS = 30 // Poll for up to 60 seconds (30 attempts * 2 seconds)
     
     // Get plan details from URL params
     const plan = searchParams.get('plan') || 'yearly' // monthly or yearly
@@ -40,7 +43,7 @@ function CheckoutContent() {
         }
     }
     
-    const amount = getAmount()
+    const amount = 20
     const planName = plan === 'yearly' ? 'Yearly' : 'Monthly'
     const currencySymbol = getCurrencySymbol(currency as 'KSH' | 'USD')
 
@@ -119,14 +122,19 @@ function CheckoutContent() {
             const data = await response.json()
 
             if (data.ResponseCode === '0') {
-                // STK push sent successfully
-                // Store subscription ID for later verification
+                // STK push sent successfully - now poll for payment confirmation
                 const subscriptionId = data.subscriptionId
                 
-                // Wait a bit for user to complete payment, then redirect to success page
-                setTimeout(() => {
-                    router.push(`/dashboard/subscription/success?plan=${plan}&amount=${amount}&currency=${currency}${subscriptionId ? `&subscriptionId=${subscriptionId}` : ''}`)
-                }, 3000) // Give user 3 seconds to see the prompt on their phone
+                if (!subscriptionId) {
+                    setError('Payment initiated but could not track status. Please check your M-Pesa messages.')
+                    setIsProcessing(false)
+                    return
+                }
+                
+                // Start polling for payment status
+                setIsWaitingConfirmation(true)
+                setPollCount(0)
+                pollPaymentStatus(subscriptionId)
             } else {
                 setError(data.errorMessage || data.ResponseDescription || 'Payment failed. Please try again.')
                 setIsProcessing(false)
@@ -136,6 +144,61 @@ function CheckoutContent() {
             setError('An error occurred. Please try again.')
             setIsProcessing(false)
         }
+    }
+
+    const pollPaymentStatus = async (subscriptionId: string) => {
+        let attempts = 0
+        
+        const poll = async () => {
+            try {
+                const response = await fetch(`/api/mpesa/status?subscriptionId=${subscriptionId}`)
+                const data = await response.json()
+                
+                if (data.status === 'active') {
+                    // Payment successful - redirect to success page
+                    router.push(`/dashboard/subscription/success?plan=${plan}&amount=${amount}&currency=${currency}&subscriptionId=${subscriptionId}`)
+                    return
+                } else if (data.status === 'failed') {
+                    // Payment failed
+                    setError('Payment failed. Please check you have sufficient funds and try again.')
+                    setIsProcessing(false)
+                    setIsWaitingConfirmation(false)
+                    return
+                } else if (data.status === 'pending') {
+                    // Still pending - continue polling
+                    attempts++
+                    setPollCount(attempts)
+                    
+                    if (attempts >= MAX_POLL_ATTEMPTS) {
+                        // Timeout - stop polling
+                        setError('Payment confirmation timed out. If money was deducted, please contact support.')
+                        setIsProcessing(false)
+                        setIsWaitingConfirmation(false)
+                        return
+                    }
+                    
+                    // Poll again after 2 seconds
+                    setTimeout(poll, 2000)
+                }
+            } catch (error) {
+                console.error('Error polling payment status:', error)
+                attempts++
+                setPollCount(attempts)
+                
+                if (attempts >= MAX_POLL_ATTEMPTS) {
+                    setError('Could not verify payment status. Please check your M-Pesa messages or contact support.')
+                    setIsProcessing(false)
+                    setIsWaitingConfirmation(false)
+                    return
+                }
+                
+                // Retry after 2 seconds
+                setTimeout(poll, 2000)
+            }
+        }
+        
+        // Start polling after a short delay to give callback time to process
+        setTimeout(poll, 3000)
     }
 
     return (
@@ -325,26 +388,39 @@ function CheckoutContent() {
 
                                     <div className="flex flex-col gap-7 w-full">
                                         <p className="font-dm-sans font-normal text-[16px] text-[#191D23] leading-normal">
-                                            {isProcessing 
-                                                ? 'Check your phone for the M-Pesa prompt. Enter your PIN to complete the payment.'
-                                                : 'You will receive an M-Pesa prompt on your phone to complete the payment. Make sure your phone is on and ready to receive the prompt.'
+                                            {isWaitingConfirmation 
+                                                ? 'Waiting for payment confirmation. Please complete the transaction on your phone...'
+                                                : isProcessing 
+                                                    ? 'Check your phone for the M-Pesa prompt. Enter your PIN to complete the payment.'
+                                                    : 'You will receive an M-Pesa prompt on your phone to complete the payment. Make sure your phone is on and ready to receive the prompt.'
                                             }
                                         </p>
+                                        {isWaitingConfirmation && (
+                                            <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+                                                <svg className="animate-spin h-5 w-5 text-[#004AAD]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                <span className="font-dm-sans text-[14px] text-[#004AAD]">
+                                                    Verifying payment... ({Math.max(0, 60 - pollCount * 2)}s remaining)
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                     
                                     <button
                                         onClick={handleMpesaPayment}
-                                        disabled={isProcessing}
+                                        disabled={isProcessing || isWaitingConfirmation}
                                         className="bg-[#004AAD] border-[1.5px] border-[#004AAD] rounded-[24px] px-3 py-[6px] h-[50px] w-[327px] flex items-center justify-center gap-1 hover:bg-[#FF9500] hover:border-[#FF9500] transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#004AAD] disabled:hover:border-[#004AAD]"
                                     >
-                                        {isProcessing ? (
+                                        {isProcessing || isWaitingConfirmation ? (
                                             <>
                                                 <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                                 </svg>
                                                 <span className="font-dm-sans font-semibold text-[18px] text-white text-center leading-normal ml-2">
-                                                    Processing...
+                                                    {isWaitingConfirmation ? 'Awaiting Confirmation...' : 'Processing...'}
                                                 </span>
                                             </>
                                         ) : (
