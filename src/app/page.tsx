@@ -1028,10 +1028,12 @@ import {
   Play
 } from 'lucide-react'
 import { useState } from 'react'
+import { DownloadModal } from '@/components/DownloadModal'
 
 export default function LandingPage() {
   const [showComingSoon, setShowComingSoon] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false)
 
   // Animation variants
   const fadeInUp = {
@@ -1114,14 +1116,12 @@ export default function LandingPage() {
                 transition={{ duration: 0.5, delay: 0.2 }}
                 className="hidden sm:block"
               >
-                <a 
-                  href="https://play.google.com/store/apps/details?id=com.fahampesa.app"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button 
+                  onClick={() => setIsDownloadModalOpen(true)}
                   className="bg-[#FF9500] text-black px-4 sm:px-6 py-2 rounded-xl font-semibold hover:bg-[#e6850e] transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 text-sm sm:text-base"
                 >
                   Download App
-                </a>
+                </button>
               </motion.div>
               
               {/* Mobile Menu Button */}
@@ -1180,15 +1180,15 @@ export default function LandingPage() {
                 >
                   Login
                 </a>
-                <a 
-                  href="https://play.google.com/store/apps/details?id=com.fahampesa.app"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button 
                   className="block w-full bg-[#FF9500] text-black px-6 py-4 rounded-xl font-semibold hover:bg-[#e6850e] transition-all text-center shadow-md hover:shadow-lg transform hover:scale-[0.98] active:scale-95"
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={() => {
+                    setMobileMenuOpen(false)
+                    setIsDownloadModalOpen(true)
+                  }}
                 >
                   Download App
-                </a>
+                </button>
               </div>
             </div>
           </motion.div>
@@ -1996,6 +1996,7 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+      <DownloadModal open={isDownloadModalOpen} onOpenChange={setIsDownloadModalOpen} />
     </div>
   )
 }
