@@ -170,6 +170,28 @@ export async function activateSubscription(
 }
 
 /**
+ * Update subscription status (for webhook callbacks)
+ */
+export async function updateSubscriptionStatus(
+  subscriptionId: string,
+  status: SubscriptionStatus
+): Promise<void> {
+  const subscriptionRef = doc(db, SUBSCRIPTIONS_COLLECTION, subscriptionId)
+  const subscriptionSnap = await getDoc(subscriptionRef)
+  
+  if (!subscriptionSnap.exists()) {
+    throw new Error('Subscription not found')
+  }
+  
+  const now = new Date()
+  
+  await updateDoc(subscriptionRef, {
+    status,
+    updatedAt: now.getTime(),
+  })
+}
+
+/**
  * Find subscription by CheckoutRequestID (for M-Pesa callback)
  */
 export async function findSubscriptionByCheckoutRequestId(
