@@ -1,2002 +1,793 @@
-// 'use client'
-
-// import { motion } from 'framer-motion'
-// import { 
-//   ShoppingCart, 
-//   BarChart3, 
-//   Package, 
-//   CheckCircle, 
-//   Download,
-//   Apple,
-//   PlayCircle,
-//   Mail,
-//   MessageCircle,
-//   Twitter,
-//   Facebook,
-//   Instagram,
-//   ArrowRight,
-//   Sun,
-//   WifiOff,
-//   Shield,
-//   Menu,
-//   X,
-//   UserPlus,
-//   Plus,
-//   TrendingUp,
-//   Play
-// } from 'lucide-react'
-// import { useState } from 'react'
-
-// export default function LandingPage() {
-//   const [showComingSoon, setShowComingSoon] = useState(false)
-//   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-//   // Animation variants
-//   const fadeInUp = {
-//     initial: { opacity: 0, y: 60 },
-//     animate: { opacity: 1, y: 0 },
-//     transition: { duration: 0.6 }
-//   }
-
-//   const staggerChildren = {
-//     animate: {
-//       transition: {
-//         staggerChildren: 0.1
-//       }
-//     }
-//   }
-
-//   return (
-//     <div className="min-h-screen bg-white">
-//       {/* Header/Navigation */}
-//       <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm">
-//         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-//           <div className="flex justify-between items-center h-14 sm:h-16">
-//             {/* Logo */}
-//             <motion.div 
-//               className="flex items-center space-x-2 sm:space-x-3"
-//               initial={{ opacity: 0, x: -20 }}
-//               animate={{ opacity: 1, x: 0 }}
-//               transition={{ duration: 0.5 }}
-//             >
-//               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-[#004AAD] to-[#FF9500] rounded-xl flex items-center justify-center shadow-md">
-//                 <span className="text-white font-bold text-lg sm:text-xl">F</span>
-//               </div>
-//               <div className="hidden xs:block sm:block">
-//                 <h1 className="text-lg sm:text-xl font-bold text-[#004AAD]">FahamPesa</h1>
-//                 <p className="text-[10px] sm:text-xs text-gray-600 leading-tight">Smart Business Tools</p>
-//               </div>
-//             </motion.div>
-
-//             {/* Navigation */}
-//             <motion.nav 
-//               className="hidden md:flex items-center space-x-8"
-//               initial={{ opacity: 0, y: -10 }}
-//               animate={{ opacity: 1, y: 0 }}
-//               transition={{ duration: 0.5, delay: 0.1 }}
-//             >
-//               <a href="#features" className="text-gray-700 hover:text-[#004AAD] transition-colors font-medium">
-//                 Features
-//               </a>
-//               <a href="#benefits" className="text-gray-700 hover:text-[#004AAD] transition-colors font-medium">
-//                 Benefits
-//               </a>
-//               <a href="#download" className="text-gray-700 hover:text-[#004AAD] transition-colors font-medium">
-//                 Download
-//               </a>
-//               <a href="#contact" className="text-gray-700 hover:text-[#004AAD] transition-colors font-medium">
-//                 Contact
-//               </a>
-//             </motion.nav>
-
-//             {/* Mobile Menu Button & CTA */}
-//             <div className="flex items-center space-x-2 sm:space-x-4">
-//               {/* Login Button */}
-//               <motion.div
-//                 initial={{ opacity: 0, x: 20 }}
-//                 animate={{ opacity: 1, x: 0 }}
-//                 transition={{ duration: 0.5, delay: 0.15 }}
-//                 className="hidden sm:block"
-//               >
-//                 <a 
-//                   href="/login"
-//                   className="text-[#004AAD] hover:text-[#FF9500] font-semibold px-3 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 text-sm sm:text-base"
-//                 >
-//                   Login
-//                 </a>
-//               </motion.div>
-
-//               <motion.div
-//                 initial={{ opacity: 0, x: 20 }}
-//                 animate={{ opacity: 1, x: 0 }}
-//                 transition={{ duration: 0.5, delay: 0.2 }}
-//                 className="hidden sm:block"
-//               >
-//                 <a 
-//                   href="https://play.google.com/store/apps/details?id=com.fahampesa.app"
-//                   target="_blank"
-//                   rel="noopener noreferrer"
-//                   className="bg-[#FF9500] text-black px-4 sm:px-6 py-2 rounded-xl font-semibold hover:bg-[#e6850e] transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 text-sm sm:text-base"
-//                 >
-//                   Download App
-//                 </a>
-//               </motion.div>
-              
-//               {/* Mobile Menu Button */}
-//               <button
-//                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-//                 className="md:hidden p-2 text-gray-700 hover:text-[#004AAD] transition-colors hover:bg-gray-100 rounded-lg"
-//               >
-//                 {mobileMenuOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
-//               </button>
-//             </div>
-//           </div>
-//         </div>
-        
-//         {/* Mobile Menu */}
-//         {mobileMenuOpen && (
-//           <motion.div
-//             initial={{ opacity: 0, y: -20 }}
-//             animate={{ opacity: 1, y: 0 }}
-//             exit={{ opacity: 0, y: -20 }}
-//             className="md:hidden bg-white border-t border-gray-200 shadow-lg"
-//           >
-//             <div className="px-4 py-4 space-y-3">
-//               <a 
-//                 href="#features" 
-//                 className="block text-gray-700 hover:text-[#004AAD] hover:bg-gray-50 transition-all font-medium py-3 px-3 rounded-lg -mx-3"
-//                 onClick={() => setMobileMenuOpen(false)}
-//               >
-//                 Features
-//               </a>
-//               <a 
-//                 href="#benefits" 
-//                 className="block text-gray-700 hover:text-[#004AAD] hover:bg-gray-50 transition-all font-medium py-3 px-3 rounded-lg -mx-3"
-//                 onClick={() => setMobileMenuOpen(false)}
-//               >
-//                 Benefits
-//               </a>
-//               <a 
-//                 href="#download" 
-//                 className="block text-gray-700 hover:text-[#004AAD] hover:bg-gray-50 transition-all font-medium py-3 px-3 rounded-lg -mx-3"
-//                 onClick={() => setMobileMenuOpen(false)}
-//               >
-//                 Download
-//               </a>
-//               <a 
-//                 href="#contact" 
-//                 className="block text-gray-700 hover:text-[#004AAD] hover:bg-gray-50 transition-all font-medium py-3 px-3 rounded-lg -mx-3"
-//                 onClick={() => setMobileMenuOpen(false)}
-//               >
-//                 Contact
-//               </a>
-//               <div className="pt-2 border-t border-gray-100 space-y-3">
-//                 <a 
-//                   href="/login"
-//                   className="block w-full bg-[#004AAD] text-white px-6 py-4 rounded-xl font-semibold hover:bg-[#003a8c] transition-all text-center shadow-md hover:shadow-lg transform hover:scale-[0.98] active:scale-95"
-//                   onClick={() => setMobileMenuOpen(false)}
-//                 >
-//                   Login
-//                 </a>
-//                 <a 
-//                   href="https://play.google.com/store/apps/details?id=com.fahampesa.app"
-//                   target="_blank"
-//                   rel="noopener noreferrer"
-//                   className="block w-full bg-[#FF9500] text-black px-6 py-4 rounded-xl font-semibold hover:bg-[#e6850e] transition-all text-center shadow-md hover:shadow-lg transform hover:scale-[0.98] active:scale-95"
-//                   onClick={() => setMobileMenuOpen(false)}
-//                 >
-//                   Download App
-//                 </a>
-//               </div>
-//             </div>
-//           </motion.div>
-//         )}
-//       </header>
-
-//       {/* Hero Section */}
-//       <section className="relative overflow-hidden bg-gradient-to-br from-[#001122] via-[#004AAD] to-[#FF9500] text-white pt-14 sm:pt-16">
-//         {/* Enhanced Background Pattern */}
-//         <div className="absolute inset-0 opacity-20">
-//           <div className="absolute inset-0" style={{
-//             backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.15'%3E%3Ccircle cx='7' cy='7' r='2'/%3E%3Ccircle cx='27' cy='27' r='1.5'/%3E%3Ccircle cx='47' cy='47' r='2'/%3E%3Ccircle cx='67' cy='67' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-//           }} />
-//         </div>
-
-//         {/* Animated floating elements */}
-//         <div className="absolute inset-0 overflow-hidden">
-//           <motion.div
-//             className="absolute top-20 left-10 w-20 h-20 bg-gradient-to-br from-[#FF9500] to-transparent rounded-full opacity-30"
-//             animate={{
-//               y: [0, -20, 0],
-//               rotate: [0, 360]
-//             }}
-//             transition={{
-//               duration: 8,
-//               repeat: Infinity,
-//               ease: "easeInOut"
-//             }}
-//           />
-//           <motion.div
-//             className="absolute bottom-20 right-10 w-32 h-32 bg-gradient-to-br from-[#0056CC] to-transparent rounded-full opacity-20"
-//             animate={{
-//               y: [0, 30, 0],
-//               rotate: [0, -360]
-//             }}
-//             transition={{
-//               duration: 12,
-//               repeat: Infinity,
-//               ease: "easeInOut"
-//             }}
-//           />
-//           <motion.div
-//             className="absolute top-1/2 left-1/4 w-16 h-16 bg-gradient-to-br from-white to-transparent rounded-full opacity-10"
-//             animate={{
-//               y: [0, -40, 0],
-//               x: [0, 20, 0]
-//             }}
-//             transition={{
-//               duration: 10,
-//               repeat: Infinity,
-//               ease: "easeInOut"
-//             }}
-//           />
-//         </div>
-
-//         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 lg:py-32">
-//           <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
-//             {/* Left Content */}
-//             <motion.div 
-//               initial="initial"
-//               animate="animate"
-//               variants={staggerChildren}
-//             >
-//               <motion.div variants={fadeInUp} className="mb-4 sm:mb-6">
-//                 <span className="inline-flex items-center px-3 sm:px-4 py-2 rounded-full bg-[#FF9500] text-black font-semibold text-xs sm:text-sm shadow-lg">
-//                   <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-//                   Smart Tools for Modern Businesses.
-//                 </span>
-//               </motion.div>
-
-//               <motion.h1 
-//                 variants={fadeInUp}
-//                 className="text-3xl xs:text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-4 sm:mb-6"
-//               >
-//                 Powerful Sales and
-//                 <span className="block text-[#FF9500]">Anywhere, Anytime</span>
-//               </motion.h1>
-
-//               <motion.p 
-//                 variants={fadeInUp}
-//                 className="text-base sm:text-lg lg:text-xl text-gray-200 mb-8 sm:mb-10 leading-relaxed"
-//               >
-//                 Fahampesa gives your business the tools to sell faster, track stock in real time, and stay in control anywhere. Secure, offline-first, and built to scale with you.
-//               </motion.p>
-
-//               {/* 3-Step Guide */}
-//               <motion.div 
-//                 variants={fadeInUp}
-//                 className="mb-8 sm:mb-10"
-//               >
-//                 <h3 className="text-lg sm:text-xl font-semibold text-white mb-4 sm:mb-6 text-center">Get started in 3 simple steps:</h3>
-//                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
-//                   <div className="flex flex-col items-center text-center group">
-//                     <div className="w-12 h-12 sm:w-16 sm:h-16 bg-[#FF9500] rounded-full flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform shadow-lg">
-//                       <UserPlus className="w-6 h-6 sm:w-8 sm:h-8 text-black" />
-//                     </div>
-//                     <span className="text-sm sm:text-base font-semibold text-white">Sign up</span>
-//                   </div>
-                  
-//                   <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-[#FF9500] rotate-90 sm:rotate-0" />
-                  
-//                   <div className="flex flex-col items-center text-center group">
-//                     <div className="w-12 h-12 sm:w-16 sm:h-16 bg-[#FF9500] rounded-full flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform shadow-lg">
-//                       <Plus className="w-6 h-6 sm:w-8 sm:h-8 text-black" />
-//                     </div>
-//                     <span className="text-sm sm:text-base font-semibold text-white">Add products</span>
-//                   </div>
-                  
-//                   <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-[#FF9500] rotate-90 sm:rotate-0" />
-                  
-//                   <div className="flex flex-col items-center text-center group">
-//                     <div className="w-12 h-12 sm:w-16 sm:h-16 bg-[#FF9500] rounded-full flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform shadow-lg">
-//                       <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-black" />
-//                     </div>
-//                     <span className="text-sm sm:text-base font-semibold text-white">Start selling</span>
-//                   </div>
-//                 </div>
-//               </motion.div>
-
-//               {/* Main CTA Button */}
-//               <motion.div 
-//                 variants={fadeInUp}
-//                 className="text-center mb-6 sm:mb-8"
-//               >
-//                 <a 
-//                   href="/login"
-//                   className="group inline-flex items-center justify-center px-8 sm:px-12 py-4 sm:py-6 bg-[#FF9500] text-black font-bold text-lg sm:text-xl rounded-xl hover:bg-[#e6850e] transform hover:scale-105 active:scale-95 transition-all duration-200 shadow-2xl hover:shadow-3xl"
-//                 >
-//                   Sign in and start your first sale
-//                   <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 ml-3 group-hover:translate-x-1 transition-transform" />
-//                 </a>
-//               </motion.div>
-
-//               {/* Secondary Actions */}
-//               <motion.div 
-//                 variants={fadeInUp}
-//                 className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center"
-//               >
-//                 <a 
-//                   href="https://play.google.com/store/apps/details?id=com.fahampesa.app"
-//                   target="_blank"
-//                   rel="noopener noreferrer"
-//                   className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 border-2 border-[#FF9500] text-[#FF9500] font-semibold rounded-xl hover:bg-[#FF9500] hover:text-black active:scale-95 transition-all duration-200 text-sm sm:text-base"
-//                 >
-//                   <Download className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-//                   Download Android App
-//                 </a>
-                
-//                 {/* Testimonial Video Button */}
-//                 <button 
-//                   onClick={() => {
-//                     const video = document.getElementById('testimonial-video') as HTMLVideoElement;
-//                     if (video) {
-//                       video.play();
-//                       video.scrollIntoView({ behavior: 'smooth' });
-//                     }
-//                   }}
-//                   className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 border-2 border-white text-white font-semibold rounded-xl hover:bg-white hover:text-[#004AAD] active:scale-95 transition-all duration-200 text-sm sm:text-base"
-//                 >
-//                   <Play className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-//                   Watch Testimonial
-//                 </button>
-//               </motion.div>
-
-//               <motion.div 
-//                 variants={fadeInUp}
-//                 className="mt-6 sm:mt-8 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-xs sm:text-sm text-gray-300"
-//               >
-//                 <div className="flex items-center">
-//                   <WifiOff className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-[#FF9500]" />
-//                   works online and offline
-//                 </div>
-//                 <div className="flex items-center">
-//                   <Sun className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-[#FF9500]" />
-//                   Real-time reports and insights
-//                 </div>
-//                 <div className="flex items-center">
-//                   <Shield className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-[#FF9500]" />
-//                   Secure by design
-//                 </div>
-//               </motion.div>
-//             </motion.div>
-
-//             {/* Right Content - Dashboard Screenshot */}
-//             <motion.div
-//               initial={{ opacity: 0, x: 50 }}
-//               animate={{ opacity: 1, x: 0 }}
-//               transition={{ duration: 0.8, delay: 0.3 }}
-//               className="relative lg:order-2 mt-8 lg:mt-0"
-//             >
-//               {/* Pure Screenshot Display - Larger Size */}
-//               <div className="relative mx-auto max-w-4xl lg:max-w-5xl">
-//                 <img 
-//                   src="/dashboard-screenshot.png" 
-//                   alt="FahamPesa Dashboard Preview" 
-//                   className="w-full h-auto drop-shadow-2xl transform hover:scale-105 transition-transform duration-300"
-//                 />
-//               </div>
-
-//               {/* Floating Elements */}
-//               <motion.div
-//                 className="absolute -top-6 -right-6 bg-[#FF9500] text-black px-6 py-3 rounded-full text-base font-semibold shadow-lg"
-//                 animate={{ y: [0, -10, 0] }}
-//                 transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-//               >
-//                 Live Dashboard
-//               </motion.div>
-              
-//               <motion.div
-//                 className="absolute -bottom-6 -left-6 bg-white text-[#004AAD] px-6 py-3 rounded-full text-base font-semibold shadow-lg"
-//                 animate={{ y: [0, 10, 0] }}
-//                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-//               >
-//                 Real-time Data
-//               </motion.div>
-//             </motion.div>
-//           </div>
-//         </div>
-//       </section>
-
-//       {/* Testimonial Video Section */}
-//       <section className="py-12 sm:py-16 lg:py-20 bg-white">
-//         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-//           <motion.div
-//             initial="initial"
-//             whileInView="animate"
-//             viewport={{ once: true }}
-//             variants={staggerChildren}
-//           >
-//             <motion.h2 
-//               variants={fadeInUp}
-//               className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4 sm:mb-6"
-//             >
-//               Hear from Our <span className="text-[#FF9500]">Happy Customers</span>
-//             </motion.h2>
-//             <motion.p 
-//               variants={fadeInUp}
-//               className="text-base sm:text-lg lg:text-xl text-gray-600 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed"
-//             >
-//               Real business owners sharing their success stories with FahamPesa
-//             </motion.p>
-
-//             <motion.div 
-//               variants={fadeInUp}
-//               className="relative max-w-3xl mx-auto"
-//             >
-//               {/* Video Container */}
-//               <div className="relative bg-black rounded-2xl overflow-hidden shadow-2xl">
-//                 <video 
-//                   id="testimonial-video"
-//                   className="w-full h-auto"
-//                   controls
-//                   poster="/testimonial-thumbnail.png"
-//                   preload="metadata"
-//                 >
-//                   <source src="/testimonial-mohammed.mp4" type="video/mp4" />
-//                   Your browser does not support the video tag.
-//                 </video>
-                
-//                 {/* Play Overlay */}
-//                 <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity duration-300">
-//                   <button 
-//                     onClick={() => {
-//                       const video = document.getElementById('testimonial-video') as HTMLVideoElement;
-//                       if (video) {
-//                         if (video.paused) {
-//                           video.play();
-//                         } else {
-//                           video.pause();
-//                         }
-//                       }
-//                     }}
-//                     className="w-16 h-16 sm:w-20 sm:h-20 bg-[#FF9500] rounded-full flex items-center justify-center hover:bg-[#e6850e] transition-colors shadow-lg"
-//                   >
-//                     <Play className="w-8 h-8 sm:w-10 sm:h-10 text-black ml-1" />
-//                   </button>
-//                 </div>
-//               </div>
-
-//               {/* Customer Info */}
-//               <motion.div 
-//                 variants={fadeInUp}
-//                 className="mt-6 sm:mt-8 flex items-center justify-center space-x-3 sm:space-x-4"
-//               >
-//                 <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-[#004AAD] to-[#FF9500] rounded-full flex items-center justify-center shadow-lg">
-//                   <span className="text-white font-bold text-lg sm:text-xl">M</span>
-//                 </div>
-//                 <div className="text-left">
-//                   <h4 className="text-lg sm:text-xl font-semibold text-gray-900">Mohammed</h4>
-//                   <p className="text-sm sm:text-base text-gray-600">Small Business Owner</p>
-//                 </div>
-//               </motion.div>
-
-//               {/* Quote */}
-//               <motion.blockquote 
-//                 variants={fadeInUp}
-//                 className="mt-4 sm:mt-6 text-base sm:text-lg text-gray-700 italic max-w-2xl mx-auto leading-relaxed"
-//               >
-//                 "FahamPesa has completely transformed how I manage my business. The offline features are a game-changer!"
-//               </motion.blockquote>
-//             </motion.div>
-//           </motion.div>
-//         </div>
-//       </section>
-
-//       {/* Features Section */}
-//       <section id="features" className="py-12 sm:py-16 lg:py-20 bg-gray-50">
-//         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-//           <motion.div 
-//             className="text-center mb-8 sm:mb-12 lg:mb-16"
-//             initial="initial"
-//             whileInView="animate"
-//             viewport={{ once: true }}
-//             variants={fadeInUp}
-//           >
-//             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4 px-2">
-//               Everything You Need to Run Your Business
-//             </h2>
-//             <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-2 leading-relaxed">
-//               From inventory management to sales tracking, FahamPesa provides all the tools 
-//               small business owners need to succeed in today&apos;s competitive market.
-//             </p>
-//           </motion.div>
-
-//           <motion.div 
-//             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8"
-//             initial="initial"
-//             whileInView="animate"
-//             viewport={{ once: true }}
-//             variants={staggerChildren}
-//           >
-//             {[
-//               {
-//                 icon: Package,
-//                 title: "Smart Inventory Management",
-//                 description: "Track your products, manage stock levels, and get low-stock alerts. Perfect for kiosks and small shops."
-//               },
-//               {
-//                 icon: ShoppingCart,
-//                 title: "Quick Sales Recording",
-//                 description: "Record sales instantly and auto-update inventory. Optimized for fast transactions in busy environments."
-//               },
-//               {
-//                 icon: BarChart3,
-//                 title: "Daily & Weekly Reports",
-//                 description: "Get insights into your business performance with detailed analytics and export reports via WhatsApp or PDF."
-//               },
-//               {
-//                 icon: WifiOff,
-//                 title: "Offline-First Design",
-//                 description: "Works completely offline, syncs automatically when connected. Never lose a sale due to poor internet."
-//               }
-//             ].map((feature, index) => (
-//               <motion.div 
-//                 key={index}
-//                 variants={fadeInUp}
-//                 className="group bg-white p-6 sm:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 sm:hover:-translate-y-2 active:scale-[0.98] cursor-pointer"
-//               >
-//                 <div className="bg-[#004AAD] text-white w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-[#FF9500] group-hover:text-black transition-all duration-300 shadow-md">
-//                   <feature.icon className="w-6 h-6 sm:w-8 sm:h-8" />
-//                 </div>
-//                 <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 leading-tight">{feature.title}</h3>
-//                 <p className="text-sm sm:text-base text-gray-600 leading-relaxed">{feature.description}</p>
-//               </motion.div>
-//             ))}
-//           </motion.div>
-//         </div>
-//       </section>
-
-//       {/* Benefits Section */}
-//       <section id="benefits" className="py-12 sm:py-16 lg:py-20 bg-white">
-//         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-//           <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 lg:gap-16 items-center">
-//             <motion.div
-//               initial="initial"
-//               whileInView="animate"
-//               viewport={{ once: true }}
-//               variants={fadeInUp}
-//             >
-//               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4 sm:mb-6 px-2 leading-tight">
-//                 Designed for <span className="text-[#FF9500]">Real-World</span> Business Challenges
-//               </h2>
-//               <p className="text-base sm:text-lg lg:text-xl text-gray-600 mb-6 sm:mb-8 px-2 leading-relaxed">
-//                 We understand the unique challenges small business owners face in Kenya. 
-//                 That&apos;s why FahamPesa is built with features that actually matter for your daily operations.
-//               </p>
-              
-//               <div className="space-y-4 sm:space-y-6 px-2">
-//                 {[
-//                   {
-//                     icon: Sun,
-//                     title: "Sunlight Optimized",
-//                     description: "High contrast design perfect for outdoor markets and direct sunlight use."
-//                   },
-//                   {
-//                     icon: CheckCircle,
-//                     title: "Budget Phone Friendly",
-//                     description: "Optimized for Tecno, Infinix, Itel, and other budget Android devices."
-//                   },
-//                   {
-//                     icon: Shield,
-//                     title: "Secure & Private",
-//                     description: "Local data encryption and secure cloud sync with Firebase authentication."
-//                   }
-//                 ].map((benefit, index) => (
-//                   <motion.div 
-//                     key={index}
-//                     variants={fadeInUp}
-//                     className="flex items-start space-x-3 sm:space-x-4 p-3 rounded-xl hover:bg-gray-50 transition-colors"
-//                   >
-//                     <div className="bg-[#004AAD] text-white w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 shadow-md">
-//                       <benefit.icon className="w-5 h-5 sm:w-6 sm:h-6" />
-//                     </div>
-//                     <div className="flex-1 min-w-0">
-//                       <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2 leading-tight">{benefit.title}</h3>
-//                       <p className="text-sm sm:text-base text-gray-600 leading-relaxed">{benefit.description}</p>
-//                     </div>
-//                   </motion.div>
-//                 ))}
-//               </div>
-//             </motion.div>
-
-//             <motion.div
-//               initial="initial"
-//               whileInView="animate"
-//               viewport={{ once: true }}
-//               variants={fadeInUp}
-//               className="relative mt-8 lg:mt-0"
-//             >
-//               {/* Stats Cards */}
-//               <div className="bg-gradient-to-br from-[#004AAD] to-[#0056CC] rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white shadow-xl">
-//                 <h3 className="text-xl sm:text-2xl font-bold mb-6 sm:mb-8 text-center lg:text-left">Perfect for Kenyan Businesses</h3>
-//                 <div className="grid grid-cols-2 gap-4 sm:gap-6">
-//                   <div className="text-center bg-white/10 rounded-xl p-3 sm:p-4 backdrop-blur">
-//                     <div className="text-2xl sm:text-3xl font-bold text-[#FF9500] mb-1 sm:mb-2">99%</div>
-//                     <div className="text-xs sm:text-sm text-gray-200 leading-tight">works online and offline</div>
-//                   </div>
-//                   <div className="text-center bg-white/10 rounded-xl p-3 sm:p-4 backdrop-blur">
-//                     <div className="text-2xl sm:text-3xl font-bold text-[#FF9500] mb-1 sm:mb-2">5s</div>
-//                     <div className="text-xs sm:text-sm text-gray-200 leading-tight">Sale Recording</div>
-//                   </div>
-//                   <div className="text-center bg-white/10 rounded-xl p-3 sm:p-4 backdrop-blur">
-//                     <div className="text-2xl sm:text-3xl font-bold text-[#FF9500] mb-1 sm:mb-2">24/7</div>
-//                     <div className="text-xs sm:text-sm text-gray-200 leading-tight">Real-time reports and insights</div>
-//                   </div>
-//                   <div className="text-center bg-white/10 rounded-xl p-3 sm:p-4 backdrop-blur">
-//                     <div className="text-2xl sm:text-3xl font-bold text-[#FF9500] mb-1 sm:mb-2">100%</div>
-//                     <div className="text-xs sm:text-sm text-gray-200 leading-tight">Secure by design</div>
-//                   </div>
-//                 </div>
-//               </div>
-//             </motion.div>
-//           </div>
-//         </div>
-//       </section>
-
-//       {/* Reports & Analytics Showcase */}
-//       <section className="py-12 sm:py-16 lg:py-20 bg-gradient-to-br from-gray-50 to-gray-100">
-//         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-//           <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
-//             {/* Left - Laptop with Reports Screenshot */}
-//             <motion.div
-//               initial={{ opacity: 0, x: -50 }}
-//               whileInView={{ opacity: 1, x: 0 }}
-//               viewport={{ once: true }}
-//               transition={{ duration: 0.8 }}
-//               className="relative"
-//             >
-//               {/* Modern Laptop Mockup */}
-//               <div className="relative mx-auto max-w-3xl">
-//                 {/* Laptop Screen */}
-//                 <div className="relative bg-gray-900 rounded-t-2xl p-4 shadow-2xl">
-//                   {/* Screen Bezel */}
-//                   <div className="bg-black rounded-xl p-2">
-//                     {/* Reports Screenshot */}
-//                     <div className="relative overflow-hidden rounded-lg bg-white">
-//                       <motion.img 
-//                         src="/reports-screenshot.png" 
-//                         alt="FahamPesa Reports & Analytics" 
-//                         className="w-full h-auto object-cover rounded-lg"
-//                         initial={{ scale: 1.1 }}
-//                         whileInView={{ scale: 1 }}
-//                         transition={{ duration: 1, ease: "easeOut" }}
-//                       />
-//                       {/* Screen Glow Effect */}
-//                       <div className="absolute inset-0 bg-gradient-to-t from-blue-500/10 via-transparent to-transparent rounded-lg"></div>
-//                     </div>
-//                   </div>
-                  
-//                   {/* Camera */}
-//                   <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-600 rounded-full"></div>
-//                 </div>
-                
-//                 {/* Laptop Base */}
-//                 <div className="bg-gray-800 h-8 rounded-b-2xl shadow-lg relative">
-//                   {/* Trackpad */}
-//                   <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-16 h-3 bg-gray-600 rounded-md"></div>
-//                 </div>
-                
-//                 {/* Laptop Shadow */}
-//                 <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 w-full h-12 bg-gradient-to-r from-transparent via-black/20 to-transparent rounded-full blur-xl"></div>
-//               </div>
-
-//               {/* Animated Data Points */}
-//               <motion.div
-//                 className="absolute top-8 -right-4 bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-semibold shadow-lg"
-//                 animate={{ 
-//                   y: [0, -8, 0],
-//                   rotate: [0, 2, 0]
-//                 }}
-//                 transition={{ 
-//                   duration: 3, 
-//                   repeat: Infinity, 
-//                   ease: "easeInOut" 
-//                 }}
-//               >
-//                 📈 Sales Up 24%
-//               </motion.div>
-              
-//               <motion.div
-//                 className="absolute bottom-12 -left-6 bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-semibold shadow-lg"
-//                 animate={{ 
-//                   y: [0, 12, 0],
-//                   rotate: [0, -2, 0]
-//                 }}
-//                 transition={{ 
-//                   duration: 4, 
-//                   repeat: Infinity, 
-//                   ease: "easeInOut",
-//                   delay: 1
-//                 }}
-//               >
-//                 📊 Live Data
-//               </motion.div>
-
-//               <motion.div
-//                 className="absolute top-1/2 -left-8 bg-purple-500 text-white px-3 py-2 rounded-lg text-sm font-semibold shadow-lg"
-//                 animate={{ 
-//                   x: [0, -8, 0],
-//                   rotate: [0, -3, 0]
-//                 }}
-//                 transition={{ 
-//                   duration: 5, 
-//                   repeat: Infinity, 
-//                   ease: "easeInOut",
-//                   delay: 2
-//                 }}
-//               >
-//                 📋 Reports
-//               </motion.div>
-//             </motion.div>
-
-//             {/* Right - Content */}
-//             <motion.div
-//               initial={{ opacity: 0, x: 50 }}
-//               whileInView={{ opacity: 1, x: 0 }}
-//               viewport={{ once: true }}
-//               transition={{ duration: 0.8, delay: 0.2 }}
-//             >
-//               <motion.div
-//                 initial="initial"
-//                 whileInView="animate"
-//                 viewport={{ once: true }}
-//                 variants={staggerChildren}
-//               >
-//                 <motion.h2 
-//                   variants={fadeInUp}
-//                   className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight"
-//                 >
-//                   Powerful <span className="text-[#FF9500]">Reports & Analytics</span>
-//                 </motion.h2>
-                
-//                 <motion.p 
-//                   variants={fadeInUp}
-//                   className="text-base sm:text-lg lg:text-xl text-gray-600 mb-6 sm:mb-8 leading-relaxed"
-//                 >
-//                   Get deep insights into your business performance with comprehensive reports, 
-//                   real-time analytics, and actionable data to help you make informed decisions.
-//                 </motion.p>
-
-//                 <motion.div 
-//                   variants={fadeInUp}
-//                   className="space-y-4 sm:space-y-6 mb-6 sm:mb-8"
-//                 >
-//                   {[
-//                     {
-//                       icon: BarChart3,
-//                       title: "Sales Analytics",
-//                       description: "Track daily, weekly, and monthly sales performance with beautiful charts and graphs."
-//                     },
-//                     {
-//                       icon: TrendingUp,
-//                       title: "Growth Insights",
-//                       description: "Identify trends, peak sales hours, and best-selling products to optimize your business."
-//                     },
-//                     {
-//                       icon: Package,
-//                       title: "Inventory Reports",
-//                       description: "Monitor stock levels, track product movement, and get alerts for low inventory."
-//                     }
-//                   ].map((feature, index) => (
-//                     <motion.div 
-//                       key={index}
-//                       variants={fadeInUp}
-//                       className="flex items-start space-x-3 sm:space-x-4 p-4 rounded-xl hover:bg-white hover:shadow-lg transition-all duration-300"
-//                     >
-//                       <div className="bg-[#004AAD] text-white w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 shadow-md">
-//                         <feature.icon className="w-5 h-5 sm:w-6 sm:h-6" />
-//                       </div>
-//                       <div className="flex-1 min-w-0">
-//                         <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2 leading-tight">{feature.title}</h3>
-//                         <p className="text-sm sm:text-base text-gray-600 leading-relaxed">{feature.description}</p>
-//                       </div>
-//                     </motion.div>
-//                   ))}
-//                 </motion.div>
-
-//                 <motion.div variants={fadeInUp}>
-//                   <a 
-//                     href="/login"
-//                     className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-[#FF9500] text-black font-semibold rounded-xl hover:bg-[#e6850e] transform hover:scale-105 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base"
-//                   >
-//                     Explore Analytics Dashboard
-//                     <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
-//                   </a>
-//                 </motion.div>
-//               </motion.div>
-//             </motion.div>
-//           </div>
-//         </div>
-//       </section>
-
-//       {/* Download Section */}
-//       <section id="download" className="py-12 sm:py-16 lg:py-20 bg-gradient-to-r from-[#004AAD] to-[#0056CC] text-white">
-//         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-//           <motion.div
-//             initial="initial"
-//             whileInView="animate"
-//             viewport={{ once: true }}
-//             variants={staggerChildren}
-//           >
-//             <motion.h2 
-//               variants={fadeInUp}
-//               className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4 sm:mb-6 px-2 leading-tight"
-//             >
-//               Ready to Transform Your Business?
-//             </motion.h2>
-//             <motion.p 
-//               variants={fadeInUp}
-//               className="text-base sm:text-lg lg:text-xl text-gray-200 mb-8 sm:mb-10 max-w-2xl mx-auto px-2 leading-relaxed"
-//             >
-//               Join thousands of small business owners who are already using FahamPesa 
-//               to streamline their operations and boost their profits.
-//             </motion.p>
-
-//             <motion.div 
-//               variants={fadeInUp}
-//               className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center px-4"
-//             >
-//               {/* Play Store Button */}
-//               <a 
-//                 href="https://play.google.com/store/apps/details?id=com.fahampesa.app" 
-//                 target="_blank" 
-//                 rel="noopener noreferrer"
-//                 className="group inline-flex items-center px-6 sm:px-8 py-4 bg-black text-white rounded-xl hover:bg-gray-800 transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl w-full sm:w-auto"
-//               >
-//                 <div className="flex items-center space-x-2 sm:space-x-3 mx-auto sm:mx-0">
-//                   <div className="relative">
-//                     <PlayCircle className="w-6 h-6 sm:w-8 sm:h-8" />
-//                   </div>
-//                   <div className="text-left">
-//                     <div className="text-xs text-gray-300 leading-tight">Get it on</div>
-//                     <div className="text-base sm:text-lg font-semibold">Google Play</div>
-//                   </div>
-//                 </div>
-//               </a>
-
-//               {/* App Store Button */}
-//               <button 
-//                 onClick={() => setShowComingSoon(true)}
-//                 className="group inline-flex items-center px-6 sm:px-8 py-4 bg-black text-white rounded-xl hover:bg-gray-800 transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl w-full sm:w-auto"
-//               >
-//                 <div className="flex items-center space-x-2 sm:space-x-3 mx-auto sm:mx-0">
-//                   <Apple className="w-6 h-6 sm:w-8 sm:h-8" />
-//                   <div className="text-left">
-//                     <div className="text-xs text-gray-300 leading-tight">Download on the</div>
-//                     <div className="text-base sm:text-lg font-semibold">App Store</div>
-//                   </div>
-//                 </div>
-//               </button>
-//             </motion.div>
-          
-//           </motion.div>
-//         </div>
-//       </section>
-
-//       {/* Coming Soon Modal */}
-//       {showComingSoon && (
-//         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-//           <motion.div 
-//             initial={{ opacity: 0, scale: 0.8, y: 20 }}
-//             animate={{ opacity: 1, scale: 1, y: 0 }}
-//             transition={{ type: "spring", damping: 20, stiffness: 300 }}
-//             className="bg-white rounded-2xl p-6 sm:p-8 max-w-sm sm:max-w-md w-full text-center shadow-2xl"
-//           >
-//             <Apple className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-gray-400" />
-//             <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Coming Soon to iOS</h3>
-//             <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 leading-relaxed">
-//               We&apos;re working hard to bring FahamPesa to the App Store. 
-//               In the meantime, you can download our Android app and start managing your business today!
-//             </p>
-//             <button 
-//               onClick={() => setShowComingSoon(false)}
-//               className="w-full px-6 py-4 bg-[#004AAD] text-white font-semibold rounded-xl hover:bg-[#003a8c] active:scale-95 transition-all duration-200 shadow-lg"
-//             >
-//               Got it, thanks!
-//             </button>
-//           </motion.div>
-//         </div>
-//       )}
-
-//       {/* Footer */}
-//       <footer id="contact" className="bg-gray-900 text-white py-12 sm:py-16">
-//         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-//           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-//             {/* Brand */}
-//             <div className="md:col-span-2">
-//               <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">FahamPesa</h3>
-//               <p className="text-sm sm:text-base text-gray-400 mb-4 sm:mb-6 max-w-md leading-relaxed">
-//                 Empowering small business owners across Kenya with smart, offline-first 
-//                 sales and inventory management tools.
-//               </p>
-//               <div className="flex space-x-4">
-//                 <a href="#" className="text-gray-400 hover:text-[#FF9500] transition-colors p-2 rounded-lg hover:bg-gray-800">
-//                   <Facebook className="w-5 h-5 sm:w-6 sm:h-6" />
-//                 </a>
-//                 <a href="#" className="text-gray-400 hover:text-[#FF9500] transition-colors p-2 rounded-lg hover:bg-gray-800">
-//                   <Twitter className="w-5 h-5 sm:w-6 sm:h-6" />
-//                 </a>
-//                 <a href="#" className="text-gray-400 hover:text-[#FF9500] transition-colors p-2 rounded-lg hover:bg-gray-800">
-//                   <Instagram className="w-5 h-5 sm:w-6 sm:h-6" />
-//                 </a>
-//               </div>
-//             </div>
-
-//             {/* Support */}
-//             <div>
-//               <h4 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Support</h4>
-//               <ul className="space-y-2 sm:space-y-3">
-//                 <li>
-//                   <a href="#" className="text-sm sm:text-base text-gray-400 hover:text-white transition-colors block py-1 hover:bg-gray-800 px-2 rounded -mx-2">
-//                     Help Center
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#" className="text-sm sm:text-base text-gray-400 hover:text-white transition-colors block py-1 hover:bg-gray-800 px-2 rounded -mx-2">
-//                     Getting Started
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#" className="text-sm sm:text-base text-gray-400 hover:text-white transition-colors block py-1 hover:bg-gray-800 px-2 rounded -mx-2">
-//                     User Guide
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#" className="text-sm sm:text-base text-gray-400 hover:text-white transition-colors block py-1 hover:bg-gray-800 px-2 rounded -mx-2">
-//                     FAQ
-//                   </a>
-//                 </li>
-//               </ul>
-//             </div>
-
-//             {/* Contact */}
-//             <div>
-//               <h4 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Contact</h4>
-//               <ul className="space-y-2 sm:space-y-3">
-//                 <li className="flex items-center">
-//                   <Mail className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-[#FF9500] flex-shrink-0" />
-//                   <a href="mailto:support@fahampesa.com" className="text-xs sm:text-sm text-gray-400 hover:text-white transition-colors break-all">
-//                     support@fahampesa.com
-//                   </a>
-//                 </li>
-//                 <li className="flex items-center">
-//                   <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-[#FF9500] flex-shrink-0" />
-//                   <a href="#" className="text-xs sm:text-sm text-gray-400 hover:text-white transition-colors">
-//                     WhatsApp Support
-//                   </a>
-//                 </li>
-//               </ul>
-//             </div>
-//           </div>
-
-//           <div className="border-t border-gray-800 mt-8 sm:mt-12 pt-6 sm:pt-8 flex flex-col sm:flex-row justify-between items-center">
-//             <p className="text-xs sm:text-sm text-gray-400 leading-relaxed mb-4 sm:mb-0">
-//               &copy; 2024 FahamPesa. Built with ❤️ for small business owners in Kenya and beyond.
-//             </p>
-//             <div className="flex items-center space-x-4">
-//               <a 
-//                 href="/login" 
-//                 className="text-gray-400 hover:text-[#FF9500] transition-colors text-sm font-medium px-3 py-2 rounded-lg hover:bg-gray-800"
-//               >
-//                 Business Login
-//               </a>
-//             </div>
-//           </div>
-//         </div>
-//       </footer>
-//     </div>
-//   )
-// }
-
-
-
 'use client'
 
-import { motion } from 'framer-motion'
-import { 
-  ShoppingCart, 
-  BarChart3, 
-  Package, 
-  CheckCircle, 
-  Download,
-  Apple,
-  PlayCircle,
-  Mail,
-  MessageCircle,
-  Twitter,
-  Facebook,
-  Instagram,
-  ArrowRight,
-  Sun,
-  WifiOff,
-  Shield,
-  Menu,
-  X,
-  UserPlus,
-  Plus,
-  TrendingUp,
-  Play
-} from 'lucide-react'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Menu, X, ArrowUpRight } from 'lucide-react'
 import { DownloadModal } from '@/components/DownloadModal'
+import { HeroMockup } from '@/components/HeroMockup'
+import { ProductCard, StockDashboardMockup } from '@/components/ProductMockup'
+
+const assets = {
+  logo: '/assets/figma/landing/logo-icon.svg',
+  check: '/assets/figma/landing/check-circle.svg',
+  wifiOff: '/assets/figma/landing/wifi-off.svg',
+  sun: '/assets/figma/landing/sun.svg',
+  download: '/assets/figma/landing/download.svg',
+  arrowForward: '/assets/figma/landing/arrow-forward.svg',
+  play: '/assets/figma/landing/play-icon.svg',
+  arrowUp: '/assets/figma/landing/arrow-up.svg',
+  arrowDown: '/assets/figma/landing/arrow-down.svg',
+  arrowUpDuotone: '/assets/figma/landing/arrow-up-duotone.svg',
+  arrowUpDuotone1: '/assets/figma/landing/arrow-up-duotone-1.svg',
+  card1: '/assets/figma/landing/card-image-1.png',
+  card2: '/assets/figma/landing/card-image-2.png',
+  card3: '/assets/figma/landing/card-image-3.png',
+  heroMock: 'https://www.figma.com/api/mcp/asset/0b078838-baad-42e0-a0f2-bae33da9702f',
+  avatar1: '/assets/figma/landing/avatar-1.png',
+  avatar2: '/assets/figma/landing/avatar-2.png',
+  avatar3: '/assets/figma/landing/avatar-3.png',
+  avatar4: '/assets/figma/landing/avatar-4.png',
+  avatar5: '/assets/figma/landing/avatar-5.png',
+  faqPattern: '/assets/figma/landing/faq-pattern.png',
+  instagram: '/assets/figma/landing/instagram.svg',
+  facebook: '/assets/figma/landing/facebook.svg',
+  xIcon: '/assets/figma/landing/x-icon.svg',
+  appStore: '/app_store.png',
+  googlePlay: '/google_play.png',
+  visualSection: 'https://www.figma.com/api/mcp/asset/0b078838-baad-42e0-a0f2-bae33da9702f',
+  testimonialThumbnail: '/testimonial-thumbnail.png',
+  testimonialVideo: '/testimonial-mohammed.mp4',
+  playIcon: 'https://www.figma.com/api/mcp/asset/8720f529-7764-486a-8aff-9b42c29a01fc',
+}
+
+const faqs = [
+  {
+    question: "Is Fahampesa a bank?",
+    answer: "Fahampesa is a Financial Technology (FinTech) Company, not a Bank. FDIC insurance only covers the failure of Regent Bank, Member FDIC. The Fahampesa POS is built for record purposes."
+  },
+  {
+    question: "How do I get started?",
+    answer: "Simply download the app from the Google Play Store or sign up on our website. You can start recording sales and managing inventory immediately."
+  },
+  {
+    question: "Can I use it offline?",
+    answer: "Yes! Fahampesa is designed to work offline. Your data will automatically sync to the cloud once you're back online."
+  },
+  {
+    question: "Is my data secure?",
+    answer: "Absolutely. We use industry-standard encryption to protect your data. Your business information is safe and private."
+  },
+  {
+    question: "How much does it cost?",
+    answer: "We offer a free trial so you can explore all features. After that, we have affordable monthly and yearly plans tailored for small businesses."
+  }
+]
+
+function FAQItem({ question, answer, isOpen, onClick }: { question: string, answer: string, isOpen: boolean, onClick: () => void }) {
+  return (
+    <div className="border-b border-[#9b9797] py-2 w-full cursor-pointer" onClick={onClick}>
+      <div className="flex justify-between items-start gap-4">
+        <div className="flex flex-col gap-4 w-full">
+          <h3 className="font-inter font-semibold text-[20px] text-[#001031] leading-[35px] tracking-[-0.4px]">
+            {question}
+          </h3>
+          <AnimatePresence>
+            {isOpen && (
+              <motion.p
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="font-inter font-normal text-[20px] text-[#2f3037] leading-[35px] tracking-[-0.4px] overflow-hidden"
+              >
+                {answer}
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </div>
+        <button className="shrink-0 mt-1">
+          <Image
+            src={isOpen ? assets.arrowUpDuotone : assets.arrowUpDuotone1}
+            alt="Toggle"
+            width={24}
+            height={24}
+            className={`transition-transform duration-300 ${isOpen ? '' : 'rotate-180'}`}
+          />
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export default function LandingPage() {
-  const [showComingSoon, setShowComingSoon] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false)
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false)
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
-  // Animation variants
-  const fadeInUp = {
-    initial: { opacity: 0, y: 60 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.6 }
-  }
-
-  const staggerChildren = {
-    animate: {
-      transition: {
-        staggerChildren: 0.1
+  const handlePlay = () => {
+    setIsPlaying(true)
+    // Small timeout to ensure video element is rendered before playing
+    setTimeout(() => {
+      if (videoRef.current) {
+        videoRef.current.play()
       }
-    }
+    }, 0)
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header/Navigation */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-14 sm:h-16">
-            {/* Logo */}
-            <motion.div 
-              className="flex items-center space-x-2 sm:space-x-3"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-[#004AAD] to-[#FF9500] rounded-xl flex items-center justify-center shadow-md">
-                <span className="text-white font-bold text-lg sm:text-xl">F</span>
-              </div>
-              <div className="hidden xs:block sm:block">
-                <h1 className="text-lg sm:text-xl font-bold text-[#004AAD]">FahamPesa</h1>
-                <p className="text-[10px] sm:text-xs text-gray-600 leading-tight">Smart Business Tools</p>
-              </div>
-            </motion.div>
+    <div className="min-h-screen bg-white overflow-x-hidden">
+      <DownloadModal open={downloadModalOpen} onOpenChange={setDownloadModalOpen} />
 
-            {/* Navigation */}
-            <motion.nav 
-              className="hidden md:flex items-center space-x-8"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-            >
-              <a href="#features" className="text-gray-700 hover:text-[#004AAD] transition-colors font-medium">
-                Features
-              </a>
-              <a href="#benefits" className="text-gray-700 hover:text-[#004AAD] transition-colors font-medium">
-                Benefits
-              </a>
-              <a href="#download" className="text-gray-700 hover:text-[#004AAD] transition-colors font-medium">
-                Download
-              </a>
-              <a href="#contact" className="text-gray-700 hover:text-[#004AAD] transition-colors font-medium">
-                Contact
-              </a>
-            </motion.nav>
-
-            {/* Mobile Menu Button & CTA */}
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              {/* Login Button */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.15 }}
-                className="hidden sm:block"
-              >
-                <a 
-                  href="/login"
-                  className="text-[#004AAD] hover:text-[#FF9500] font-semibold px-3 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 text-sm sm:text-base"
-                >
-                  Login
-                </a>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="hidden sm:block"
-              >
-                <button 
-                  onClick={() => setIsDownloadModalOpen(true)}
-                  className="bg-[#FF9500] text-black px-4 sm:px-6 py-2 rounded-xl font-semibold hover:bg-[#e6850e] transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 text-sm sm:text-base"
-                >
-                  Download App
-                </button>
-              </motion.div>
-              
-              {/* Mobile Menu Button */}
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 text-gray-700 hover:text-[#004AAD] transition-colors hover:bg-gray-100 rounded-lg"
-              >
-                {mobileMenuOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
-              </button>
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white h-[80px] flex items-center border-b border-gray-100">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px] w-full flex justify-between items-center">
+          {/* Logo */}
+          <div className="flex items-center gap-[7px]">
+            <div className="w-[32px] h-[32px] relative">
+              <Image src={assets.logo} alt="FahamPesa" fill className="object-contain" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-roboto font-bold text-[20px] text-[#001223] leading-none">Fahampesa</span>
+              <span className="font-inter font-light text-[10px] text-[#001223]">Smart Business Tools</span>
             </div>
           </div>
-        </div>
-        
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="md:hidden bg-white border-t border-gray-200 shadow-lg"
+
+          {/* Desktop Nav */}
+          <nav className="hidden lg:flex items-center gap-8">
+            <Link href="#product" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Product</Link>
+            <Link href="#benefits" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Benefits</Link>
+            <Link href="#pricing" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Pricing</Link>
+          </nav>
+
+          {/* Desktop Actions */}
+          <div className="hidden lg:flex items-center gap-4">
+            <Link href="/login" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-6 py-3 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">
+              Login
+            </Link>
+            <button
+              onClick={() => setDownloadModalOpen(true)}
+              className="font-dm-sans font-semibold text-[14px] text-[#001031] border border-[#001031] rounded-[10px] px-6 py-3 hover:bg-gray-50 hover:border-[#004AAD] hover:text-[#004AAD] transition-colors"
+            >
+              Get Desktop App
+            </button>
+            <Link
+              href="/login"
+              className="font-dm-sans font-semibold text-[14px] text-white bg-[#004AAD] rounded-[10px] px-6 py-3 hover:bg-[#003a8c] transition-colors flex items-center gap-2"
+            >
+              Start a free trial
+              <ArrowUpRight size={16} />
+            </Link>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            className="lg:hidden p-2"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            <div className="px-4 py-4 space-y-3">
-              <a 
-                href="#features" 
-                className="block text-gray-700 hover:text-[#004AAD] hover:bg-gray-50 transition-all font-medium py-3 px-3 rounded-lg -mx-3"
-                onClick={() => setMobileMenuOpen(false)}
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="absolute top-[80px] left-0 right-0 bg-white border-b border-gray-200 shadow-lg lg:hidden p-4 flex flex-col gap-4"
+            >
+              <Link href="#product" onClick={() => setMobileMenuOpen(false)} className="font-dm-sans font-semibold text-[14px] text-[#001031] py-2 px-4 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Product</Link>
+              <Link href="#benefits" onClick={() => setMobileMenuOpen(false)} className="font-dm-sans font-semibold text-[14px] text-[#001031] py-2 px-4 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Benefits</Link>
+              <Link href="#pricing" onClick={() => setMobileMenuOpen(false)} className="font-dm-sans font-semibold text-[14px] text-[#001031] py-2 px-4 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Pricing</Link>
+              <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="font-dm-sans font-semibold text-[14px] text-[#001031] py-2 px-4 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Login</Link>
+              <button
+                onClick={() => { setDownloadModalOpen(true); setMobileMenuOpen(false); }}
+                className="font-dm-sans font-semibold text-[14px] text-[#001031] border border-[#001031] rounded-[10px] px-6 py-3 w-full hover:border-[#004AAD] hover:text-[#004AAD] transition-colors"
               >
-                Features
-              </a>
-              <a 
-                href="#benefits" 
-                className="block text-gray-700 hover:text-[#004AAD] hover:bg-gray-50 transition-all font-medium py-3 px-3 rounded-lg -mx-3"
+                Get Desktop App
+              </button>
+              <Link
+                href="/login"
                 onClick={() => setMobileMenuOpen(false)}
+                className="font-dm-sans font-semibold text-[14px] text-white bg-[#004AAD] rounded-[10px] px-6 py-3 w-full text-center flex items-center justify-center gap-2"
               >
-                Benefits
-              </a>
-              <a 
-                href="#download" 
-                className="block text-gray-700 hover:text-[#004AAD] hover:bg-gray-50 transition-all font-medium py-3 px-3 rounded-lg -mx-3"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Download
-              </a>
-              <a 
-                href="#contact" 
-                className="block text-gray-700 hover:text-[#004AAD] hover:bg-gray-50 transition-all font-medium py-3 px-3 rounded-lg -mx-3"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Contact
-              </a>
-              <div className="pt-2 border-t border-gray-100 space-y-3">
-                <a 
-                  href="/login"
-                  className="block w-full bg-[#004AAD] text-white px-6 py-4 rounded-xl font-semibold hover:bg-[#003a8c] transition-all text-center shadow-md hover:shadow-lg transform hover:scale-[0.98] active:scale-95"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Login
-                </a>
-                <button 
-                  className="block w-full bg-[#FF9500] text-black px-6 py-4 rounded-xl font-semibold hover:bg-[#e6850e] transition-all text-center shadow-md hover:shadow-lg transform hover:scale-[0.98] active:scale-95"
-                  onClick={() => {
-                    setMobileMenuOpen(false)
-                    setIsDownloadModalOpen(true)
-                  }}
-                >
-                  Download App
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
+                Start a free trial
+                <ArrowUpRight size={16} />
+              </Link>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#001122] via-[#004AAD] to-[#FF9500] text-white pt-14 sm:pt-16">
-        {/* Enhanced Background Pattern */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.15'%3E%3Ccircle cx='7' cy='7' r='2'/%3E%3Ccircle cx='27' cy='27' r='1.5'/%3E%3Ccircle cx='47' cy='47' r='2'/%3E%3Ccircle cx='67' cy='67' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }} />
-        </div>
-
-        {/* Animated floating elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <motion.div
-            className="absolute top-20 left-10 w-20 h-20 bg-gradient-to-br from-[#FF9500] to-transparent rounded-full opacity-30"
-            animate={{
-              y: [0, -20, 0],
-              rotate: [0, 360]
-            }}
-            transition={{
-              duration: 8,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-          <motion.div
-            className="absolute bottom-20 right-10 w-32 h-32 bg-gradient-to-br from-[#0056CC] to-transparent rounded-full opacity-20"
-            animate={{
-              y: [0, 30, 0],
-              rotate: [0, -360]
-            }}
-            transition={{
-              duration: 12,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-          <motion.div
-            className="absolute top-1/2 left-1/4 w-16 h-16 bg-gradient-to-br from-white to-transparent rounded-full opacity-10"
-            animate={{
-              y: [0, -40, 0],
-              x: [0, 20, 0]
-            }}
-            transition={{
-              duration: 10,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-        </div>
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 lg:py-32">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
-            {/* Left Content */}
-            <motion.div 
-              initial="initial"
-              animate="animate"
-              variants={staggerChildren}
-            >
-              <motion.div variants={fadeInUp} className="mb-4 sm:mb-6">
-                <span className="inline-flex items-center px-3 sm:px-4 py-2 rounded-full bg-[#FF9500] text-black font-semibold text-xs sm:text-sm shadow-lg">
-                  <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                  Smart Tools for Modern Businesses.
-                </span>
-              </motion.div>
-
-              <motion.h1 
-                variants={fadeInUp}
-                className="text-3xl xs:text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-4 sm:mb-6"
-              >
-                Powerful Sales and
-                <span className="block text-[#FF9500]">Anywhere, Anytime</span>
-              </motion.h1>
-
-              <motion.p 
-                variants={fadeInUp}
-                className="text-base sm:text-lg lg:text-xl text-gray-200 mb-8 sm:mb-10 leading-relaxed"
-              >
-                Fahampesa gives your business the tools to sell faster, track stock in real time, and stay in control anywhere. Secure, offline-first, and built to scale with you.
-              </motion.p>
-
-              {/* 3-Step Guide */}
-              <motion.div 
-                variants={fadeInUp}
-                className="mb-8 sm:mb-10"
-              >
-                <h3 className="text-lg sm:text-xl font-semibold text-white mb-4 sm:mb-6 text-center">Get started in 3 simple steps:</h3>
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
-                  <div className="flex flex-col items-center text-center group">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-[#FF9500] rounded-full flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform shadow-lg">
-                      <UserPlus className="w-6 h-6 sm:w-8 sm:h-8 text-black" />
-                    </div>
-                    <span className="text-sm sm:text-base font-semibold text-white">Sign up</span>
-                  </div>
-                  
-                  <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-[#FF9500] rotate-90 sm:rotate-0" />
-                  
-                  <div className="flex flex-col items-center text-center group">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-[#FF9500] rounded-full flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform shadow-lg">
-                      <Plus className="w-6 h-6 sm:w-8 sm:h-8 text-black" />
-                    </div>
-                    <span className="text-sm sm:text-base font-semibold text-white">Add products</span>
-                  </div>
-                  
-                  <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-[#FF9500] rotate-90 sm:rotate-0" />
-                  
-                  <div className="flex flex-col items-center text-center group">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-[#FF9500] rounded-full flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform shadow-lg">
-                      <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-black" />
-                    </div>
-                    <span className="text-sm sm:text-base font-semibold text-white">Start selling</span>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Main CTA Button */}
-              <motion.div 
-                variants={fadeInUp}
-                className="text-center mb-6 sm:mb-8"
-              >
-                <a 
-                  href="/login"
-                  className="group inline-flex items-center justify-center px-8 sm:px-12 py-4 sm:py-6 bg-[#FF9500] text-black font-bold text-lg sm:text-xl rounded-xl hover:bg-[#e6850e] transform hover:scale-105 active:scale-95 transition-all duration-200 shadow-2xl hover:shadow-3xl"
-                >
-                  Sign in and start your first sale
-                  <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 ml-3 group-hover:translate-x-1 transition-transform" />
-                </a>
-              </motion.div>
-
-              {/* Secondary Actions */}
-              <motion.div 
-                variants={fadeInUp}
-                className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center"
-              >
-                <a 
-                  href="https://play.google.com/store/apps/details?id=com.fahampesa.app"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 border-2 border-[#FF9500] text-[#FF9500] font-semibold rounded-xl hover:bg-[#FF9500] hover:text-black active:scale-95 transition-all duration-200 text-sm sm:text-base"
-                >
-                  <Download className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                  Download Android App
-                </a>
-                
-                {/* Testimonial Video Button */}
-                <button 
-                  onClick={() => {
-                    const video = document.getElementById('testimonial-video') as HTMLVideoElement;
-                    if (video) {
-                      video.play();
-                      video.scrollIntoView({ behavior: 'smooth' });
-                    }
-                  }}
-                  className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 border-2 border-white text-white font-semibold rounded-xl hover:bg-white hover:text-[#004AAD] active:scale-95 transition-all duration-200 text-sm sm:text-base"
-                >
-                  <Play className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                  Watch Testimonial
-                </button>
-              </motion.div>
-
-              <motion.div 
-                variants={fadeInUp}
-                className="mt-6 sm:mt-8 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-xs sm:text-sm text-gray-300"
-              >
-                <div className="flex items-center">
-                  <WifiOff className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-[#FF9500]" />
-                  works online and offline
-                </div>
-                <div className="flex items-center">
-                  <Sun className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-[#FF9500]" />
-                  Real-time reports and insights
-                </div>
-                <div className="flex items-center">
-                  <Shield className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-[#FF9500]" />
-                  Secure by design
-                </div>
-              </motion.div>
-            </motion.div>
-
-            {/* Right Content - Dashboard Screenshot */}
+      <section className="pt-[80px] bg-[#DEE4FF] min-h-[700px] relative overflow-hidden">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px] pt-[116px] pb-[80px] relative z-10 lg:flex lg:items-center lg:justify-between">
+          <div className="max-w-[650px]">
+            {/* Floating Tag */}
             <motion.div
-              initial={{ opacity: 0, x: 50 }}
+              initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-              className="relative lg:order-2 mt-8 lg:mt-0"
+              transition={{ delay: 0.4 }}
+              className="hidden lg:inline-flex items-center bg-white mb-10 rounded-[90px] px-4 py-2 gap-2.5 "
             >
-              {/* Pure Screenshot Display - Larger Size */}
-              <div className="relative mx-auto max-w-4xl lg:max-w-5xl">
-                <img 
-                  src="/dashboard-screenshot.png" 
-                  alt="FahamPesa Dashboard Preview" 
-                  className="w-full h-auto drop-shadow-2xl transform hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-
-              {/* Floating Elements */}
-              <motion.div
-                className="absolute -top-6 -right-6 bg-[#FF9500] text-black px-6 py-3 rounded-full text-base font-semibold shadow-lg"
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              >
-                Live Dashboard
-              </motion.div>
-              
-              <motion.div
-                className="absolute -bottom-6 -left-6 bg-white text-[#004AAD] px-6 py-3 rounded-full text-base font-semibold shadow-lg"
-                animate={{ y: [0, 10, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              >
-                Real-time Data
-              </motion.div>
+              <Image src={assets.check} alt="" width={24} height={24} />
+              <span className="font-dm-sans font-semibold text-[16px] text-[#004AAD]">Smart tool for modern businesses</span>
             </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="font-inter font-medium text-[36px] sm:text-[48px] lg:text-[60px] text-[#001031] leading-[1.19] tracking-[-1.5px] mb-6"
+            >
+              POS System built for your Business
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="font-inter font-normal text-[16px] sm:text-[18px] text-[#001031] leading-[28px] tracking-[-0.4px] mb-10 max-w-[630px]"
+            >
+              Fahampesa gives your business the tools to sell faster, track stock in real time, and stay in control anywhere. Secure, offline-first, and built to scale with you.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="flex flex-col sm:flex-row gap-4 mb-10"
+            >
+              <button
+                onClick={() => setDownloadModalOpen(true)}
+                className="flex items-center justify-center gap-[10px] border border-[#004AAD] rounded-[10px] px-[24px] py-[16px] hover:bg-[#004AAD]/5 transition-colors"
+              >
+                <span className="font-dm-sans font-semibold text-[16px] text-[#004AAD]">Download App</span>
+                <Image src={assets.download} alt="" width={20} height={20} />
+              </button>
+              <Link href="/login" className="flex items-center justify-center gap-[10px] bg-[#004AAD] rounded-[10px] px-[24px] py-[16px] hover:bg-[#003a8c] transition-colors">
+                <span className="font-dm-sans font-semibold text-[16px] text-white">Start a free trial</span>
+                <Image src={assets.arrowForward} alt="" width={20} height={20} />
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="flex flex-wrap gap-8"
+            >
+              <div className="flex items-center gap-[8px]">
+                <Image src={assets.wifiOff} alt="" width={18} height={18} />
+                <span className="font-inter font-normal text-[14px] text-[#001031] tracking-[-0.4px]">Works online and offline</span>
+              </div>
+              <div className="flex items-center gap-[8px]">
+                <Image src={assets.sun} alt="" width={18} height={18} />
+                <span className="font-inter font-normal text-[14px] text-[#001031] tracking-[-0.4px]">Real-time reports and insights</span>
+              </div>
+            </motion.div>
+          </div>
+
+
+
+          {/* Hero mockup image */}
+          <div className="hidden lg:block absolute right-0 translate-x-[5%] top-1/2 -translate-y-1/2 w-[600px] h-[420px] scale-[0.85]">
+            <HeroMockup />
           </div>
         </div>
       </section>
 
-      {/* Testimonial Video Section */}
-      <section className="py-12 sm:py-16 lg:py-20 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-            variants={staggerChildren}
-          >
-            <motion.h2 
-              variants={fadeInUp}
-              className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4 sm:mb-6"
-            >
-              Hear from Our <span className="text-[#FF9500]">Happy Customers</span>
-            </motion.h2>
-            <motion.p 
-              variants={fadeInUp}
-              className="text-base sm:text-lg lg:text-xl text-gray-600 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed"
-            >
-              Real business owners sharing their success stories with FahamPesa
-            </motion.p>
-
-            <motion.div 
-              variants={fadeInUp}
-              className="relative max-w-3xl mx-auto"
-            >
-              {/* Video Container */}
-              <div className="relative bg-black rounded-2xl overflow-hidden shadow-2xl">
-                <video 
-                  id="testimonial-video"
-                  className="w-full h-auto"
-                  controls
-                  poster="/testimonial-thumbnail.png"
-                  preload="metadata"
-                >
-                  <source src="/testimonial-mohammed.mp4" type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-                
-                {/* Play Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity duration-300">
-                  <button 
-                    onClick={() => {
-                      const video = document.getElementById('testimonial-video') as HTMLVideoElement;
-                      if (video) {
-                        if (video.paused) {
-                          video.play();
-                        } else {
-                          video.pause();
-                        }
-                      }
-                    }}
-                    className="w-16 h-16 sm:w-20 sm:h-20 bg-[#FF9500] rounded-full flex items-center justify-center hover:bg-[#e6850e] transition-colors shadow-lg"
-                  >
-                    <Play className="w-8 h-8 sm:w-10 sm:h-10 text-black ml-1" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Customer Info */}
-              <motion.div 
-                variants={fadeInUp}
-                className="mt-6 sm:mt-8 flex items-center justify-center space-x-3 sm:space-x-4"
-              >
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-[#004AAD] to-[#FF9500] rounded-full flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-lg sm:text-xl">M</span>
-                </div>
-                <div className="text-left">
-                  <h4 className="text-lg sm:text-xl font-semibold text-gray-900">Mohammed</h4>
-                  <p className="text-sm sm:text-base text-gray-600">Small Business Owner</p>
-                </div>
-              </motion.div>
-
-              {/* Quote */}
-              <motion.blockquote 
-                variants={fadeInUp}
-                className="mt-4 sm:mt-6 text-base sm:text-lg text-gray-700 italic max-w-2xl mx-auto leading-relaxed"
-              >
-                "FahamPesa has completely transformed how I manage my business. The offline features are a game-changer!"
-              </motion.blockquote>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="py-12 sm:py-16 lg:py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div 
-            className="text-center mb-8 sm:mb-12 lg:mb-16"
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-            variants={fadeInUp}
-          >
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4 px-2">
+      {/* Product Section */}
+      <section id="product" className="py-[80px] bg-white relative">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px]">
+          <div className="text-center mb-[80px]">
+            <span className="font-inter font-medium text-[14px] text-[#004AAD] tracking-[0.9px] uppercase block mb-4">Products</span>
+            <h2 className="font-inter font-medium text-[36px] sm:text-[48px] lg:text-[60px] text-[#001031] leading-[1.19] tracking-[-1.5px] mb-6">
               Everything You Need to Run Your Business
             </h2>
-            <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-2 leading-relaxed">
-              From inventory management to sales tracking, FahamPesa provides all the tools 
-              small business owners need to succeed in today&apos;s competitive market.
+            <p className="font-inter font-normal text-[16px] sm:text-[18px] text-[#001031] leading-[28px] tracking-[-0.4px] max-w-[720px] mx-auto">
+              From inventory management to sales tracking, FahamPesa provides all the tools small business owners need to succeed in today&apos;s competitive market.
             </p>
-          </motion.div>
+          </div>
 
-          <motion.div 
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8"
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-            variants={staggerChildren}
-          >
-            {[
-              {
-                icon: Package,
-                title: "Smart Inventory Management",
-                description: "Track your products, manage stock levels, and get low-stock alerts. Perfect for kiosks and small shops."
-              },
-              {
-                icon: ShoppingCart,
-                title: "Quick Sales Recording",
-                description: "Record sales instantly and auto-update inventory. Optimized for fast transactions in busy environments."
-              },
-              {
-                icon: BarChart3,
-                title: "Daily & Weekly Reports",
-                description: "Get insights into your business performance with detailed analytics and export reports via WhatsApp or PDF."
-              },
-              {
-                icon: WifiOff,
-                title: "Offline-First Design",
-                description: "Works completely offline, syncs automatically when connected. Never lose a sale due to poor internet."
-              }
-            ].map((feature, index) => (
-              <motion.div 
-                key={index}
-                variants={fadeInUp}
-                className="group bg-white p-6 sm:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 sm:hover:-translate-y-2 active:scale-[0.98] cursor-pointer"
-              >
-                <div className="bg-[#004AAD] text-white w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-[#FF9500] group-hover:text-black transition-all duration-300 shadow-md">
-                  <feature.icon className="w-6 h-6 sm:w-8 sm:h-8" />
-                </div>
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 leading-tight">{feature.title}</h3>
-                <p className="text-sm sm:text-base text-gray-600 leading-relaxed">{feature.description}</p>
-              </motion.div>
-            ))}
-          </motion.div>
+          <div className="flex flex-col gap-6">
+            <ProductCard
+              title="Smart Inventory Management"
+              description="Track your products, manage stock levels, and get low-stock alerts. Perfect for kiosks and small shops."
+            >
+              <StockDashboardMockup />
+            </ProductCard>
+
+            <ProductCard
+              title="Quick Sales Recording"
+              description="Record sales instantly and auto-update inventory. Optimized for fast transactions in busy environments."
+              imageSrc="/image-mockup2.png"
+              bgColor="bg-[#FFF2E7]"
+            />
+
+            <ProductCard
+              title="Daily & Weekly Reports"
+              description="Get insights into your business performance with detailed analytics and export reports via WhatsApp or PDF."
+              imageSrc="/image-mockup3.png"
+              bgColor="bg-[#EAE6FC]"
+            />
+          </div>
         </div>
       </section>
 
-      {/* Benefits Section */}
-      <section id="benefits" className="py-12 sm:py-16 lg:py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 lg:gap-16 items-center">
-            <motion.div
-              initial="initial"
-              whileInView="animate"
-              viewport={{ once: true }}
-              variants={fadeInUp}
-            >
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4 sm:mb-6 px-2 leading-tight">
-                Designed for <span className="text-[#FF9500]">Real-World</span> Business Challenges
-              </h2>
-              <p className="text-base sm:text-lg lg:text-xl text-gray-600 mb-6 sm:mb-8 px-2 leading-relaxed">
-                We understand the unique challenges small business owners face in Kenya. 
-                That&apos;s why FahamPesa is built with features that actually matter for your daily operations.
+      {/* Visual Section with Benefit Cards */}
+      <section className="w-full">
+        <div className="w-full h-[500px] sm:h-[700px] lg:h-[884px] relative">
+          <Image 
+            src={assets.visualSection} 
+            alt="FahamPesa Dashboard Preview" 
+            fill 
+            className="object-cover object-center"
+            priority
+          />
+          {/* Benefit Cards Overlay */}
+          <div className="absolute inset-0 flex items-end justify-center pb-16 lg:pb-24">
+            <div className="flex flex-col lg:flex-row gap-6 px-4 sm:px-6 lg:px-[100px] w-full max-w-[1440px] justify-center">
+              {/* Sales Analytics Card */}
+              <div className="bg-[rgba(9,9,11,0.4)] backdrop-blur-sm border border-[rgba(89,91,93,0.8)] flex flex-col gap-6 lg:gap-9 items-center justify-center py-8 lg:py-10 px-8 lg:px-12 rounded-[32px] lg:rounded-[48px] w-full lg:w-[350px]">
+                <div className="bg-[rgba(255,255,255,0.2)] flex items-center justify-center p-4 lg:p-[18px] rounded-[24px] lg:rounded-[30px] size-[50px] lg:size-[60px]">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 17H7V10H9V17ZM13 17H11V7H13V17ZM17 17H15V13H17V17ZM19 19H5V5H19V19.1M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3Z" fill="white"/>
+                  </svg>
+                </div>
+                <p className="font-inter font-semibold text-[24px] lg:text-[32px] text-white tracking-[-0.4px] leading-[1.2]">
+                  Sales Analytics
+                </p>
+                <p className="font-inter font-normal text-[14px] lg:text-[16px] text-[#eee] text-center tracking-[-0.4px] leading-[24px]">
+                  Track daily, weekly, and monthly sales performance with beautiful charts and graphs.
+                </p>
+              </div>
+
+              {/* Growth Insights Card */}
+              <div className="bg-[rgba(9,9,11,0.4)] backdrop-blur-sm border border-[rgba(89,91,93,0.8)] flex flex-col gap-6 lg:gap-9 items-center justify-center py-8 lg:py-10 px-8 lg:px-12 rounded-[32px] lg:rounded-[48px] w-full lg:w-[350px]">
+                <div className="bg-[rgba(255,255,255,0.2)] flex items-center justify-center p-4 lg:p-[18px] rounded-[24px] lg:rounded-[30px] size-[50px] lg:size-[60px]">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M16 6L18.29 8.29L13.41 13.17L9.41 9.17L2 16.59L3.41 18L9.41 12L13.41 16L19.71 9.71L22 12V6H16Z" fill="white"/>
+                  </svg>
+                </div>
+                <p className="font-inter font-semibold text-[24px] lg:text-[32px] text-white tracking-[-0.4px] leading-[1.2]">
+                  Growth Insights
+                </p>
+                <p className="font-inter font-normal text-[14px] lg:text-[16px] text-[#eee] text-center tracking-[-0.4px] leading-[24px]">
+                  Identify trends, peak sales hours, and best-selling products to optimize your business.
+                </p>
+              </div>
+
+              {/* Inventory Reports Card */}
+              <div className="bg-[rgba(9,9,11,0.4)] backdrop-blur-sm border border-[rgba(89,91,93,0.8)] flex flex-col gap-6 lg:gap-9 items-center justify-center py-8 lg:py-10 px-8 lg:px-12 rounded-[32px] lg:rounded-[48px] w-full lg:w-[350px]">
+                <div className="bg-[rgba(255,255,255,0.2)] flex items-center justify-center p-4 lg:p-[18px] rounded-[24px] lg:rounded-[30px] size-[50px] lg:size-[60px]">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 2H4C3 2 2 2.9 2 4V7.01C2 7.73 2.43 8.35 3 8.7V20C3 21.1 4.1 22 5 22H19C19.9 22 21 21.1 21 20V8.7C21.57 8.35 22 7.73 22 7.01V4C22 2.9 21 2 20 2ZM19 20H5V9H19V20ZM20 7H4V4H20V7Z" fill="white"/>
+                    <path d="M15 12H9V14H15V12Z" fill="white"/>
+                  </svg>
+                </div>
+                <p className="font-inter font-semibold text-[24px] lg:text-[30px] text-white tracking-[-0.4px] leading-[1.2]">
+                  Inventory Reports
+                </p>
+                <p className="font-inter font-normal text-[14px] lg:text-[16px] text-[#eee] text-center tracking-[-0.4px] leading-[24px]">
+                  Monitor stock levels, track product movement, and get alerts for low inventory.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Who We Serve Section */}
+      <section className="py-[80px] bg-white">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px]">
+          <div className="text-center mb-[80px]">
+            <span className="font-inter font-medium text-[14px] text-[#004AAD] tracking-[0.9px] uppercase block mb-4">WHO WE SERVE</span>
+            <h2 className="font-inter font-medium text-[36px] sm:text-[48px] lg:text-[60px] text-[#001031] leading-[1.19] tracking-[-1.5px] mb-6">
+              Trusted by businesses <br className="hidden lg:block" /> from various industries
+            </h2>
+            <p className="font-inter font-normal text-[16px] text-[#001031] leading-[28px] tracking-[-0.4px]">
+              Here are some of the Business can that benefit&apos;s from our solution
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-8">
+            {/* Card 1: Small retail shops */}
+            <div className="bg-[#EFEEF3] rounded-[48px] p-8 lg:p-[50px] min-h-[400px] relative overflow-hidden flex flex-col lg:flex-row items-center">
+              <div className="lg:w-[45%] z-10">
+                <h3 className="font-inter font-normal text-[32px] lg:text-[48px] text-[#001031] leading-tight tracking-[-0.4px] mb-5">
+                  Small retail shops. Dukas and kiosks.
+                </h3>
+                <p className="font-inter font-normal text-[16px] text-[#001031] leading-[24px] tracking-[-0.4px]">
+                  We built Fahampesa for everyday sellers who want to move faster and sell smarter. Easily record sales, track stock, and know what&apos;s selling; even if you run a small shop or kiosk. No complicated setup, just simple tools that help you stay in control and avoid losses.
+                </p>
+              </div>
+              <div className="lg:w-[55%] relative h-[330px] w-full mt-8 lg:mt-0 flex items-center justify-center lg:justify-end gap-4">
+                {/* Sales Card Mockup */}
+                <div className="relative w-[264px] h-[330px]">
+                  <div className="absolute bg-[#fafbfb] h-[88px] left-1/2 translate-x-[calc(-50%+19.5px)] opacity-60 rounded-[16px] shadow-[0px_4px_20px_0px_rgba(0,0,0,0.05)] top-1/2 translate-y-[calc(-50%+21px)] w-[225px]" />
+                  <div className="absolute bg-[#fafbfb] h-[88px] left-1/2 translate-x-[calc(-50%+10px)] opacity-80 rounded-[16px] shadow-[0px_4px_20px_0px_rgba(0,0,0,0.05)] top-1/2 translate-y-[calc(-50%-9px)] w-[244px]" />
+                  <div className="absolute bg-white flex flex-col gap-[16px] h-[100px] items-start justify-center left-0 px-[22px] py-[13px] rounded-[16px] shadow-[0px_4px_20px_0px_rgba(0,0,0,0.05)] top-[71px] w-[264px]">
+                    <p className="font-inter font-medium text-[20px] text-[#09090b]">New Sale - Xiaomi A7...</p>
+                    <div className="flex gap-[6px] items-center">
+                      <span className="font-inter font-normal text-[16px] text-[#71717a]">12/25/2025</span>
+                      <span className="w-[4px] h-[4px] bg-[#71717a] rounded-full" />
+                      <span className="font-inter font-normal text-[16px] text-[#71717a]">10:40:02 AM</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Person Image */}
+                <div className="relative w-[250px] h-[300px]">
+                  <div className="relative w-full h-full rounded-[32px] overflow-hidden">
+                    <Image src={assets.card1} alt="" fill className="object-cover" />
+                  </div>
+                  <div className="absolute bottom-[10px] left-[57px] bg-white rounded-[16px] px-[10px] py-[8px] flex items-center gap-[6px] shadow-md">
+                    {/* <Image src={assets.avatar1} alt="" width={16} height={16} className="rounded-full" /> */}
+                    <span className="w-[10px] h-[10px] bg-[#004AAD] rounded-full" />
+                    <span className="font-inter font-normal text-[14px] text-[#001031] tracking-[-0.4px]">Joseph</span>
+                  </div>
+                  <div className="absolute bottom-[10px] left-[16px]">
+                    <Image src={assets.avatar2} alt="" width={33} height={33} className="rounded-full" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Wholesalers */}
+            <div className="bg-[#EFEEF3] rounded-[48px] p-8 lg:p-[50px] min-h-[400px] relative overflow-hidden flex flex-col lg:flex-row items-center">
+              <div className="lg:w-[55%] relative h-[330px] w-full mb-8 lg:mb-0 flex items-center justify-center lg:justify-start gap-4 order-2 lg:order-1">
+                {/* Sales Card Mockup */}
+                <div className="relative w-[264px] h-[330px]">
+                  <div className="absolute bg-[#fafbfb] h-[88px] left-1/2 translate-x-[calc(-50%+19.5px)] opacity-60 rounded-[16px] shadow-[0px_4px_20px_0px_rgba(0,0,0,0.05)] top-1/2 translate-y-[calc(-50%+21px)] w-[225px]" />
+                  <div className="absolute bg-[#fafbfb] h-[88px] left-1/2 translate-x-[calc(-50%+10px)] opacity-80 rounded-[16px] shadow-[0px_4px_20px_0px_rgba(0,0,0,0.05)] top-1/2 translate-y-[calc(-50%-9px)] w-[244px]" />
+                  <div className="absolute bg-white flex flex-col gap-[16px] h-[100px] items-start justify-center left-0 px-[22px] py-[13px] rounded-[16px] shadow-[0px_4px_20px_0px_rgba(0,0,0,0.05)] top-[71px] w-[264px]">
+                    <p className="font-inter font-medium text-[20px] text-[#09090b]">New Sale - Rice Bags...</p>
+                    <div className="flex gap-[6px] items-center">
+                      <span className="font-inter font-normal text-[16px] text-[#71717a]">11/29/2025</span>
+                      <span className="w-[4px] h-[4px] bg-[#71717a] rounded-full" />
+                      <span className="font-inter font-normal text-[16px] text-[#71717a]">02:50:09 PM</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Person Image */}
+                <div className="relative w-[250px] h-[300px]">
+                  <div className="relative w-full h-full rounded-[32px] overflow-hidden">
+                    <Image src={assets.card2} alt="" fill className="object-cover" />
+                  </div>
+                  <div className="absolute bottom-[10px] left-[57px] bg-white rounded-[16px] px-[10px] py-[8px] flex items-center gap-[6px] shadow-md">
+                    <span className="w-[10px] h-[10px] bg-[#004AAD] rounded-full" />
+                    <span className="font-inter font-normal text-[14px] text-[#001031] tracking-[-0.4px]">Nelson</span>
+                  </div>
+                  <div className="absolute bottom-[10px] left-[16px]">
+                    <Image src={assets.avatar3} alt="" width={33} height={33} className="rounded-full" />
+                  </div>
+                </div>
+              </div>
+              <div className="lg:w-[45%] z-10 order-1 lg:order-2">
+                <h3 className="font-inter font-normal text-[32px] lg:text-[48px] text-[#001031] leading-tight tracking-[-0.4px] mb-5">
+                  Wholesalers and mini distributors.
+                </h3>
+                <p className="font-inter font-normal text-[16px] text-[#001031] leading-[24px] tracking-[-0.4px]">
+                  Manage high-volume sales with clarity and confidence. Track bulk transactions, monitor inventory levels, and keep accurate sales records across customers. Fahampesa helps you reduce errors, stay organized, and scale your distribution business with ease.
+                </p>
+              </div>
+            </div>
+
+            {/* Card 3: Service businesses */}
+            <div className="bg-[#EFEEF3] rounded-[48px] p-8 lg:p-[50px] min-h-[400px] relative overflow-hidden flex flex-col lg:flex-row items-center">
+              <div className="lg:w-[45%] z-10">
+                <h3 className="font-inter font-normal text-[32px] lg:text-[48px] text-[#001031] leading-tight tracking-[-0.4px] mb-5">
+                  Service businesses. Salons, garages, cyber cafes.
+                </h3>
+                <p className="font-inter font-normal text-[16px] text-[#001031] leading-[24px] tracking-[-0.4px]">
+                  Perfect for businesses that sell services, not just products. Quickly record services rendered, manage daily transactions, and understand your earnings without paperwork.
+                </p>
+              </div>
+              <div className="lg:w-[55%] relative h-[330px] w-full mt-8 lg:mt-0 flex items-center justify-center lg:justify-end gap-4">
+                {/* Sales Card Mockup */}
+                <div className="relative w-[264px] h-[330px]">
+                  <div className="absolute bg-[#fafbfb] h-[88px] left-1/2 translate-x-[calc(-50%+19.5px)] opacity-60 rounded-[16px] shadow-[0px_4px_20px_0px_rgba(0,0,0,0.05)] top-1/2 translate-y-[calc(-50%+21px)] w-[225px]" />
+                  <div className="absolute bg-[#fafbfb] h-[88px] left-1/2 translate-x-[calc(-50%+10px)] opacity-80 rounded-[16px] shadow-[0px_4px_20px_0px_rgba(0,0,0,0.05)] top-1/2 translate-y-[calc(-50%-9px)] w-[244px]" />
+                  <div className="absolute bg-white flex flex-col gap-[16px] h-[100px] items-start justify-center left-0 px-[22px] py-[13px] rounded-[16px] shadow-[0px_4px_20px_0px_rgba(0,0,0,0.05)] top-[71px] w-[264px]">
+                    <p className="font-inter font-medium text-[20px] text-[#09090b]">New Sale - Virgin Hair..</p>
+                    <div className="flex gap-[6px] items-center">
+                      <span className="font-inter font-normal text-[16px] text-[#71717a]">12/31/2025</span>
+                      <span className="w-[4px] h-[4px] bg-[#71717a] rounded-full" />
+                      <span className="font-inter font-normal text-[16px] text-[#71717a]">09:49:00 AM</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Person Image */}
+                <div className="relative w-[250px] h-[300px]">
+                  <div className="relative w-full h-full rounded-[32px] overflow-hidden">
+                    <Image src={assets.card3} alt="" fill className="object-cover" />
+                  </div>
+                  <div className="absolute bottom-[10px] left-[57px] bg-white rounded-[16px] px-[10px] py-[8px] flex items-center gap-[6px] shadow-md">
+                     <span className="w-[10px] h-[10px] bg-[#004AAD] rounded-full" />
+                    <span className="font-inter font-normal text-[14px] text-[#001031] tracking-[-0.4px]">Maria</span>
+                  </div>
+                  <div className="absolute bottom-[10px] left-[16px]">
+                    <Image src={assets.avatar4} alt="" width={33} height={33} className="rounded-full" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Review Section */}
+      <section className="py-[80px] bg-white">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px] text-center">
+          <h2 className="font-inter font-medium text-[36px] sm:text-[48px] lg:text-[60px] text-[#001031] mb-4">
+            Customer&apos;s Review
+          </h2>
+          <p className="font-inter font-normal text-[16px] text-[#001031] mb-[60px]">
+            Real business owners sharing their success stories with FahamPesa
+          </p>
+
+          <div 
+            className="relative w-full max-w-[700px] mx-auto h-[350px] sm:h-[550px] bg-[#363232] rounded-[32px] overflow-hidden flex items-center justify-center group cursor-pointer"
+            onClick={handlePlay}
+          >
+            {!isPlaying ? (
+              <>
+                {/* Video Thumbnail */}
+                <div className="absolute inset-0">
+                  <Image 
+                    src={assets.testimonialThumbnail} 
+                    alt="Customer Testimonial" 
+                    fill 
+                    className="object-cover opacity-80 group-hover:opacity-70 transition-opacity"
+                  />
+                </div>
+                
+                {/* Play Button */}
+                <div className="w-[80px] h-[80px] relative z-10 transition-transform group-hover:scale-110">
+                  <Image src={assets.playIcon} alt="Play" fill />
+                </div>
+              </>
+            ) : (
+              <video
+                ref={videoRef}
+                src={assets.testimonialVideo}
+                className="absolute inset-0 h-full w-full object-cover"
+                controls
+                autoPlay
+                playsInline
+              />
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Steps Section */}
+      <section className="py-[80px] bg-[#DEE4FF]">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px]">
+          <h2 className="font-inter font-medium text-[36px] sm:text-[48px] text-[#001031] mb-[80px] tracking-[-1.5px]">
+            Get started in 3 simple steps:
+          </h2>
+
+          <div className="flex flex-col lg:flex-row justify-between gap-5 items-center lg:items-start">
+            {/* Step 1 */}
+            <div className="flex flex-col items-center">
+              <div className="w-[400px] h-[380px] bg-[#001223] rounded-[40px] relative mb-6 shrink-0 overflow-hidden">
+                <div className="absolute top-[30px] left-[30px] w-[340px] bg-white rounded-[24px] p-[40px] flex flex-col gap-[29px]">
+                  <h3 className="font-dm-sans font-bold text-[24px] text-[#191D23]">Set up your account</h3>
+                  <div className="w-full flex flex-col gap-[10px]">
+                    <div>
+                      <label className="block font-dm-sans text-[16px] text-black mb-[10px]">Business Name</label>
+                      <div className="border border-[#BFC4CB] rounded-[8px] p-[16px] w-full">
+                        <p className="font-dm-sans text-[16px] text-[#64748B]">Enter your business name</p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block font-dm-sans text-[16px] text-black mb-[10px]">Phone Number</label>
+                      <div className="border border-[#BFC4CB] rounded-[8px] p-[8px] flex gap-[10px] items-center w-full">
+                        <div className="bg-[#F0F2F5] rounded-[8px] p-[8px] flex items-center gap-[2px] shrink-0">
+                          <Image src={assets.avatar5} alt="" width={24} height={24} />
+                          <span className="text-[#64748B] text-[16px] font-dm-sans">+254</span>
+                          <Image src={assets.arrowDown} alt="" width={20} height={20} />
+                        </div>
+                        <p className="text-[#64748B] text-[16px] font-dm-sans flex-1">123 4567...</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-[#F0F2F5] rounded-[16px] p-[16px] flex items-center justify-center w-full">
+                    <span className="font-dm-sans font-normal text-[16px] text-[#64748B]">Continue</span>
+                  </div>
+                </div>
+              </div>
+              <h3 className="font-inter font-normal text-[30px] text-[#001031] mb-3 text-center">Create account</h3>
+              <p className="font-inter font-normal text-[18px] text-[#001031] text-center max-w-[340px] leading-[24px]">
+                Create your Fahampesa account with your phone number to get started.
               </p>
-              
-              <div className="space-y-4 sm:space-y-6 px-2">
-                {[
-                  {
-                    icon: Sun,
-                    title: "Sunlight Optimized",
-                    description: "High contrast design perfect for outdoor markets and direct sunlight use."
-                  },
-                  {
-                    icon: CheckCircle,
-                    title: "Budget Phone Friendly",
-                    description: "Optimized for Tecno, Infinix, Itel, and other budget Android devices."
-                  },
-                  {
-                    icon: Shield,
-                    title: "Secure & Private",
-                    description: "Local data encryption and secure cloud sync with Firebase authentication."
-                  }
-                ].map((benefit, index) => (
-                  <motion.div 
-                    key={index}
-                    variants={fadeInUp}
-                    className="flex items-start space-x-3 sm:space-x-4 p-3 rounded-xl hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="bg-[#004AAD] text-white w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 shadow-md">
-                      <benefit.icon className="w-5 h-5 sm:w-6 sm:h-6" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2 leading-tight">{benefit.title}</h3>
-                      <p className="text-sm sm:text-base text-gray-600 leading-relaxed">{benefit.description}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial="initial"
-              whileInView="animate"
-              viewport={{ once: true }}
-              variants={fadeInUp}
-              className="relative mt-8 lg:mt-0"
-            >
-              {/* Stats Cards */}
-              <div className="bg-gradient-to-br from-[#004AAD] to-[#0056CC] rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white shadow-xl">
-                <h3 className="text-xl sm:text-2xl font-bold mb-6 sm:mb-8 text-center lg:text-left">Perfect for Kenyan Businesses</h3>
-                <div className="grid grid-cols-2 gap-4 sm:gap-6">
-                  <div className="text-center bg-white/10 rounded-xl p-3 sm:p-4 backdrop-blur">
-                    <div className="text-2xl sm:text-3xl font-bold text-[#FF9500] mb-1 sm:mb-2">99%</div>
-                    <div className="text-xs sm:text-sm text-gray-200 leading-tight">works online and offline</div>
+            {/* Step 2 */}
+            <div className="flex flex-col items-center">
+              <div className="w-[400px] h-[380px] bg-[#001223] rounded-[40px] relative mb-6 shrink-0 overflow-hidden">
+                <div className="absolute top-[30px] left-[30px] w-[340px] bg-white rounded-[24px] p-[40px] flex flex-col gap-[29px]">
+                  <h3 className="font-dm-sans font-bold text-[24px] text-[#191D23]">Add New Product</h3>
+                  <div className="w-full flex flex-col gap-[10px]">
+                    <div>
+                      <label className="block font-dm-sans text-[16px] text-black mb-[10px]">Product Name<span className="text-[#E92C2C]">*</span></label>
+                      <div className="border border-[#BFC4CB] rounded-[8px] p-[16px] w-full">
+                        <p className="font-dm-sans text-[16px] text-[#64748B]">e.g., Coca-Cola 500ml</p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block font-dm-sans text-[16px] text-black mb-[10px]">Category<span className="text-[#E92C2C]">*</span></label>
+                      <div className="border border-[#BFC4CB] rounded-[8px] p-[16px] flex justify-between items-center gap-[10px] w-full">
+                        <span className="text-[#191D23] text-[16px] font-dm-sans">Select Category</span>
+                        <Image src={assets.arrowDown} alt="" width={24} height={24} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-center bg-white/10 rounded-xl p-3 sm:p-4 backdrop-blur">
-                    <div className="text-2xl sm:text-3xl font-bold text-[#FF9500] mb-1 sm:mb-2">5s</div>
-                    <div className="text-xs sm:text-sm text-gray-200 leading-tight">Sale Recording</div>
-                  </div>
-                  <div className="text-center bg-white/10 rounded-xl p-3 sm:p-4 backdrop-blur">
-                    <div className="text-2xl sm:text-3xl font-bold text-[#FF9500] mb-1 sm:mb-2">24/7</div>
-                    <div className="text-xs sm:text-sm text-gray-200 leading-tight">Real-time reports and insights</div>
-                  </div>
-                  <div className="text-center bg-white/10 rounded-xl p-3 sm:p-4 backdrop-blur">
-                    <div className="text-2xl sm:text-3xl font-bold text-[#FF9500] mb-1 sm:mb-2">100%</div>
-                    <div className="text-xs sm:text-sm text-gray-200 leading-tight">Secure by design</div>
+                  <div className="bg-[#F0F2F5] rounded-[16px] p-[16px] flex items-center justify-center w-full">
+                    <span className="font-dm-sans font-normal text-[16px] text-[#64748B]">Next</span>
                   </div>
                 </div>
               </div>
-            </motion.div>
+              <h3 className="font-inter font-normal text-[30px] text-[#001031] mb-3 text-center">Add Product</h3>
+              <p className="font-inter font-normal text-[18px] text-[#001031] text-center max-w-[340px] leading-[24px]">
+                Create your Fahampesa account and set up your business profile to get started.
+              </p>
+            </div>
+
+            {/* Step 3 */}
+            <div className="flex flex-col items-center">
+              <div className="w-[400px] h-[380px] bg-[#001223] rounded-[40px] relative mb-6 shrink-0 overflow-hidden">
+                <div className="absolute top-[30px] left-[30px] w-[340px] bg-white rounded-[24px] p-[40px] flex flex-col gap-[29px]">
+                  <h3 className="font-dm-sans font-bold text-[24px] text-[#191D23]">Record Sale</h3>
+                  <div className="w-full flex flex-col gap-[10px]">
+                    <div>
+                      <label className="block font-dm-sans text-[16px] text-black mb-[10px]">Product/Service<span className="text-[#E92C2C]">*</span></label>
+                      <div className="border border-[#BFC4CB] rounded-[8px] p-[16px] flex justify-between items-center gap-[10px] w-full">
+                        <span className="text-[#191D23] text-[16px] font-dm-sans">Product</span>
+                        <Image src={assets.arrowDown} alt="" width={24} height={24} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block font-dm-sans text-[16px] text-black mb-[10px]">Quantity<span className="text-[#E92C2C]">*</span></label>
+                      <div className="border border-[#BFC4CB] rounded-[8px] p-[16px] w-full">
+                        <p className="text-[#191D23] text-[16px] font-dm-sans">1</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-[#F0F2F5] rounded-[16px] p-[16px] flex items-center justify-center w-full">
+                    <span className="font-dm-sans font-normal text-[16px] text-[#64748B]">Record Sales</span>
+                  </div>
+                </div>
+              </div>
+              <h3 className="font-inter font-normal text-[30px] text-[#001031] mb-3 text-center">Start Selling</h3>
+              <p className="font-inter font-normal text-[18px] text-[#001031] text-center max-w-[340px] leading-[24px]">
+                Create your Fahampesa account and set up your business profile to get started.
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Reports & Analytics Showcase */}
-      <section className="py-12 sm:py-16 lg:py-20 bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
-            {/* Left - Laptop with Reports Screenshot */}
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="relative"
-            >
-              {/* Modern Laptop Mockup */}
-              <div className="relative mx-auto max-w-3xl">
-                {/* Laptop Screen */}
-                <div className="relative bg-gray-900 rounded-t-2xl p-4 shadow-2xl">
-                  {/* Screen Bezel */}
-                  <div className="bg-black rounded-xl p-2">
-                    {/* Reports Screenshot */}
-                    <div className="relative overflow-hidden rounded-lg bg-white">
-                      <motion.img 
-                        src="/reports-screenshot.png" 
-                        alt="FahamPesa Reports & Analytics" 
-                        className="w-full h-auto object-cover rounded-lg"
-                        initial={{ scale: 1.1 }}
-                        whileInView={{ scale: 1 }}
-                        transition={{ duration: 1, ease: "easeOut" }}
-                      />
-                      {/* Screen Glow Effect */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-blue-500/10 via-transparent to-transparent rounded-lg"></div>
-                    </div>
-                  </div>
-                  
-                  {/* Camera */}
-                  <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-600 rounded-full"></div>
-                </div>
-                
-                {/* Laptop Base */}
-                <div className="bg-gray-800 h-8 rounded-b-2xl shadow-lg relative">
-                  {/* Trackpad */}
-                  <div className="absolute top-2 left-1/2 transform -translate-x-1/2 w-16 h-3 bg-gray-600 rounded-md"></div>
-                </div>
-                
-                {/* Laptop Shadow */}
-                <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 w-full h-12 bg-gradient-to-r from-transparent via-black/20 to-transparent rounded-full blur-xl"></div>
-              </div>
+      {/* FAQ Section */}
+      <section className="py-[80px] bg-white">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px]">
+          <div className="text-center mb-[60px]">
+            <span className="font-inter font-medium text-[18px] text-[#004AAD] tracking-[0.9px] uppercase block mb-4">FAQ</span>
+            <h2 className="font-inter font-medium text-[40px] sm:text-[78px] text-[#001031] leading-[1.19] tracking-[-1.5px]">
+              Frequently Asked<br/> Questions
+            </h2>
+          </div>
 
-              {/* Animated Data Points */}
-              <motion.div
-                className="absolute top-8 -right-4 bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-semibold shadow-lg"
-                animate={{ 
-                  y: [0, -8, 0],
-                  rotate: [0, 2, 0]
-                }}
-                transition={{ 
-                  duration: 3, 
-                  repeat: Infinity, 
-                  ease: "easeInOut" 
-                }}
+          <div className="max-w-[820px] mx-auto flex flex-col gap-[30px] mb-[100px]">
+            {faqs.map((faq, index) => (
+              <FAQItem
+                key={index}
+                question={faq.question}
+                answer={faq.answer}
+                isOpen={openFaqIndex === index}
+                onClick={() => setOpenFaqIndex(openFaqIndex === index ? null : index)}
+              />
+            ))}
+          </div>
+
+          <div className="relative w-full max-w-[1235px] mx-auto h-[400px] rounded-[48px] overflow-hidden bg-gradient-to-br from-[#002F6C] to-[#001223] text-white p-10 flex flex-col justify-center items-center text-center">
+            <div className="absolute inset-0">
+              <Image 
+                src="https://www.figma.com/api/mcp/asset/158c379c-40cd-4482-aab2-52e540a9670b" 
+                alt="Background Pattern" 
+                fill 
+                className="object-cover opacity-40"
+              />
+            </div>
+            <div className="relative z-10 flex flex-col items-center gap-4 max-w-[675px]">
+              <h3 className="font-inter font-semibold text-[32px] sm:text-[48px] leading-tight">Ready to take full control?</h3>
+              <p className="font-inter font-normal text-[16px] leading-[24px]">
+                Whether you&apos;re a manufacturer, construction firm or a hardware store, we can help you pay employees or casual labourers in cash, into a mobile wallet or bank account.
+              </p>
+              <Link
+                href="/login"
+                className="inline-block bg-white text-[#001031] font-dm-sans font-semibold text-[20px] px-6 py-4 rounded-[16px] hover:bg-gray-100 transition-colors mt-4 flex items-center gap-2"
               >
-                📈 Sales Up 24%
-              </motion.div>
-              
-              <motion.div
-                className="absolute bottom-12 -left-6 bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-semibold shadow-lg"
-                animate={{ 
-                  y: [0, 12, 0],
-                  rotate: [0, -2, 0]
-                }}
-                transition={{ 
-                  duration: 4, 
-                  repeat: Infinity, 
-                  ease: "easeInOut",
-                  delay: 1
-                }}
-              >
-                📊 Live Data
-              </motion.div>
-
-              <motion.div
-                className="absolute top-1/2 -left-8 bg-purple-500 text-white px-3 py-2 rounded-lg text-sm font-semibold shadow-lg"
-                animate={{ 
-                  x: [0, -8, 0],
-                  rotate: [0, -3, 0]
-                }}
-                transition={{ 
-                  duration: 5, 
-                  repeat: Infinity, 
-                  ease: "easeInOut",
-                  delay: 2
-                }}
-              >
-                📋 Reports
-              </motion.div>
-            </motion.div>
-
-            {/* Right - Content */}
-            <motion.div
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-            >
-              <motion.div
-                initial="initial"
-                whileInView="animate"
-                viewport={{ once: true }}
-                variants={staggerChildren}
-              >
-                <motion.h2 
-                  variants={fadeInUp}
-                  className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight"
-                >
-                  Powerful <span className="text-[#FF9500]">Reports & Analytics</span>
-                </motion.h2>
-                
-                <motion.p 
-                  variants={fadeInUp}
-                  className="text-base sm:text-lg lg:text-xl text-gray-600 mb-6 sm:mb-8 leading-relaxed"
-                >
-                  Get deep insights into your business performance with comprehensive reports, 
-                  real-time analytics, and actionable data to help you make informed decisions.
-                </motion.p>
-
-                <motion.div 
-                  variants={fadeInUp}
-                  className="space-y-4 sm:space-y-6 mb-6 sm:mb-8"
-                >
-                  {[
-                    {
-                      icon: BarChart3,
-                      title: "Sales Analytics",
-                      description: "Track daily, weekly, and monthly sales performance with beautiful charts and graphs."
-                    },
-                    {
-                      icon: TrendingUp,
-                      title: "Growth Insights",
-                      description: "Identify trends, peak sales hours, and best-selling products to optimize your business."
-                    },
-                    {
-                      icon: Package,
-                      title: "Inventory Reports",
-                      description: "Monitor stock levels, track product movement, and get alerts for low inventory."
-                    }
-                  ].map((feature, index) => (
-                    <motion.div 
-                      key={index}
-                      variants={fadeInUp}
-                      className="flex items-start space-x-3 sm:space-x-4 p-4 rounded-xl hover:bg-white hover:shadow-lg transition-all duration-300"
-                    >
-                      <div className="bg-[#004AAD] text-white w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 shadow-md">
-                        <feature.icon className="w-5 h-5 sm:w-6 sm:h-6" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2 leading-tight">{feature.title}</h3>
-                        <p className="text-sm sm:text-base text-gray-600 leading-relaxed">{feature.description}</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </motion.div>
-
-                <motion.div variants={fadeInUp}>
-                  <a 
-                    href="/login"
-                    className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-[#FF9500] text-black font-semibold rounded-xl hover:bg-[#e6850e] transform hover:scale-105 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base"
-                  >
-                    Explore Analytics Dashboard
-                    <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
-                  </a>
-                </motion.div>
-              </motion.div>
-            </motion.div>
+                Start a free trial
+                <ArrowUpRight size={20} />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
-
-      {/* Download Section */}
-      <section id="download" className="py-12 sm:py-16 lg:py-20 bg-gradient-to-r from-[#004AAD] to-[#0056CC] text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <motion.div
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-            variants={staggerChildren}
-          >
-            <motion.h2 
-              variants={fadeInUp}
-              className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4 sm:mb-6 px-2 leading-tight"
-            >
-              Ready to Transform Your Business?
-            </motion.h2>
-            <motion.p 
-              variants={fadeInUp}
-              className="text-base sm:text-lg lg:text-xl text-gray-200 mb-8 sm:mb-10 max-w-2xl mx-auto px-2 leading-relaxed"
-            >
-              Join thousands of small business owners who are already using FahamPesa 
-              to streamline their operations and boost their profits.
-            </motion.p>
-
-            <motion.div 
-              variants={fadeInUp}
-              className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center px-4"
-            >
-              {/* Play Store Button */}
-              <a 
-                href="https://play.google.com/store/apps/details?id=com.fahampesa.app" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="group inline-flex items-center px-6 sm:px-8 py-4 bg-black text-white rounded-xl hover:bg-gray-800 transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl w-full sm:w-auto"
-              >
-                <div className="flex items-center space-x-2 sm:space-x-3 mx-auto sm:mx-0">
-                  <div className="relative">
-                    <PlayCircle className="w-6 h-6 sm:w-8 sm:h-8" />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-xs text-gray-300 leading-tight">Get it on</div>
-                    <div className="text-base sm:text-lg font-semibold">Google Play</div>
-                  </div>
-                </div>
-              </a>
-
-              {/* App Store Button */}
-              <button 
-                onClick={() => setShowComingSoon(true)}
-                className="group inline-flex items-center px-6 sm:px-8 py-4 bg-black text-white rounded-xl hover:bg-gray-800 transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl w-full sm:w-auto"
-              >
-                <div className="flex items-center space-x-2 sm:space-x-3 mx-auto sm:mx-0">
-                  <Apple className="w-6 h-6 sm:w-8 sm:h-8" />
-                  <div className="text-left">
-                    <div className="text-xs text-gray-300 leading-tight">Download on the</div>
-                    <div className="text-base sm:text-lg font-semibold">App Store</div>
-                  </div>
-                </div>
-              </button>
-            </motion.div>
-          
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Coming Soon Modal */}
-      {showComingSoon && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.8, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: "spring", damping: 20, stiffness: 300 }}
-            className="bg-white rounded-2xl p-6 sm:p-8 max-w-sm sm:max-w-md w-full text-center shadow-2xl"
-          >
-            <Apple className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-gray-400" />
-            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Coming Soon to iOS</h3>
-            <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 leading-relaxed">
-              We&apos;re working hard to bring FahamPesa to the App Store. 
-              In the meantime, you can download our Android app and start managing your business today!
-            </p>
-            <button 
-              onClick={() => setShowComingSoon(false)}
-              className="w-full px-6 py-4 bg-[#004AAD] text-white font-semibold rounded-xl hover:bg-[#003a8c] active:scale-95 transition-all duration-200 shadow-lg"
-            >
-              Got it, thanks!
-            </button>
-          </motion.div>
-        </div>
-      )}
 
       {/* Footer */}
-      <footer id="contact" className="bg-gray-900 text-white py-12 sm:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-            {/* Brand */}
-            <div className="md:col-span-2">
-              <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">FahamPesa</h3>
-              <p className="text-sm sm:text-base text-gray-400 mb-4 sm:mb-6 max-w-md leading-relaxed">
-                Empowering small business owners across Kenya with smart, offline-first 
-                sales and inventory management tools.
-              </p>
-              <div className="flex space-x-4">
-                <a href="#" className="text-gray-400 hover:text-[#FF9500] transition-colors p-2 rounded-lg hover:bg-gray-800">
-                  <Facebook className="w-5 h-5 sm:w-6 sm:h-6" />
-                </a>
-                <a href="#" className="text-gray-400 hover:text-[#FF9500] transition-colors p-2 rounded-lg hover:bg-gray-800">
-                  <Twitter className="w-5 h-5 sm:w-6 sm:h-6" />
-                </a>
-                <a href="#" className="text-gray-400 hover:text-[#FF9500] transition-colors p-2 rounded-lg hover:bg-gray-800">
-                  <Instagram className="w-5 h-5 sm:w-6 sm:h-6" />
-                </a>
+      <footer className="bg-[#001223] text-white py-[80px]">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+            {/* Column 1 */}
+            <div className="flex flex-col gap-6">
+              <h4 className="font-dm-sans font-semibold text-[16px] text-[#64748B]">COMPANY</h4>
+              <Link href="#" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">About Us</Link>
+              <Link href="#" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">Legal</Link>
+              <Link href="#" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">Terms of Service</Link>
+              <Link href="#" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">Privacy</Link>
+            </div>
+
+            {/* Column 2 */}
+            <div className="flex flex-col gap-6">
+              <h4 className="font-dm-sans font-semibold text-[16px] text-[#64748B]">HELP</h4>
+              <Link href="#" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">FAQ</Link>
+              <Link href="#" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">User Guide</Link>
+              <Link href="#" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">WhatsApp Support</Link>
+              <Link href="mailto:support@fahampesa.com" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">support@fahampesa.com</Link>
+            </div>
+
+            {/* Column 3 */}
+            <div className="flex flex-col gap-6">
+              <h4 className="font-dm-sans font-semibold text-[16px] text-[#64748B]">GET THE APP</h4>
+              <button onClick={() => setDownloadModalOpen(true)} className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors text-left">Desktop for Windows</button>
+              <button onClick={() => setDownloadModalOpen(true)} className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors text-left">Desktop for Mac</button>
+
+                <div className="flex gap-4 mt-4">
+                <div
+                 
+                  onClick={() => setDownloadModalOpen(true)}
+                  className="w-[140px] h-10 relative"
+                >
+                  <Image src={assets.googlePlay} alt="Google Play" fill className="object-contain" />
+                </div>
+                <div
+                 
+                  onClick={() => setDownloadModalOpen(true)}
+                  className="w-[140px] h-10 relative"
+                >
+                  <Image src={assets.appStore} alt="App Store" fill className="object-contain" />
+                </div>
+                </div>
+            </div>
+
+            {/* Column 4: Socials */}
+            <div className="flex flex-col gap-6 items-start lg:items-end">
+              <div className="flex gap-4">
+                <Link href="#" className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                  <Image src={assets.facebook} alt="Facebook" width={12} height={12} />
+                </Link>
+                <Link href="#" className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                  <Image src={assets.xIcon} alt="X" width={12} height={12} />
+                </Link>
+                <Link href="#" className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                  <Image src={assets.instagram} alt="Instagram" width={12} height={12} />
+                </Link>
               </div>
-            </div>
-
-            {/* Support */}
-            <div>
-              <h4 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Support</h4>
-              <ul className="space-y-2 sm:space-y-3">
-                <li>
-                  <a href="#" className="text-sm sm:text-base text-gray-400 hover:text-white transition-colors block py-1 hover:bg-gray-800 px-2 rounded -mx-2">
-                    Help Center
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-sm sm:text-base text-gray-400 hover:text-white transition-colors block py-1 hover:bg-gray-800 px-2 rounded -mx-2">
-                    Getting Started
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-sm sm:text-base text-gray-400 hover:text-white transition-colors block py-1 hover:bg-gray-800 px-2 rounded -mx-2">
-                    User Guide
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-sm sm:text-base text-gray-400 hover:text-white transition-colors block py-1 hover:bg-gray-800 px-2 rounded -mx-2">
-                    FAQ
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            {/* Contact */}
-            <div>
-              <h4 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Contact</h4>
-              <ul className="space-y-2 sm:space-y-3">
-                <li className="flex items-center">
-                  <Mail className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-[#FF9500] flex-shrink-0" />
-                  <a href="mailto:support@fahampesa.com" className="text-xs sm:text-sm text-gray-400 hover:text-white transition-colors break-all">
-                    support@fahampesa.com
-                  </a>
-                </li>
-                <li className="flex items-center">
-                  <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-[#FF9500] flex-shrink-0" />
-                  <a href="#" className="text-xs sm:text-sm text-gray-400 hover:text-white transition-colors">
-                    WhatsApp Support
-                  </a>
-                </li>
-              </ul>
             </div>
           </div>
 
-          <div className="border-t border-gray-800 mt-8 sm:mt-12 pt-6 sm:pt-8 flex flex-col sm:flex-row justify-between items-center">
-            <p className="text-xs sm:text-sm text-gray-400 leading-relaxed mb-4 sm:mb-0">
-              &copy; 2024 FahamPesa. Built with ❤️ for small business owners in Kenya and beyond.
+          <div className="mt-[80px] pt-8 border-t border-gray-800">
+            <p className="font-dm-sans font-medium text-[14px] text-white">
+              Copyright © 2026 Fahampesa - All Rights Reserved
             </p>
-            <div className="flex items-center space-x-4">
-              <a 
-                href="/login" 
-                className="text-gray-400 hover:text-[#FF9500] transition-colors text-sm font-medium px-3 py-2 rounded-lg hover:bg-gray-800"
-              >
-                Business Login
-              </a>
-            </div>
           </div>
         </div>
       </footer>
-      <DownloadModal open={isDownloadModalOpen} onOpenChange={setIsDownloadModalOpen} />
     </div>
   )
 }
