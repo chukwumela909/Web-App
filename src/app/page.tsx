@@ -222,29 +222,72 @@ export default function LandingPage() {
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="absolute top-[80px] left-0 right-0 bg-white border-b border-gray-200 shadow-lg lg:hidden p-4 flex flex-col gap-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] bg-white lg:hidden flex flex-col"
             >
-              <Link href="#product" onClick={() => setMobileMenuOpen(false)} className="font-dm-sans font-semibold text-[14px] text-[#001031] py-2 px-4 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Product</Link>
-              <Link href="#benefits" onClick={() => setMobileMenuOpen(false)} className="font-dm-sans font-semibold text-[14px] text-[#001031] py-2 px-4 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Benefits</Link>
-              <Link href="#pricing" onClick={() => setMobileMenuOpen(false)} className="font-dm-sans font-semibold text-[14px] text-[#001031] py-2 px-4 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Pricing</Link>
-              <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="font-dm-sans font-semibold text-[14px] text-[#001031] py-2 px-4 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Login</Link>
-              <button
-                onClick={() => { setDownloadModalOpen(true); setMobileMenuOpen(false); }}
-                className="font-dm-sans font-semibold text-[14px] text-[#001031] border border-[#001031] rounded-[10px] px-6 py-3 w-full hover:border-[#004AAD] hover:text-[#004AAD] transition-colors"
-              >
-                Get Desktop App
-              </button>
-              <Link
-                href="/login"
-                onClick={() => setMobileMenuOpen(false)}
-                className="font-dm-sans font-semibold text-[14px] text-white bg-[#004AAD] rounded-[10px] px-6 py-3 w-full text-center flex items-center justify-center gap-2"
-              >
-                Start a free trial
-                <ArrowUpRight size={16} />
-              </Link>
+              {/* Mobile Menu Header */}
+              <div className="h-[80px] flex items-center justify-between px-4 sm:px-6 border-b border-gray-100 shrink-0">
+                <div className="flex items-center gap-[7px]">
+                  <div className="w-[32px] h-[32px] relative">
+                    <Image src={assets.logo} alt="FahamPesa" fill className="object-contain" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-roboto font-bold text-[20px] text-[#001223] leading-none">Fahampesa</span>
+                    <span className="font-inter font-light text-[10px] text-[#001223]">Smart Business Tools</span>
+                  </div>
+                </div>
+                <button
+                  className="p-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <X size={24} className="text-[#001031]" />
+                </button>
+              </div>
+
+              {/* Mobile Menu Links */}
+              <div className="flex-1 flex flex-col items-center pt-8 gap-2 px-4">
+                <Link 
+                  href="#product" 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className="font-dm-sans font-bold text-[16px] text-[#001031] py-3 px-4 rounded-[8px] hover:bg-[#F0F5FF] transition-colors w-full text-center"
+                >
+                  Products
+                </Link>
+                <Link 
+                  href="#benefits" 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className="font-dm-sans font-bold text-[16px] text-[#001031] py-3 px-4 rounded-[8px] hover:bg-gray-50 w-full text-center"
+                >
+                  Benefits
+                </Link>
+                <Link 
+                  href="#pricing" 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className="font-dm-sans font-bold text-[16px] text-[#001031] py-3 px-4 rounded-[8px] hover:bg-gray-50 w-full text-center"
+                >
+                  Pricing
+                </Link>
+              </div>
+
+              {/* Mobile Menu Footer Actions */}
+              <div className="p-4 flex flex-col gap-4 mb-4">
+                <Link 
+                  href="/login" 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className="font-dm-sans font-bold text-[16px] text-[#001031] border border-[#001031] rounded-[12px] py-4 w-full text-center hover:bg-gray-50 transition-colors"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="font-dm-sans font-bold text-[16px] text-white bg-[#1D4ED8] rounded-[12px] py-4 w-full text-center hover:bg-[#1e40af] transition-colors"
+                >
+                  Start a free trial
+                </Link>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
