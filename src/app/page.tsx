@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, ArrowUpRight } from 'lucide-react'
 import { DownloadModal } from '@/components/DownloadModal'
-import { HeroMockup } from '@/components/HeroMockup'
 import { ProductCard, StockDashboardMockup } from '@/components/ProductMockup'
 
 const assets = {
@@ -44,24 +43,72 @@ const assets = {
 
 const faqs = [
   {
-    question: "Is Fahampesa a bank?",
-    answer: "Fahampesa is a Financial Technology (FinTech) Company, not a Bank. FDIC insurance only covers the failure of Regent Bank, Member FDIC. The Fahampesa POS is built for record purposes."
+    question: "What is Fahampesa?",
+    answer: "Fahampesa is a professional business management platform combining point of sale, inventory control, and business reporting for growing businesses."
   },
   {
-    question: "How do I get started?",
-    answer: "Simply download the app from the Google Play Store or sign up on our website. You can start recording sales and managing inventory immediately."
+    question: "Who is Fahampesa built for?",
+    answer: "Retailers, wholesalers, pharmacies, service businesses, and multi-branch operations that need accuracy and control."
   },
   {
-    question: "Can I use it offline?",
-    answer: "Yes! Fahampesa is designed to work offline. Your data will automatically sync to the cloud once you're back online."
+    question: "Does Fahampesa work offline?",
+    answer: "Yes. Sales, stock, and records continue working offline and sync securely when internet returns."
+  },
+  {
+    question: "Which devices are supported?",
+    answer: "Windows, macOS, Linux, Android, and iOS are supported."
+  },
+  {
+    question: "Does Fahampesa support M-Pesa?",
+    answer: "Yes. M-Pesa integration is available in supported regions."
+  },
+  {
+    question: "Is Fahampesa suitable for small businesses?",
+    answer: "Yes. Fahampesa supports businesses from early stage to growth phase."
+  },
+  {
+    question: "Can Fahampesa handle multiple branches?",
+    answer: "Yes. Multi-branch management and centralized reporting are supported."
+  },
+  {
+    question: "How does Fahampesa help reduce losses?",
+    answer: "By providing clear stock tracking, transaction records, and sales visibility to identify issues early."
   },
   {
     question: "Is my data secure?",
-    answer: "Absolutely. We use industry-standard encryption to protect your data. Your business information is safe and private."
+    answer: "Yes. Secure infrastructure and controlled access protect your data."
   },
   {
-    question: "How much does it cost?",
-    answer: "We offer a free trial so you can explore all features. After that, we have affordable monthly and yearly plans tailored for small businesses."
+    question: "Who owns the business data?",
+    answer: "You own your business data at all times."
+  },
+  {
+    question: "How much does Fahampesa cost?",
+    answer: "A free entry plan is available. Paid plans unlock advanced features."
+  },
+  {
+    question: "Do I need a credit card to start?",
+    answer: "No. You can start without providing payment details."
+  },
+  {
+    question: "Can I export my data?",
+    answer: "Yes. Business records can be exported when required."
+  },
+  {
+    question: "What kind of support is available?",
+    answer: "Support is provided through official Fahampesa channels."
+  },
+  {
+    question: "Is Fahampesa compliant with local regulations?",
+    answer: "Yes. Fahampesa follows applicable regional regulations."
+  },
+  {
+    question: "How do I get started?",
+    answer: "Create an account, install Fahampesa, and begin recording sales and stock."
+  },
+  {
+    question: "Is Fahampesa suitable for long-term use?",
+    answer: "Yes. Fahampesa is built as a long-term business system."
   }
 ]
 
@@ -204,24 +251,24 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="pt-[80px] bg-[#DEE4FF] min-h-[700px] relative overflow-hidden">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px] pt-[116px] pb-[80px] relative z-10 lg:flex lg:items-center lg:justify-between">
-          <div className="max-w-[650px]">
+      <section className="pt-[80px] bg-[#DEE4FF] min-h-[600px] lg:min-h-[750px] relative overflow-hidden">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px] pt-[60px] lg:pt-[60px] pb-[40px] lg:pb-[80px] relative z-10">
+          <div className="lg:w-[50%]">
             {/* Floating Tag */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4 }}
-              className="hidden lg:inline-flex items-center bg-white mb-10 rounded-[90px] px-4 py-2 gap-2.5 "
+              className="inline-flex items-center bg-white mb-6 lg:mb-8 rounded-[90px] px-3 lg:px-5 py-1.5 lg:py-2.5 gap-2"
             >
-              <Image src={assets.check} alt="" width={24} height={24} />
-              <span className="font-dm-sans font-semibold text-[16px] text-[#004AAD]">Smart tool for modern businesses</span>
+              <Image src={assets.check} alt="" width={20} height={20} className="lg:w-[24px] lg:h-[24px]" />
+              <span className="font-dm-sans font-semibold text-[12px] lg:text-[18px] text-[#004AAD]">Smart tool for modern businesses</span>
             </motion.div>
 
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="font-inter font-medium text-[36px] sm:text-[48px] lg:text-[60px] text-[#001031] leading-[1.19] tracking-[-1.5px] mb-6"
+              className="font-inter font-medium text-[32px] sm:text-[48px] lg:text-[72px] text-[#001031] leading-[1.1] tracking-[-1px] lg:tracking-[-2px] mb-6 lg:mb-8"
             >
               POS System built for your Business
             </motion.h1>
@@ -229,7 +276,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="font-inter font-normal text-[16px] sm:text-[18px] text-[#001031] leading-[28px] tracking-[-0.4px] mb-10 max-w-[630px]"
+              className="font-inter font-normal text-[14px] lg:text-[18px] text-[#001031] leading-[22px] lg:leading-[30px] tracking-[-0.4px] mb-8 lg:mb-12 max-w-[600px]"
             >
               Fahampesa gives your business the tools to sell faster, track stock in real time, and stay in control anywhere. Secure, offline-first, and built to scale with you.
             </motion.p>
@@ -238,18 +285,18 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="flex flex-col sm:flex-row gap-4 mb-10"
+              className="flex flex-row gap-3 lg:gap-5 mb-8 lg:mb-12"
             >
               <button
                 onClick={() => setDownloadModalOpen(true)}
-                className="flex items-center justify-center gap-[10px] border border-[#004AAD] rounded-[10px] px-[24px] py-[16px] hover:bg-[#004AAD]/5 transition-colors"
+                className="flex items-center justify-center gap-[8px] lg:gap-[10px] border border-[#004AAD] rounded-[10px] px-[16px] lg:px-[32px] py-[12px] lg:py-[18px] hover:bg-[#004AAD]/5 transition-colors"
               >
-                <span className="font-dm-sans font-semibold text-[16px] text-[#004AAD]">Download App</span>
-                <Image src={assets.download} alt="" width={20} height={20} />
+                <span className="font-dm-sans font-semibold text-[14px] lg:text-[18px] text-[#004AAD]">Download App</span>
+                <Image src={assets.download} alt="" width={16} height={16} className="lg:w-[22px] lg:h-[22px]" />
               </button>
-              <Link href="/login" className="flex items-center justify-center gap-[10px] bg-[#004AAD] rounded-[10px] px-[24px] py-[16px] hover:bg-[#003a8c] transition-colors">
-                <span className="font-dm-sans font-semibold text-[16px] text-white">Start a free trial</span>
-                <Image src={assets.arrowForward} alt="" width={20} height={20} />
+              <Link href="/login" className="flex items-center justify-center gap-[8px] lg:gap-[10px] bg-[#004AAD] rounded-[10px] px-[16px] lg:px-[32px] py-[12px] lg:py-[18px] hover:bg-[#003a8c] transition-colors">
+                <span className="font-dm-sans font-semibold text-[14px] lg:text-[18px] text-white">Start a free trial</span>
+                <Image src={assets.arrowForward} alt="" width={16} height={16} className="lg:w-[22px] lg:h-[22px]" />
               </Link>
             </motion.div>
 
@@ -257,25 +304,50 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="flex flex-wrap gap-8"
+              className="flex flex-wrap gap-4 lg:gap-10"
             >
-              <div className="flex items-center gap-[8px]">
-                <Image src={assets.wifiOff} alt="" width={18} height={18} />
-                <span className="font-inter font-normal text-[14px] text-[#001031] tracking-[-0.4px]">Works online and offline</span>
+              <div className="flex items-center gap-[6px] lg:gap-[10px]">
+                <Image src={assets.wifiOff} alt="" width={16} height={16} className="lg:w-[20px] lg:h-[20px]" />
+                <span className="font-inter font-normal text-[12px] lg:text-[16px] text-[#001031] tracking-[-0.4px]">Works online and offline</span>
               </div>
-              <div className="flex items-center gap-[8px]">
-                <Image src={assets.sun} alt="" width={18} height={18} />
-                <span className="font-inter font-normal text-[14px] text-[#001031] tracking-[-0.4px]">Real-time reports and insights</span>
+              <div className="flex items-center gap-[6px] lg:gap-[10px]">
+                <Image src={assets.sun} alt="" width={16} height={16} className="lg:w-[20px] lg:h-[20px]" />
+                <span className="font-inter font-normal text-[12px] lg:text-[16px] text-[#001031] tracking-[-0.4px]">Real-time reports and insights</span>
               </div>
             </motion.div>
           </div>
 
+          {/* Hero mockup image - Mobile */}
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+            className="lg:hidden relative -mr-20 ml-4 w-[calc(100%+80px)] h-[350px] mt-8"
+          >
+            <Image 
+              src="/assets/figma/landing/hero-image.png" 
+              alt="FahamPesa Dashboard Preview" 
+              fill 
+              className="object-contain object-right"
+              priority
+            />
+          </motion.div>
 
-
-          {/* Hero mockup image */}
-          <div className="hidden lg:block absolute right-0 translate-x-[5%] top-1/2 -translate-y-1/2 w-[600px] h-[420px] scale-[0.85]">
-            <HeroMockup />
-          </div>
+          {/* Hero mockup image - Desktop */}
+          <motion.div 
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3, duration: 0.6 }}
+            className="hidden lg:block absolute right-0 top-[50%] -translate-y-[50%] w-[52%] h-[70%] max-h-[450px]"
+          >
+            <Image 
+              src="/assets/figma/landing/hero-image.png" 
+              alt="FahamPesa Dashboard Preview" 
+              fill 
+              className="object-contain object-right"
+              priority
+            />
+          </motion.div>
         </div>
       </section>
 
@@ -285,7 +357,7 @@ export default function LandingPage() {
           <div className="text-center mb-[80px]">
             <span className="font-inter font-medium text-[14px] text-[#004AAD] tracking-[0.9px] uppercase block mb-4">Products</span>
             <h2 className="font-inter font-medium text-[36px] sm:text-[48px] lg:text-[60px] text-[#001031] leading-[1.19] tracking-[-1.5px] mb-6">
-              Everything You Need to Run Your Business
+              Everything You Need <br/> to Run Your Business
             </h2>
             <p className="font-inter font-normal text-[16px] sm:text-[18px] text-[#001031] leading-[28px] tracking-[-0.4px] max-w-[720px] mx-auto">
               From inventory management to sales tracking, FahamPesa provides all the tools small business owners need to succeed in today&apos;s competitive market.
@@ -296,9 +368,9 @@ export default function LandingPage() {
             <ProductCard
               title="Smart Inventory Management"
               description="Track your products, manage stock levels, and get low-stock alerts. Perfect for kiosks and small shops."
-            >
-              <StockDashboardMockup />
-            </ProductCard>
+              imageSrc="/image-mockup1.png"
+              bgColor="bg-[#E6EFFC]"
+            />
 
             <ProductCard
               title="Quick Sales Recording"
@@ -329,7 +401,7 @@ export default function LandingPage() {
           />
           {/* Benefit Cards Overlay */}
           <div className="absolute inset-0 flex items-end justify-center pb-16 lg:pb-24">
-            <div className="flex flex-col lg:flex-row gap-6 px-4 sm:px-6 lg:px-[100px] w-full max-w-[1440px] justify-center">
+            <div className="flex flex-col lg:flex-row gap-6 px-4 sm:px-6 lg:mb-36  w-full max-w-[1440px] items-center justify-center">
               {/* Sales Analytics Card */}
               <div className="bg-[rgba(9,9,11,0.4)] backdrop-blur-sm border border-[rgba(89,91,93,0.8)] flex flex-col gap-6 lg:gap-9 items-center justify-center py-8 lg:py-10 px-8 lg:px-12 rounded-[32px] lg:rounded-[48px] w-full lg:w-[350px]">
                 <div className="bg-[rgba(255,255,255,0.2)] flex items-center justify-center p-4 lg:p-[18px] rounded-[24px] lg:rounded-[30px] size-[50px] lg:size-[60px]">
@@ -546,7 +618,7 @@ export default function LandingPage() {
                 
                 {/* Play Button */}
                 <div className="w-[80px] h-[80px] relative z-10 transition-transform group-hover:scale-110">
-                  <Image src={assets.playIcon} alt="Play" fill />
+                <Image src={assets.play} alt="Play" fill className="object-contain" />
                 </div>
               </>
             ) : (
@@ -675,7 +747,7 @@ export default function LandingPage() {
       <section className="py-[80px] bg-white">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px]">
           <div className="text-center mb-[60px]">
-            <span className="font-inter font-medium text-[18px] text-[#004AAD] tracking-[0.9px] uppercase block mb-4">FAQ</span>
+            <span className="font-inter font-medium text-[18px] text-[#004AAD] tracking-[0.9px] uppercase block mb-4">FREQUENTLY ASKED QUESTIONS</span>
             <h2 className="font-inter font-medium text-[40px] sm:text-[78px] text-[#001031] leading-[1.19] tracking-[-1.5px]">
               Frequently Asked<br/> Questions
             </h2>
@@ -693,14 +765,9 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div className="relative w-full max-w-[1235px] mx-auto h-[400px] rounded-[48px] overflow-hidden bg-gradient-to-br from-[#002F6C] to-[#001223] text-white p-10 flex flex-col justify-center items-center text-center">
+          <div className="relative w-full max-w-[1235px] mx-auto h-[400px] rounded-[48px] overflow-hidden text-white p-10 flex flex-col justify-center items-center text-center" style={{ background: 'radial-gradient(ellipse at top left, #0A4DA6 0%, #001834 50%, #000D1F 100%)' }}>
             <div className="absolute inset-0">
-              <Image 
-                src="https://www.figma.com/api/mcp/asset/158c379c-40cd-4482-aab2-52e540a9670b" 
-                alt="Background Pattern" 
-                fill 
-                className="object-cover opacity-40"
-              />
+             
             </div>
             <div className="relative z-10 flex flex-col items-center gap-4 max-w-[675px]">
               <h3 className="font-inter font-semibold text-[32px] sm:text-[48px] leading-tight">Ready to take full control?</h3>
@@ -709,10 +776,10 @@ export default function LandingPage() {
               </p>
               <Link
                 href="/login"
-                className="inline-block bg-white text-[#001031] font-dm-sans font-semibold text-[20px] px-6 py-4 rounded-[16px] hover:bg-gray-100 transition-colors mt-4 flex items-center gap-2"
+                className="flex bg-white text-[#001031] font-dm-sans font-semibold text-[20px] px-6 py-4 rounded-[16px] hover:bg-gray-100 transition-colors mt-4 flex items-center gap-2"
               >
                 Start a free trial
-                <ArrowUpRight size={20} />
+             
               </Link>
             </div>
           </div>

@@ -403,32 +403,37 @@ interface ProductCardProps {
 
 export function ProductCard({ title, description, children, imageSrc, className, bgColor = "bg-[#e6effc]" }: ProductCardProps) {
   return (
-    <div className={cn("relative w-full overflow-hidden rounded-[48px] p-8 md:p-16 flex flex-col md:flex-row gap-12", bgColor, className)}>
-      <div className="flex-1 flex flex-col justify-center gap-9 z-10 max-w-lg">
-        <div className="flex flex-col gap-6">
-          <h3 className="font-['Archivo'] font-bold text-[32px] md:text-[38px] leading-[1.1] text-[#001031]">
+    <div className={cn("relative w-full overflow-hidden rounded-[32px] lg:rounded-[48px] min-h-[320px] lg:min-h-[380px] flex flex-col lg:flex-row", bgColor, className)}>
+      {/* Text Content */}
+      <div className="flex-1 flex flex-col justify-center gap-6 lg:gap-8 p-8 lg:p-12 z-10 lg:max-w-[45%]">
+        <div className="flex flex-col gap-4 lg:gap-5">
+          <h3 className="font-inter font-medium text-[28px] lg:text-[36px] leading-[1.15] tracking-[-0.5px] text-[#001031]">
             {title}
           </h3>
-          <p className="font-['DM_Sans'] text-lg leading-[1.6] text-[#001031]/80">
+          <p className="font-inter font-normal text-[14px] lg:text-[15px] leading-[1.6] text-[#001031]/80 max-w-[400px]">
             {description}
           </p>
         </div>
-        <div className="flex items-center gap-2 text-[#004aad] font-semibold text-lg cursor-pointer hover:gap-3 transition-all">
+        <div className="flex items-center gap-2 text-[#004aad] font-dm-sans font-semibold text-[14px] lg:text-[16px] cursor-pointer hover:gap-3 transition-all">
           Get Started
-          <ArrowRight className="w-5 h-5" />
+          <ArrowRight className="w-4 h-4 lg:w-5 lg:h-5" />
         </div>
       </div>
-      <div className="flex-1 relative flex items-center justify-end min-h-[300px] md:min-h-[400px] overflow-visible">
+      
+      {/* Mockup Image */}
+      <div className="flex-1 relative min-h-[220px] lg:min-h-0">
         {children ? (
-          children
+          <div className="absolute inset-0 lg:right-[-10%] flex items-center justify-center lg:justify-end">
+            {children}
+          </div>
         ) : imageSrc ? (
-          <div className="absolute right-0 md:-right-16 w-[500px] h-[450px] md:w-[600px] md:h-[500px]">
-             <Image 
-                src={imageSrc} 
-                alt={title} 
-                fill 
-                className="object-contain object-right"
-             />
+          <div className="absolute top-[15%] bottom-0 left-0 right-0 lg:left-auto lg:right-[-5%] lg:w-[100%]">
+            <Image 
+              src={imageSrc} 
+              alt={title} 
+              fill 
+              className="object-contain object-bottom lg:object-right-bottom"
+            />
           </div>
         ) : null}
       </div>
