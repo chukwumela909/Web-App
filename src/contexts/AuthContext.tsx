@@ -180,22 +180,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Helper to get or create reCAPTCHA verifier
   const getRecaptchaVerifier = async (containerId: string = 'recaptcha-container'): Promise<RecaptchaVerifier> => {
-    const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier }
+    const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier; recaptchaRendered?: boolean }
     
-    // Clear existing verifier and create fresh one for each OTP request
+    // If we already have a rendered verifier, return it
+    if (windowWithRecaptcha.recaptchaVerifier && windowWithRecaptcha.recaptchaRendered) {
+      return windowWithRecaptcha.recaptchaVerifier
+    }
+    
+    // Clear existing verifier if it exists but wasn't fully rendered
     if (windowWithRecaptcha.recaptchaVerifier) {
       try {
         windowWithRecaptcha.recaptchaVerifier.clear()
+        windowWithRecaptcha.recaptchaRendered = false
       } catch {
         // Ignore
       }
     }
     
-    // Make sure container exists
+    // Make sure container exists and clear its contents
     const container = document.getElementById(containerId)
     if (!container) {
       throw new Error('reCAPTCHA container not found. Please refresh the page.')
     }
+    
+    // Clear the container's innerHTML to remove any existing reCAPTCHA
+    container.innerHTML = ''
     
     const verifier = new RecaptchaVerifier(auth, containerId, {
       size: 'invisible',
@@ -204,6 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       'expired-callback': () => {
         console.log('reCAPTCHA expired')
+        windowWithRecaptcha.recaptchaRendered = false
       }
     })
     
@@ -212,9 +222,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('reCAPTCHA rendered successfully')
     
     windowWithRecaptcha.recaptchaVerifier = verifier
+    windowWithRecaptcha.recaptchaRendered = true
     setRecaptchaVerifier(verifier)
     
     return verifier
+  }
+  
+  // Reset reCAPTCHA after use (call after OTP is sent or on error)
+  const resetRecaptcha = () => {
+    const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier; recaptchaRendered?: boolean }
+    if (windowWithRecaptcha.recaptchaVerifier) {
+      try {
+        windowWithRecaptcha.recaptchaVerifier.clear()
+      } catch {
+        // Ignore
+      }
+    }
+    windowWithRecaptcha.recaptchaVerifier = undefined
+    windowWithRecaptcha.recaptchaRendered = false
+    setRecaptchaVerifier(null)
+    
+    // Clear the container
+    const container = document.getElementById('recaptcha-container')
+    if (container) {
+      container.innerHTML = ''
+    }
   }
 
   // Send OTP for registration (stores pending data for after verification)
@@ -225,17 +257,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, verifier)
       console.log('OTP sent successfully')
       setConfirmationResult(confirmation)
+      // Reset reCAPTCHA after successful send so it can be used again for resend
+      resetRecaptcha()
     } catch (error: unknown) {
       console.error('Send OTP error:', error)
       // Reset reCAPTCHA on error
-      const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier }
-      if (windowWithRecaptcha.recaptchaVerifier) {
-        try {
-          windowWithRecaptcha.recaptchaVerifier.clear()
-        } catch {
-          // Ignore
-        }
-      }
+      resetRecaptcha()
       // Re-throw with more helpful message
       const firebaseError = error as { code?: string; message?: string }
       if (firebaseError.code === 'auth/internal-error') {
@@ -320,17 +347,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const verifier = await getRecaptchaVerifier()
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, verifier)
       setConfirmationResult(confirmation)
+      // Reset reCAPTCHA after successful send
+      resetRecaptcha()
     } catch (error) {
       console.error('Send login OTP error:', error)
       // Reset reCAPTCHA on error
-      const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier }
-      if (windowWithRecaptcha.recaptchaVerifier) {
-        try {
-          windowWithRecaptcha.recaptchaVerifier.clear()
-        } catch {
-          // Ignore
-        }
-      }
+      resetRecaptcha()
       throw error
     }
   }
