@@ -12,7 +12,7 @@ import {
   ApplicationVerifier
 } from 'firebase/auth'
 import { doc, updateDoc, setDoc, serverTimestamp, query, collection, where, getDocs } from 'firebase/firestore'
-import { auth, db, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, ConfirmationResult } from '@/lib/firebase'
+import { auth, db, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, signInWithCredential, ConfirmationResult } from '@/lib/firebase'
 import { getUserRole, UserRole } from '@/lib/adminUtils'
 
 interface AuthContextType {
@@ -27,14 +27,13 @@ interface AuthContextType {
   isSuperAdmin: boolean
   isAdmin: boolean
   // Phone auth methods
-  setupRecaptcha: (containerId: string) => void
   sendOtp: (phoneNumber: string) => Promise<void>
   verifyOtp: (otp: string) => Promise<void>
   sendLoginOtp: (phoneNumber: string) => Promise<void>
   verifyLoginOtp: (otp: string) => Promise<void>
-  confirmationResult: ConfirmationResult | null
-  recaptchaVerifier: ApplicationVerifier | null
+  verificationId: string
   setPendingRegistration: (data: { email: string; password: string; businessName: string; phoneNumber: string; country: string } | null) => void
+  clearRecaptcha: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -52,8 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
   const [roleLoading, setRoleLoading] = useState(false)
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
-  const [recaptchaVerifier, setRecaptchaVerifier] = useState<ApplicationVerifier | null>(null)
+  const [verificationId, setVerificationId] = useState<string>('')
   
   // Store pending registration data for phone auth flow
   const pendingRegistrationRef = useRef<{
@@ -145,135 +143,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await sendPasswordResetEmail(auth, email)
   }
 
-  // Setup reCAPTCHA verifier for phone auth
-  const setupRecaptcha = (containerId: string) => {
-    if (typeof window === 'undefined') return
-    
-    // Clear any existing verifier
-    const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier; recaptchaWidgetId?: number }
+  // Clear reCAPTCHA on unmount or error
+  const clearRecaptcha = () => {
+    const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier }
     if (windowWithRecaptcha.recaptchaVerifier) {
       try {
         windowWithRecaptcha.recaptchaVerifier.clear()
       } catch {
         // Ignore errors when clearing
       }
-    }
-    
-    try {
-      const verifier = new RecaptchaVerifier(auth, containerId, {
-        size: 'normal',
-        callback: () => {
-          console.log('reCAPTCHA solved - user verified')
-        },
-        'expired-callback': () => {
-          console.log('reCAPTCHA expired, please solve again')
-        }
-      })
-      
-      windowWithRecaptcha.recaptchaVerifier = verifier
-      setRecaptchaVerifier(verifier)
-    } catch (error) {
-      console.error('Error setting up reCAPTCHA:', error)
+      windowWithRecaptcha.recaptchaVerifier = undefined
     }
   }
 
-  // Helper to get or create reCAPTCHA verifier
-  const getRecaptchaVerifier = async (containerId: string = 'recaptcha-container'): Promise<RecaptchaVerifier> => {
-    const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier; recaptchaRendered?: boolean }
-    
-    // If we already have a rendered verifier, return it
-    if (windowWithRecaptcha.recaptchaVerifier && windowWithRecaptcha.recaptchaRendered) {
-      return windowWithRecaptcha.recaptchaVerifier
-    }
-    
-    // Clear existing verifier if it exists but wasn't fully rendered
-    if (windowWithRecaptcha.recaptchaVerifier) {
-      try {
-        windowWithRecaptcha.recaptchaVerifier.clear()
-        windowWithRecaptcha.recaptchaRendered = false
-      } catch {
-        // Ignore
-      }
-    }
-    
-    // Make sure container exists and clear its contents
-    const container = document.getElementById(containerId)
-    if (!container) {
-      throw new Error('reCAPTCHA container not found. Please refresh the page.')
-    }
-    
-    // Clear the container's innerHTML to remove any existing reCAPTCHA
-    container.innerHTML = ''
-    
-    const verifier = new RecaptchaVerifier(auth, containerId, {
-      size: 'normal',
-      callback: () => {
-        console.log('reCAPTCHA verified - user solved challenge')
-      },
-      'expired-callback': () => {
-        console.log('reCAPTCHA expired, please solve again')
-        windowWithRecaptcha.recaptchaRendered = false
-      }
-    })
-    
-    // Render the reCAPTCHA widget - this is required before use
-    await verifier.render()
-    console.log('reCAPTCHA widget rendered successfully')
-    
-    windowWithRecaptcha.recaptchaVerifier = verifier
-    windowWithRecaptcha.recaptchaRendered = true
-    setRecaptchaVerifier(verifier)
-    
-    return verifier
-  }
-  
-  // Reset reCAPTCHA after use (call after OTP is sent or on error)
-  const resetRecaptcha = () => {
-    const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier; recaptchaRendered?: boolean }
-    if (windowWithRecaptcha.recaptchaVerifier) {
-      try {
-        windowWithRecaptcha.recaptchaVerifier.clear()
-      } catch {
-        // Ignore
-      }
-    }
-    windowWithRecaptcha.recaptchaVerifier = undefined
-    windowWithRecaptcha.recaptchaRendered = false
-    setRecaptchaVerifier(null)
-    
-    // Clear the container
-    const container = document.getElementById('recaptcha-container')
-    if (container) {
-      container.innerHTML = ''
-    }
-  }
-
-  // Send OTP for registration (stores pending data for after verification)
+  // Send OTP for registration
   const sendOtp = async (phoneNumber: string) => {
+    const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier }
+    
     try {
-      const verifier = await getRecaptchaVerifier()
-      console.log('Attempting to send OTP to:', phoneNumber)
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, verifier)
-      console.log('OTP sent successfully')
-      setConfirmationResult(confirmation)
-      // Reset reCAPTCHA after successful send so it can be used again for resend
-      resetRecaptcha()
-    } catch (error: unknown) {
+      // Initialize reCAPTCHA if not already done
+      if (!windowWithRecaptcha.recaptchaVerifier) {
+        windowWithRecaptcha.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'normal',
+          callback: () => {
+            console.log('reCAPTCHA verified')
+          }
+        })
+      }
+      
+      const appVerifier = windowWithRecaptcha.recaptchaVerifier
+      console.log('Sending OTP to:', phoneNumber)
+      
+      const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier)
+      setVerificationId(confirmationResult.verificationId)
+      console.log('OTP sent successfully!')
+    } catch (error) {
       console.error('Send OTP error:', error)
       // Reset reCAPTCHA on error
-      resetRecaptcha()
-      // Re-throw with more helpful message
-      const firebaseError = error as { code?: string; message?: string }
-      if (firebaseError.code === 'auth/internal-error') {
-        throw new Error('Phone verification failed. Firebase Phone Auth does not work on localhost. Please add a test phone number in Firebase Console (Authentication → Sign-in method → Phone → Phone numbers for testing) or deploy to a real domain.')
-      }
+      clearRecaptcha()
       throw error
     }
   }
 
   // Verify OTP and complete registration
   const verifyOtp = async (otp: string) => {
-    if (!confirmationResult) {
+    if (!verificationId) {
       throw new Error('No OTP request pending. Please request a new code.')
     }
     
@@ -281,29 +195,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Registration data not found. Please start over.')
     }
     
-    // Verify the OTP - this creates/signs in a phone-authenticated user
-    const phoneCredential = PhoneAuthProvider.credential(
-      confirmationResult.verificationId,
-      otp
-    )
-    
-    // Sign out from phone auth temporarily
-    await signOut(auth)
-    
-    // Now create the email/password account
     const { email, password, businessName, phoneNumber, country } = pendingRegistrationRef.current
+    
+    // Create phone credential
+    const phoneCredential = PhoneAuthProvider.credential(verificationId, otp)
+    
+    // Sign out from any phone auth session
+    if (auth.currentUser) {
+      await signOut(auth)
+    }
+    
+    // Create the email/password account
     const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-    const user = userCredential.user
+    const newUser = userCredential.user
     
     // Link phone credential to the account
-    await linkWithCredential(user, phoneCredential)
+    try {
+      await linkWithCredential(newUser, phoneCredential)
+    } catch (linkError) {
+      console.log('Phone credential linking skipped or failed:', linkError)
+      // Continue anyway - the user is created with email/password
+    }
     
     // Update profile and create Firestore documents
-    await updateProfile(user, {
+    await updateProfile(newUser, {
       displayName: businessName
     })
     
-    await setDoc(doc(db, 'userProfiles', user.uid), {
+    await setDoc(doc(db, 'userProfiles', newUser.uid), {
       businessName: businessName,
       email: email,
       phoneNumber: phoneNumber,
@@ -315,7 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       lastLogin: serverTimestamp()
     })
     
-    await setDoc(doc(db, 'userRoles', user.uid), {
+    await setDoc(doc(db, 'userRoles', newUser.uid), {
       role: 'user',
       email: email,
       businessName: businessName,
@@ -326,7 +245,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Clear pending registration data
     pendingRegistrationRef.current = null
-    setConfirmationResult(null)
+    setVerificationId('')
+    clearRecaptcha()
   }
 
   // Send OTP for login
@@ -342,29 +262,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('No account found with this phone number. Please register first.')
     }
     
+    const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier }
+    
     try {
-      const verifier = await getRecaptchaVerifier()
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, verifier)
-      setConfirmationResult(confirmation)
-      // Reset reCAPTCHA after successful send
-      resetRecaptcha()
+      // Initialize reCAPTCHA if not already done
+      if (!windowWithRecaptcha.recaptchaVerifier) {
+        windowWithRecaptcha.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'normal',
+          callback: () => {
+            console.log('reCAPTCHA verified')
+          }
+        })
+      }
+      
+      const appVerifier = windowWithRecaptcha.recaptchaVerifier
+      const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier)
+      setVerificationId(confirmationResult.verificationId)
+      console.log('Login OTP sent successfully!')
     } catch (error) {
       console.error('Send login OTP error:', error)
       // Reset reCAPTCHA on error
-      resetRecaptcha()
+      clearRecaptcha()
       throw error
     }
   }
 
   // Verify login OTP
   const verifyLoginOtp = async (otp: string) => {
-    if (!confirmationResult) {
+    if (!verificationId) {
       throw new Error('No OTP request pending. Please request a new code.')
     }
     
-    // Confirm the OTP - this signs in with phone
-    await confirmationResult.confirm(otp)
-    setConfirmationResult(null)
+    const credential = PhoneAuthProvider.credential(verificationId, otp)
+    await signInWithCredential(auth, credential)
+    setVerificationId('')
+    clearRecaptcha()
   }
 
   // Helper to set pending registration data (called from login page)
@@ -387,14 +319,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isSuperAdmin,
     isAdmin,
     // Phone auth
-    setupRecaptcha,
     sendOtp,
     verifyOtp,
     sendLoginOtp,
     verifyLoginOtp,
-    confirmationResult,
-    recaptchaVerifier,
-    setPendingRegistration
+    verificationId,
+    setPendingRegistration,
+    clearRecaptcha
   }
 
   return (

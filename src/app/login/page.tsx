@@ -44,12 +44,13 @@ export default function LoginPage() {
     isSuperAdmin, 
     loading, 
     roleLoading,
-    setupRecaptcha,
     sendOtp,
     verifyOtp,
     sendLoginOtp,
     verifyLoginOtp,
-    setPendingRegistration
+    verificationId,
+    setPendingRegistration,
+    clearRecaptcha
   } = useAuth()
   const { staff, hasPermission, loading: staffLoading } = useStaff()
   const router = useRouter()
@@ -93,26 +94,13 @@ export default function LoginPage() {
   }
 
   const [timer, setTimer] = useState(52)
-  const [recaptchaReady, setRecaptchaReady] = useState(false)
 
-  // Initialize reCAPTCHA when step 3 (registration) or phone login step is reached
+  // Cleanup reCAPTCHA on unmount
   useEffect(() => {
-    const shouldShowRecaptcha = (!isLogin && step === 3) || (isLogin && loginMethod === 'phone' && loginPhoneStep === 'phone')
-    
-    if (shouldShowRecaptcha) {
-      // Small delay to ensure DOM is ready after conditional render
-      const timer = setTimeout(() => {
-        const container = document.getElementById('recaptcha-container')
-        if (container) {
-          setupRecaptcha('recaptcha-container')
-          setRecaptchaReady(true)
-        }
-      }, 300)
-      return () => clearTimeout(timer)
-    } else {
-      setRecaptchaReady(false)
+    return () => {
+      clearRecaptcha()
     }
-  }, [step, isLogin, loginMethod, loginPhoneStep, setupRecaptcha])
+  }, [clearRecaptcha])
 
   // Timer countdown for OTP resend
   useEffect(() => {

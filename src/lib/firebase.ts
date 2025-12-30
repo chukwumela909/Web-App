@@ -5,6 +5,7 @@ import {
   signInWithPhoneNumber,
   PhoneAuthProvider,
   linkWithCredential,
+  signInWithCredential,
   ConfirmationResult
 } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
@@ -36,6 +37,6 @@ if (typeof window !== 'undefined') {
 }
 
 export { analytics }
-export { RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential }
+export { RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, signInWithCredential }
 export type { ConfirmationResult }
 export default app
