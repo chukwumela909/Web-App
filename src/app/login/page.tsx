@@ -95,15 +95,24 @@ export default function LoginPage() {
   const [timer, setTimer] = useState(52)
   const [recaptchaReady, setRecaptchaReady] = useState(false)
 
-  // Initialize reCAPTCHA on mount
+  // Initialize reCAPTCHA when step 3 (registration) or phone login step is reached
   useEffect(() => {
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      setupRecaptcha('recaptcha-container')
-      setRecaptchaReady(true)
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [setupRecaptcha])
+    const shouldShowRecaptcha = (!isLogin && step === 3) || (isLogin && loginMethod === 'phone' && loginPhoneStep === 'phone')
+    
+    if (shouldShowRecaptcha) {
+      // Small delay to ensure DOM is ready after conditional render
+      const timer = setTimeout(() => {
+        const container = document.getElementById('recaptcha-container')
+        if (container) {
+          setupRecaptcha('recaptcha-container')
+          setRecaptchaReady(true)
+        }
+      }, 300)
+      return () => clearTimeout(timer)
+    } else {
+      setRecaptchaReady(false)
+    }
+  }, [step, isLogin, loginMethod, loginPhoneStep, setupRecaptcha])
 
   // Timer countdown for OTP resend
   useEffect(() => {
@@ -1136,6 +1145,15 @@ export default function LoginPage() {
                     </button>
                 )}
 
+                {/* Visible reCAPTCHA - shows when user needs to send OTP */}
+                {((!isLogin && step === 3) || (isLogin && loginMethod === 'phone' && loginPhoneStep === 'phone')) && (
+                    <div 
+                        id="recaptcha-container" 
+                        className="flex justify-center my-4"
+                        style={{ minHeight: '78px' }}
+                    ></div>
+                )}
+
                 {/* Submit Button */}
                 <button 
                     type="submit"
@@ -1186,9 +1204,6 @@ export default function LoginPage() {
                 )}
             </form>
         </div>
-        
-        {/* Invisible reCAPTCHA container - required for phone auth */}
-        <div id="recaptcha-container"></div>
     </div>
   )
 }

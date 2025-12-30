@@ -161,13 +161,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     try {
       const verifier = new RecaptchaVerifier(auth, containerId, {
-        size: 'invisible',
+        size: 'normal',
         callback: () => {
-          console.log('reCAPTCHA solved')
+          console.log('reCAPTCHA solved - user verified')
         },
         'expired-callback': () => {
-          console.log('reCAPTCHA expired, resetting...')
-          setupRecaptcha(containerId)
+          console.log('reCAPTCHA expired, please solve again')
         }
       })
       
@@ -207,19 +206,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     container.innerHTML = ''
     
     const verifier = new RecaptchaVerifier(auth, containerId, {
-      size: 'invisible',
+      size: 'normal',
       callback: () => {
-        console.log('reCAPTCHA verified')
+        console.log('reCAPTCHA verified - user solved challenge')
       },
       'expired-callback': () => {
-        console.log('reCAPTCHA expired')
+        console.log('reCAPTCHA expired, please solve again')
         windowWithRecaptcha.recaptchaRendered = false
       }
     })
     
     // Render the reCAPTCHA widget - this is required before use
     await verifier.render()
-    console.log('reCAPTCHA rendered successfully')
+    console.log('reCAPTCHA widget rendered successfully')
     
     windowWithRecaptcha.recaptchaVerifier = verifier
     windowWithRecaptcha.recaptchaRendered = true
