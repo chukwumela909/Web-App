@@ -1,5 +1,12 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import { 
+  getAuth, 
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  PhoneAuthProvider,
+  linkWithCredential,
+  ConfirmationResult
+} from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getAnalytics } from 'firebase/analytics'
 
@@ -29,4 +36,6 @@ if (typeof window !== 'undefined') {
 }
 
 export { analytics }
+export { RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential }
+export type { ConfirmationResult }
 export default app

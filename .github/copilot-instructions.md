@@ -1,4 +1,4 @@
-# Copilot Instructions for FahamPesa Web App
+Hey, Cortana. # Copilot Instructions for FahamPesa Web App
 
 ## Architecture
 - Next.js App Router (`src/app`) with client-heavy routes; many API route handlers live under `src/app/api/**` (Firebase/Firestore-backed business logic).

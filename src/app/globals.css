@@ -74,6 +74,34 @@ body {
   outline-offset: 2px;
 }
 
+/* Login page input - no focus outline */
+.login-input,
+.login-input:focus,
+.login-input:focus-visible,
+.login-input:active {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+
+.login-input-wrapper,
+.login-input-wrapper:focus,
+.login-input-wrapper:focus-within,
+.login-input-wrapper:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Ensure login inputs override global focus-visible */
+.login-input-wrapper input:focus,
+.login-input-wrapper input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
 /* Chrome Input Focus Fix - Critical for Chrome browser */
 input[type="text"],
 input[type="email"],
