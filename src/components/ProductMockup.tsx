@@ -2,6 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -416,10 +417,10 @@ export function ProductCard({ title, description, children, imageSrc, mobileImag
               {description}
             </p>
           </div>
-          <div className="flex items-center gap-1 text-[#004aad] font-inter font-semibold text-[16px] tracking-[-0.4px] cursor-pointer hover:gap-2 transition-all mt-2">
+          <Link href="/login" className="flex items-center gap-1 text-[#004aad] font-inter font-semibold text-[16px] tracking-[-0.4px] cursor-pointer hover:gap-2 transition-all mt-2">
             Get Started
             <ArrowRight className="w-5 h-5" />
-          </div>
+          </Link>
         </div>
         
         {/* Right Side - Mockup */}

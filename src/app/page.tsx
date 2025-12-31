@@ -151,6 +151,7 @@ export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [downloadModalOpen, setDownloadModalOpen] = useState(false)
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
+  const [showAllFaqs, setShowAllFaqs] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -172,7 +173,7 @@ export default function LandingPage() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-white h-[80px] flex items-center border-b border-gray-100">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px] w-full flex justify-between items-center">
           {/* Logo */}
-          <div className="flex items-center gap-[7px]">
+          <Link href="/" className="flex items-center gap-[7px]">
             <div className="w-[32px] h-[32px] relative">
               <Image src={assets.logo} alt="FahamPesa" fill className="object-contain" />
             </div>
@@ -180,13 +181,13 @@ export default function LandingPage() {
               <span className="font-roboto font-bold text-[20px] text-[#001223] leading-none">Fahampesa</span>
               <span className="font-inter font-light text-[10px] text-[#001223]">Smart Business Tools</span>
             </div>
-          </div>
+          </Link>
 
           {/* Desktop Nav */}
           <nav className="hidden lg:flex items-center gap-8">
             <Link href="#product" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Product</Link>
-            <Link href="#benefits" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Benefits</Link>
-            <Link href="#pricing" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Pricing</Link>
+            <Link href="#who-we-serve" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Customers</Link>
+            <Link href="/pricingpage" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Pricing</Link>
           </nav>
 
           {/* Desktop Actions */}
@@ -229,7 +230,7 @@ export default function LandingPage() {
             >
               {/* Mobile Menu Header */}
               <div className="h-[80px] flex items-center justify-between px-4 sm:px-6 border-b border-gray-100 shrink-0">
-                <div className="flex items-center gap-[7px]">
+                <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-[7px]">
                   <div className="w-[32px] h-[32px] relative">
                     <Image src={assets.logo} alt="FahamPesa" fill className="object-contain" />
                   </div>
@@ -237,7 +238,7 @@ export default function LandingPage() {
                     <span className="font-roboto font-bold text-[20px] text-[#001223] leading-none">Fahampesa</span>
                     <span className="font-inter font-light text-[10px] text-[#001223]">Smart Business Tools</span>
                   </div>
-                </div>
+                </Link>
                 <button
                   className="p-2"
                   onClick={() => setMobileMenuOpen(false)}
@@ -256,14 +257,14 @@ export default function LandingPage() {
                   Products
                 </Link>
                 <Link 
-                  href="#benefits" 
+                  href="#who-we-serve" 
                   onClick={() => setMobileMenuOpen(false)} 
                   className="font-dm-sans font-bold text-[16px] text-[#001031] py-3 px-4 rounded-[8px] hover:bg-gray-50 w-full text-center"
                 >
-                  Benefits
+                  Customers
                 </Link>
                 <Link 
-                  href="#pricing" 
+                  href="/pricingpage" 
                   onClick={() => setMobileMenuOpen(false)} 
                   className="font-dm-sans font-bold text-[16px] text-[#001031] py-3 px-4 rounded-[8px] hover:bg-gray-50 w-full text-center"
                 >
@@ -499,7 +500,7 @@ export default function LandingPage() {
       </section>
 
       {/* Who We Serve Section */}
-      <section className="py-[80px] bg-white">
+      <section id="who-we-serve" className="py-[80px] bg-white">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px]">
           <div className="text-center mb-[80px]">
             <span className="font-inter font-medium text-[14px] text-[#004AAD] tracking-[0.9px] uppercase block mb-4">WHO WE SERVE</span>
@@ -891,17 +892,17 @@ export default function LandingPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-[80px] bg-white">
+      <section id="faq" className="py-[80px] bg-white">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px]">
           <div className="text-center mb-[60px]">
-            <span className="font-inter font-medium text-[18px] text-[#004AAD] tracking-[0.9px] uppercase block mb-4">FREQUENTLY ASKED QUESTIONS</span>
+            <span className="font-inter font-medium text-[18px] text-[#004AAD] tracking-[0.9px] uppercase block mb-4">FAQs</span>
             <h2 className="font-inter font-medium text-[40px] sm:text-[78px] text-[#001031] leading-[1.19] tracking-[-1.5px]">
               Frequently Asked<br /> Questions
             </h2>
           </div>
 
-          <div className="max-w-[820px] mx-auto flex flex-col gap-[30px] mb-[100px]">
-            {faqs.map((faq, index) => (
+          <div className="max-w-[820px] mx-auto flex flex-col gap-[30px] mb-[40px]">
+            {(showAllFaqs ? faqs : faqs.slice(0, 3)).map((faq, index) => (
               <FAQItem
                 key={index}
                 question={faq.question}
@@ -911,6 +912,19 @@ export default function LandingPage() {
               />
             ))}
           </div>
+
+          {!showAllFaqs && faqs.length > 3 && (
+            <div className="flex justify-center mb-[100px]">
+              <button
+                onClick={() => setShowAllFaqs(true)}
+                className="font-dm-sans font-semibold text-[16px] text-[#004AAD] border border-[#004AAD] rounded-[10px] px-8 py-3 hover:bg-[#004AAD] hover:text-white transition-colors"
+              >
+                See All FAQs
+              </button>
+            </div>
+          )}
+
+          {showAllFaqs && <div className="mb-[100px]" />}
 
           <div className="relative w-full max-w-[1235px] mx-auto h-[400px] rounded-[48px] overflow-hidden text-white p-10 flex flex-col justify-center items-center text-center" style={{ background: 'radial-gradient(ellipse at top left, #0A4DA6 0%, #001834 50%, #000D1F 100%)' }}>
             <div className="absolute inset-0">
@@ -949,9 +963,9 @@ export default function LandingPage() {
             {/* Column 2 */}
             <div className="flex flex-col gap-6">
               <h4 className="font-dm-sans font-semibold text-[16px] text-[#64748B]">HELP</h4>
-              <Link href="#" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">FAQ</Link>
+              <Link href="#faq" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">FAQ</Link>
               <Link href="#" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">User Guide</Link>
-              <Link href="#" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">WhatsApp Support</Link>
+              <Link href="https://wa.me/message/55YQ3IBJHOQCM1" target="_blank" rel="noopener noreferrer" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">WhatsApp Support</Link>
               <Link href="mailto:support@fahampesa.com" className="font-dm-sans font-medium text-[14px] hover:text-[#004AAD] transition-colors">support@fahampesa.com</Link>
             </div>
 
@@ -992,14 +1006,21 @@ export default function LandingPage() {
             {/* Column 4: Socials */}
             <div className="flex flex-col gap-6 mt-4 lg:mt-0 lg:items-end">
               <div className="flex gap-4">
-                <Link href="#" className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                <Link href="https://www.facebook.com/share/1HGyTGdrpY/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
                   <Image src={assets.facebook} alt="Facebook" width={12} height={12} />
                 </Link>
-                <Link href="#" className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
-                  <Image src={assets.xIcon} alt="X" width={12} height={12} />
+                <Link href="https://www.tiktok.com/@fahampesa" target="_blank" rel="noopener noreferrer" className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                  <svg viewBox="0 0 24 24" className="w-3 h-3" fill="#001223">
+                    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
+                  </svg>
                 </Link>
-                <Link href="#" className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                <Link href="https://www.instagram.com/fahampesa?igsh=MWV5bWlvZGR3bjN4eQ%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer" className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
                   <Image src={assets.instagram} alt="Instagram" width={12} height={12} />
+                </Link>
+                <Link href="https://wa.me/message/55YQ3IBJHOQCM1" target="_blank" rel="noopener noreferrer" className="w-[30px] h-[30px] bg-white rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                  <svg viewBox="0 0 24 24" className="w-3 h-3" fill="#001223">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                  </svg>
                 </Link>
               </div>
             </div>
