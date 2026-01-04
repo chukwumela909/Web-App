@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/firebase'
-import { collection, getDocs } from 'firebase/firestore'
+import { adminDb } from '@/lib/firebase-admin-server'
 
 export async function GET(request: NextRequest) {
   try {
-    const alertsRef = collection(db, 'security_alerts')
-    const alertsSnapshot = await getDocs(alertsRef)
+    if (!adminDb) {
+      return NextResponse.json({
+        success: false,
+        error: 'Firebase Admin SDK not initialized'
+      }, { status: 500 })
+    }
     
-    const alerts = []
+    const alertsSnapshot = await adminDb.collection('security_alerts').get()
+    
+    const alerts: any[] = []
     alertsSnapshot.forEach((doc) => {
       alerts.push({
         id: doc.id,

@@ -1,27 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { doc, updateDoc, getDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { adminDb } from '@/lib/firebase-admin-server'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Firebase Admin SDK not initialized' },
+        { status: 500 }
+      )
+    }
+    
     const { id } = params
     const { disabled } = await request.json()
 
-    // Get current user document
-    const userRef = doc(db, 'users', id)
-    const userDoc = await getDoc(userRef)
+    // Get current user document using Admin SDK
+    const userRef = adminDb.collection('users').doc(id)
+    const userDoc = await userRef.get()
     
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       )
     }
 
-    const userData = userDoc.data()
+    const userData = userDoc.data()!
     const currentDisplayName = userData.displayName || userData.name || ''
 
     // Update user status
@@ -36,7 +42,7 @@ export async function POST(
       newDisplayName = currentDisplayName.replace('[DISABLED] ', '')
     }
 
-    await updateDoc(userRef, {
+    await userRef.update({
       displayName: newDisplayName,
       disabled: disabled,
       disabledAt: disabled ? new Date() : null,

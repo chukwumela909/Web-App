@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { listAllUsers, getUserByEmail, FirebaseAuthUser } from '@/lib/firebase-admin-server'
-import { db } from '@/lib/firebase'
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore'
+import { listAllUsers, getUserByEmail, FirebaseAuthUser, adminDb } from '@/lib/firebase-admin-server'
 
 export interface EnhancedUser extends FirebaseAuthUser {
   lastActiveAt?: string
@@ -36,28 +34,25 @@ export async function GET(request: NextRequest) {
     // Enhance with Firestore data if requested
     let enhancedUsers: EnhancedUser[] = authUsers
     
-    if (includeFirestoreData) {
-      // Get all Firestore user documents for matching
-      const usersRef = collection(db, 'users')
-      const firestoreSnapshot = await getDocs(usersRef)
+    if (includeFirestoreData && adminDb) {
+      // Get all Firestore user documents for matching using Admin SDK
+      const firestoreSnapshot = await adminDb.collection('users').get()
       const firestoreUsers = new Map()
       
       firestoreSnapshot.forEach((doc) => {
         firestoreUsers.set(doc.id, doc.data())
       })
       
-      // Get all userProfiles for subscription data
-      const userProfilesRef = collection(db, 'userProfiles')
-      const userProfilesSnapshot = await getDocs(userProfilesRef)
+      // Get all userProfiles for subscription data using Admin SDK
+      const userProfilesSnapshot = await adminDb.collection('userProfiles').get()
       const userProfiles = new Map()
       
       userProfilesSnapshot.forEach((doc) => {
         userProfiles.set(doc.id, doc.data())
       })
       
-      // Also get active subscriptions for plan type info
-      const subscriptionsRef = collection(db, 'subscriptions')
-      const subscriptionsSnapshot = await getDocs(subscriptionsRef)
+      // Also get active subscriptions for plan type info using Admin SDK
+      const subscriptionsSnapshot = await adminDb.collection('subscriptions').get()
       const subscriptions = new Map()
       
       subscriptionsSnapshot.forEach((doc) => {
@@ -146,10 +141,13 @@ export async function GET(request: NextRequest) {
       try {
         console.log('Falling back to Firestore-only user data...')
         
-        const usersRef = collection(db, 'users')
-        const snapshot = await getDocs(usersRef)
+        if (!adminDb) {
+          throw new Error('Admin SDK not initialized for fallback')
+        }
         
-        const users = []
+        const snapshot = await adminDb.collection('users').get()
+        
+        const users: any[] = []
         snapshot.forEach((doc) => {
           const data = doc.data()
           

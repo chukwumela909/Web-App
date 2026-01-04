@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/firebase'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { adminDb, Timestamp } from '@/lib/firebase-admin-server'
 
 export interface NotificationSettings {
   emailEnabled: boolean
@@ -30,10 +29,17 @@ const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 
 export async function GET(request: NextRequest) {
   try {
-    const settingsRef = doc(db, 'platform_settings', 'notifications')
-    const settingsSnap = await getDoc(settingsRef)
+    if (!adminDb) {
+      return NextResponse.json({
+        success: false,
+        error: 'Firebase Admin SDK not initialized'
+      }, { status: 500 })
+    }
     
-    if (settingsSnap.exists()) {
+    const settingsRef = adminDb.collection('platform_settings').doc('notifications')
+    const settingsSnap = await settingsRef.get()
+    
+    if (settingsSnap.exists) {
       const data = settingsSnap.data() as NotificationSettings
       return NextResponse.json({
         success: true,
@@ -116,12 +122,12 @@ export async function POST(request: NextRequest) {
       slackEnabled: Boolean(slackEnabled),
       webhookUrl: webhookUrl || '',
       alertThresholds: alertThresholds || DEFAULT_NOTIFICATION_SETTINGS.alertThresholds,
-      updatedAt: serverTimestamp(),
+      updatedAt: Timestamp?.now() || new Date(),
       updatedBy: updatedBy || 'Unknown'
     }
     
-    const settingsRef = doc(db, 'platform_settings', 'notifications')
-    await setDoc(settingsRef, settings, { merge: true })
+    const settingsRef = adminDb!.collection('platform_settings').doc('notifications')
+    await settingsRef.set(settings, { merge: true })
     
     return NextResponse.json({
       success: true,

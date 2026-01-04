@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/firebase'
-import { collection, getDocs } from 'firebase/firestore'
+import { adminDb } from '@/lib/firebase-admin-server'
 
 export async function GET(request: NextRequest) {
   try {
-    // Note: We can't access Firebase Auth users directly from client-side code
-    // But we can check the Firestore users collection which should mirror Auth users
+    if (!adminDb) {
+      return NextResponse.json({
+        success: false,
+        error: 'Firebase Admin SDK not initialized'
+      }, { status: 500 })
+    }
     
-    const usersRef = collection(db, 'users')
-    const snapshot = await getDocs(usersRef)
+    // Fetch users from Firestore using Admin SDK
+    const snapshot = await adminDb.collection('users').get()
     
-    const users = []
+    const users: any[] = []
     snapshot.forEach((doc) => {
       const data = doc.data()
       users.push({

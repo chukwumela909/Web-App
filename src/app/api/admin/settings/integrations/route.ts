@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/firebase'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { adminDb, Timestamp } from '@/lib/firebase-admin-server'
 
 export interface IntegrationSettings {
   firebase: {
@@ -44,10 +43,17 @@ const DEFAULT_INTEGRATION_SETTINGS: IntegrationSettings = {
 
 export async function GET(request: NextRequest) {
   try {
-    const settingsRef = doc(db, 'platform_settings', 'integrations')
-    const settingsSnap = await getDoc(settingsRef)
+    if (!adminDb) {
+      return NextResponse.json({
+        success: false,
+        error: 'Firebase Admin SDK not initialized'
+      }, { status: 500 })
+    }
     
-    if (settingsSnap.exists()) {
+    const settingsRef = adminDb.collection('platform_settings').doc('integrations')
+    const settingsSnap = await settingsRef.get()
+    
+    if (settingsSnap.exists) {
       const data = settingsSnap.data() as IntegrationSettings
       return NextResponse.json({
         success: true,
@@ -133,12 +139,12 @@ export async function POST(request: NextRequest) {
         hostUrl: posthog?.hostUrl || 'https://app.posthog.com',
         status: posthog?.enabled && posthog?.apiKey ? 'connected' : 'disconnected'
       },
-      updatedAt: serverTimestamp(),
+      updatedAt: Timestamp?.now() || new Date(),
       updatedBy: updatedBy || 'Unknown'
     }
     
-    const settingsRef = doc(db, 'platform_settings', 'integrations')
-    await setDoc(settingsRef, settings, { merge: true })
+    const settingsRef = adminDb!.collection('platform_settings').doc('integrations')
+    await settingsRef.set(settings, { merge: true })
     
     return NextResponse.json({
       success: true,

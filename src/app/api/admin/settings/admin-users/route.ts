@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/firebase'
-import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, query, where } from 'firebase/firestore'
+import { adminDb, Timestamp } from '@/lib/firebase-admin-server'
 
 export interface AdminUser {
   id: string
@@ -16,8 +15,14 @@ export interface AdminUser {
 
 export async function GET(request: NextRequest) {
   try {
-    const adminUsersRef = collection(db, 'admin_users')
-    const snapshot = await getDocs(adminUsersRef)
+    if (!adminDb) {
+      return NextResponse.json({
+        success: false,
+        error: 'Firebase Admin SDK not initialized'
+      }, { status: 500 })
+    }
+    
+    const snapshot = await adminDb.collection('admin_users').get()
     
     const adminUsers: AdminUser[] = []
     snapshot.forEach((doc) => {
@@ -100,9 +105,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Check if email already exists
-      const existingUsersRef = collection(db, 'admin_users')
-      const existingQuery = query(existingUsersRef, where('email', '==', email))
-      const existingSnapshot = await getDocs(existingQuery)
+      const existingSnapshot = await adminDb!.collection('admin_users').where('email', '==', email).get()
       
       if (!existingSnapshot.empty) {
         return NextResponse.json({
@@ -120,13 +123,13 @@ export async function POST(request: NextRequest) {
         role,
         lastLogin: null,
         status: 'active',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: Timestamp?.now() || new Date(),
+        updatedAt: Timestamp?.now() || new Date(),
         createdBy: createdBy || 'Unknown'
       }
       
-      const adminUserRef = doc(db, 'admin_users', adminUserId)
-      await setDoc(adminUserRef, newAdminUser)
+      const adminUserRef = adminDb!.collection('admin_users').doc(adminUserId)
+      await adminUserRef.set(newAdminUser)
       
       return NextResponse.json({
         success: true,
@@ -148,13 +151,13 @@ export async function POST(request: NextRequest) {
         }, { status: 400 })
       }
       
-      const adminUserRef = doc(db, 'admin_users', id)
+      const adminUserRef = adminDb!.collection('admin_users').doc(id)
       const updatePayload = {
         ...updateData,
-        updatedAt: serverTimestamp()
+        updatedAt: Timestamp?.now() || new Date()
       }
       
-      await setDoc(adminUserRef, updatePayload, { merge: true })
+      await adminUserRef.set(updatePayload, { merge: true })
       
       return NextResponse.json({
         success: true,
@@ -171,8 +174,8 @@ export async function POST(request: NextRequest) {
         }, { status: 400 })
       }
       
-      const adminUserRef = doc(db, 'admin_users', id)
-      await deleteDoc(adminUserRef)
+      const adminUserRef = adminDb!.collection('admin_users').doc(id)
+      await adminUserRef.delete()
       
       return NextResponse.json({
         success: true,
