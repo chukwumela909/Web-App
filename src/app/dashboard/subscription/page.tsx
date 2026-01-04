@@ -131,6 +131,7 @@ export default function SubscriptionPage() {
     const [downloadModalOpen, setDownloadModalOpen] = useState(false)
     const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
     const [showAllFaqs, setShowAllFaqs] = useState(false)
+    const [activeTab, setActiveTab] = useState<'mobile' | 'web' | 'desktop'>('mobile')
     const router = useRouter()
     const { currency, isLoading} = useCurrency()
 
@@ -586,7 +587,71 @@ export default function SubscriptionPage() {
                     Compare Features
                 </h2>
 
-                <img className='mx-auto max-w-6xl' src="/assets/figma/subscription/image.png" alt=""  />
+                {/* Mobile Tabs */}
+                <div className="md:hidden max-w-[400px] mx-auto mb-8">
+                    <div className="flex p-1 bg-[#F8F9FA] rounded-[12px]">
+                        <button
+                            onClick={() => setActiveTab('mobile')}
+                            className={`flex-1 py-2 px-1 text-[12px] sm:text-[13px] font-medium rounded-[8px] text-center transition-all ${
+                                activeTab === 'mobile' 
+                                ? 'bg-[#E9F2F8] text-[#004AAD]' 
+                                : 'text-[#64748B]'
+                            }`}
+                        >
+                            Mobile App
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('web')}
+                            className={`flex-1 py-2 px-1 text-[12px] sm:text-[13px] font-medium rounded-[8px] text-center transition-all ${
+                                activeTab === 'web' 
+                                ? 'bg-[#E9F2F8] text-[#004AAD]' 
+                                : 'text-[#64748B]'
+                            }`}
+                        >
+                            Web App (Free)
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('desktop')}
+                            className={`flex-1 py-2 px-1 text-[12px] sm:text-[13px] font-medium rounded-[8px] text-center transition-all ${
+                                activeTab === 'desktop' 
+                                ? 'bg-[#E9F2F8] text-[#004AAD]' 
+                                : 'text-[#64748B]'
+                            }`}
+                        >
+                            Desktop App (Pro)
+                        </button>
+                    </div>
+                </div>
+
+                {/* Mobile Table */}
+                <div className="md:hidden max-w-[400px] mx-auto border border-[#E2E8F0] rounded-[16px] overflow-hidden mb-8">
+                    {/* Header */}
+                    <div className="flex bg-[#F8F9FA] border-b border-[#E2E8F0]">
+                        <div className="flex-1 py-4 px-4 text-[14px] font-bold text-[#191D23]">
+                            Features
+                        </div>
+                        <div className="flex-1 py-4 px-4 text-[14px] font-bold text-[#191D23] text-center border-l border-[#E2E8F0]">
+                            Access
+                        </div>
+                    </div>
+                    {/* Rows */}
+                    {features.map((feature, index) => (
+                        <div key={index} className="flex border-b border-[#E2E8F0] last:border-0">
+                            <div className="flex-1 py-4 px-4 text-[14px] font-medium text-[#191D23] flex items-center">
+                                {feature.name}
+                            </div>
+                            <div className="flex-1 py-4 px-4 flex items-center justify-center border-l border-[#E2E8F0]">
+                                {renderFeatureCell(
+                                    activeTab === 'mobile' ? feature.mobile :
+                                    activeTab === 'web' ? feature.webFree :
+                                    feature.desktop
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <img className='hidden md:block mx-auto max-w-6xl' src="/assets/figma/subscription/image.png" alt=""  />
 
                   <div className="flex justify-center items-center mt-12">
                         <button 
