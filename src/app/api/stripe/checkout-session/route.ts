@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createPendingSubscription } from '@/lib/subscription-service'
+import { createPendingSubscriptionAdmin } from '@/lib/subscription-service-admin'
 import { PLAN_PRICING, PlanType } from '@/lib/subscription-types'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
 
     const planName = planType === 'yearly' ? '1 Year Pro Plan' : '1 Month Pro Plan'
 
-    // Create pending subscription in Firestore first
-    const subscription = await createPendingSubscription({
+    // Create pending subscription in Firestore first (using Admin SDK)
+    const subscription = await createPendingSubscriptionAdmin({
       userId,
       email,
       planType,

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuth } from 'firebase-admin/auth'
-import { adminApp } from '@/lib/firebase-admin-server'
-import { doc, deleteDoc, getDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { adminApp, adminDb } from '@/lib/firebase-admin-server'
 
 // Mock staff data for development - starting with empty list
 const mockStaffMembers: any[] = []
@@ -14,17 +12,24 @@ export async function GET(
   try {
     const { id: staffId } = await params
     
-    // Fetch staff member from Firestore
-    const staffDoc = await getDoc(doc(db, 'staff', staffId))
+    if (!adminDb) {
+      return NextResponse.json({
+        success: false,
+        error: 'Firebase Admin SDK not initialized'
+      }, { status: 500 })
+    }
     
-    if (!staffDoc.exists()) {
+    // Fetch staff member from Firestore using Admin SDK
+    const staffDoc = await adminDb.collection('staff').doc(staffId).get()
+    
+    if (!staffDoc.exists) {
       return NextResponse.json({
         success: false,
         error: 'Staff member not found'
       }, { status: 404 })
     }
     
-    const data = staffDoc.data()
+    const data = staffDoc.data()!
     const staff = {
       id: staffDoc.id,
       name: data.name,
@@ -109,6 +114,13 @@ export async function DELETE(
   try {
     const { id: staffId } = await params
     
+    if (!adminDb || !adminApp) {
+      return NextResponse.json({
+        success: false,
+        error: 'Firebase Admin SDK not initialized'
+      }, { status: 500 })
+    }
+    
     // Delete Firebase Auth user and Firestore record
     const auth = getAuth(adminApp)
     
@@ -117,8 +129,8 @@ export async function DELETE(
       await auth.deleteUser(staffId)
       console.log(`Deleted Firebase Auth user: ${staffId}`)
       
-      // Delete Firestore record
-      await deleteDoc(doc(db, 'staff', staffId))
+      // Delete Firestore record using Admin SDK
+      await adminDb.collection('staff').doc(staffId).delete()
       console.log(`Deleted Firestore staff record: ${staffId}`)
       
       // Remove from mock data for immediate response
@@ -139,8 +151,10 @@ export async function DELETE(
       if (authError.code === 'auth/user-not-found') {
         // User already deleted or doesn't exist, still try to clean up Firestore
         try {
-          await deleteDoc(doc(db, 'staff', staffId))
-          console.log(`Cleaned up Firestore staff record: ${staffId}`)
+          if (adminDb) {
+            await adminDb.collection('staff').doc(staffId).delete()
+            console.log(`Cleaned up Firestore staff record: ${staffId}`)
+          }
         } catch (firestoreError) {
           console.error('Error cleaning up Firestore record:', firestoreError)
         }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSubscription } from '@/lib/subscription-service'
+import { getSubscriptionAdmin } from '@/lib/subscription-service-admin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const subscription = await getSubscription(subscriptionId)
+    const subscription = await getSubscriptionAdmin(subscriptionId)
 
     if (!subscription) {
       return NextResponse.json(

@@ -3,7 +3,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getAllSubscriptions, getSubscriptionStats } from '@/lib/subscription-service'
+import { getAllSubscriptionsAdmin, getSubscriptionStatsAdmin } from '@/lib/subscription-service-admin'
 import { SubscriptionStatus, Currency } from '@/lib/subscription-types'
 
 export async function GET(request: NextRequest) {
@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
     if (currency) filter.currency = currency
     if (email) filter.email = email
     
-    // Fetch subscriptions
-    const subscriptions = await getAllSubscriptions(filter)
+    // Fetch subscriptions using Admin SDK
+    const subscriptions = await getAllSubscriptionsAdmin(filter)
     
     // Format for response
     const formattedSubscriptions = subscriptions.map((sub) => ({
@@ -49,15 +49,15 @@ export async function GET(request: NextRequest) {
     const response: {
       subscriptions: typeof formattedSubscriptions
       total: number
-      stats?: Awaited<ReturnType<typeof getSubscriptionStats>>
+      stats?: Awaited<ReturnType<typeof getSubscriptionStatsAdmin>>
     } = {
       subscriptions: formattedSubscriptions,
       total: formattedSubscriptions.length,
     }
     
-    // Include stats if requested
+    // Include stats if requested (using Admin SDK)
     if (includeStats) {
-      response.stats = await getSubscriptionStats()
+      response.stats = await getSubscriptionStatsAdmin()
     }
     
     return NextResponse.json(response)

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { activateSubscription, updateSubscriptionStatus } from '@/lib/subscription-service'
+import { activateSubscriptionAdmin, updateSubscriptionStatusAdmin } from '@/lib/subscription-service-admin'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-05-28.basil',
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         console.log(`Activating subscription ${subscriptionId} with transaction ${transactionId}`)
 
         try {
-          await activateSubscription(subscriptionId, transactionId)
+          await activateSubscriptionAdmin(subscriptionId, transactionId)
           console.log(`Subscription ${subscriptionId} activated successfully`)
         } catch (error) {
           console.error('Error activating subscription:', error)
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         if (subscriptionId) {
           console.log(`Checkout session expired for subscription ${subscriptionId}`)
           try {
-            await updateSubscriptionStatus(subscriptionId, 'failed')
+            await updateSubscriptionStatusAdmin(subscriptionId, 'failed')
           } catch (error) {
             console.error('Error updating subscription status:', error)
           }

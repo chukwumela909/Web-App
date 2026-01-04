@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { activateSubscription, getSubscription } from '@/lib/subscription-service'
+import { activateSubscriptionAdmin, getSubscriptionAdmin } from '@/lib/subscription-service-admin'
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the subscription to verify it exists and is pending
-    const subscription = await getSubscription(subscriptionId)
+    const subscription = await getSubscriptionAdmin(subscriptionId)
     
     if (!subscription) {
       return NextResponse.json(
@@ -45,8 +45,8 @@ export async function POST(request: NextRequest) {
     // Generate a transaction ID if not provided
     const txnId = transactionId || `MANUAL-${Date.now()}`
 
-    // Activate the subscription
-    const activatedSubscription = await activateSubscription(subscriptionId, txnId)
+    // Activate the subscription using Admin SDK
+    const activatedSubscription = await activateSubscriptionAdmin(subscriptionId, txnId)
 
     return NextResponse.json({
       success: true,

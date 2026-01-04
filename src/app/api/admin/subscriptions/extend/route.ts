@@ -3,9 +3,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { extendSubscription, getSubscription } from '@/lib/subscription-service'
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { extendSubscriptionAdmin, getSubscriptionAdmin } from '@/lib/subscription-service-admin'
+import { adminDb } from '@/lib/firebase-admin-server'
+import { FieldValue } from 'firebase-admin/firestore'
 
 // Helper function to send in-app notification
 async function sendInAppNotification(
@@ -16,8 +16,9 @@ async function sendInAppNotification(
   newEndDate: string
 ) {
   try {
+    if (!adminDb) return false
     const durationText = duration === '1-month' ? '1 month' : '2 months'
-    await addDoc(collection(db, 'notifications'), {
+    await adminDb.collection('notifications').add({
       userId,
       userEmail,
       title: 'Subscription Extended! 🎉',
@@ -30,7 +31,7 @@ async function sendInAppNotification(
         action: 'extend',
         duration
       },
-      createdAt: serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     })
     return true
   } catch (error) {
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if subscription exists
-    const existing = await getSubscription(subscriptionId)
+    const existing = await getSubscriptionAdmin(subscriptionId)
     if (!existing) {
       return NextResponse.json(
         { error: 'Subscription not found' },
@@ -133,12 +134,12 @@ export async function POST(request: NextRequest) {
     const userEmail = existing.email
     
     // Extend the subscription (this also handles expired/cancelled subscriptions)
-    const updatedSubscription = await extendSubscription({
+    const updatedSubscription = await extendSubscriptionAdmin(
       subscriptionId,
-      duration,
+      duration === '1-month' ? 'monthly' : 'yearly',
       adminId,
       reason,
-    })
+    )
     
     // Format the new end date for notifications
     const newEndDateFormatted = updatedSubscription.endDate 

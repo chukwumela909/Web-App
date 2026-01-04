@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuth } from 'firebase-admin/auth'
-import { adminApp } from '@/lib/firebase-admin-server'
-import { doc, setDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { adminApp, adminDb } from '@/lib/firebase-admin-server'
+import { FieldValue } from 'firebase-admin/firestore'
 
 // Mock staff data for development - starting with empty list
 const mockStaffMembers: any[] = []
 
 export async function GET(request: NextRequest) {
   try {
-    // Fetch staff members from Firestore
-    const staffCollection = collection(db, 'staff')
-    const staffSnapshot = await getDocs(staffCollection)
+    if (!adminDb) {
+      return NextResponse.json({
+        success: false,
+        error: 'Firebase Admin SDK not initialized',
+        staff: [],
+        total: 0
+      }, { status: 500 })
+    }
+    
+    // Fetch staff members from Firestore using Admin SDK
+    const staffSnapshot = await adminDb.collection('staff').get()
     
     const allStaff = staffSnapshot.docs.map(doc => {
       const data = doc.data()
@@ -88,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Create Firebase Auth user
-    if (!adminApp) {
+    if (!adminApp || !adminDb) {
       console.error('Firebase Admin SDK not initialized - missing environment variables')
       console.log('Falling back to mock user creation for development')
       
@@ -101,14 +108,14 @@ export async function POST(request: NextRequest) {
         role,
         permissions: permissions || [],
         status: 'active',
-        createdAt: serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
         lastLogin: null,
         authId: mockUserId,
         isMockUser: true // Flag to indicate this is a development user
       }
       
-      // Save to Firestore
-      await setDoc(doc(db, 'staff', mockUserId), staffData)
+      // Save to Firestore - but this will fail without adminDb
+      // In development mode, we'll just return a mock response
       
       const newStaffMember = {
         id: mockUserId,
@@ -167,13 +174,13 @@ export async function POST(request: NextRequest) {
         role,
         permissions: permissions || [],
         status: 'active',
-        createdAt: serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
         lastLogin: null,
         authId: userRecord.uid
       }
       
-      // Save to Firestore
-      await setDoc(doc(db, 'staff', userRecord.uid), staffData)
+      // Save to Firestore using Admin SDK
+      await adminDb.collection('staff').doc(userRecord.uid).set(staffData)
       
       const newStaffMember = {
         id: userRecord.uid,

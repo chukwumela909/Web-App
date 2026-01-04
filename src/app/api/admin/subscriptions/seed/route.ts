@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/firebase'
-import { collection, addDoc, Timestamp } from 'firebase/firestore'
+import { adminDb } from '@/lib/firebase-admin-server'
+import { Timestamp } from 'firebase-admin/firestore'
 
 // POST /api/admin/subscriptions/seed - Create test subscriptions
 export async function POST() {
   try {
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Firebase Admin SDK not initialized' },
+        { status: 500 }
+      )
+    }
+    
     const now = new Date()
     const oneMonthLater = new Date(now)
     oneMonthLater.setMonth(oneMonthLater.getMonth() + 1)
@@ -12,11 +19,11 @@ export async function POST() {
     const yesterday = new Date(now)
     yesterday.setDate(yesterday.getDate() - 1)
     
-    const subscriptionsRef = collection(db, 'subscriptions')
+    const subscriptionsRef = adminDb.collection('subscriptions')
     const createdIds: string[] = []
     
     // Test subscription 1: Active KSH Monthly
-    const sub1 = await addDoc(subscriptionsRef, {
+    const sub1 = await subscriptionsRef.add({
       userId: 'test-user-001',
       email: 'active.user@example.com',
       phoneNumber: '+254712345678',
@@ -35,7 +42,7 @@ export async function POST() {
     createdIds.push(sub1.id)
     
     // Test subscription 2: Expired KSH Monthly
-    const sub2 = await addDoc(subscriptionsRef, {
+    const sub2 = await subscriptionsRef.add({
       userId: 'test-user-002',
       email: 'expired.user@example.com',
       phoneNumber: '+254722345678',
@@ -54,7 +61,7 @@ export async function POST() {
     createdIds.push(sub2.id)
     
     // Test subscription 3: Active USD Monthly
-    const sub3 = await addDoc(subscriptionsRef, {
+    const sub3 = await subscriptionsRef.add({
       userId: 'test-user-003',
       email: 'international@example.com',
       phoneNumber: '+1234567890',
@@ -73,7 +80,7 @@ export async function POST() {
     createdIds.push(sub3.id)
     
     // Test subscription 4: Pending KSH
-    const sub4 = await addDoc(subscriptionsRef, {
+    const sub4 = await subscriptionsRef.add({
       userId: 'test-user-004',
       email: 'pending.user@example.com',
       phoneNumber: '+254732345678',
@@ -95,7 +102,7 @@ export async function POST() {
     const oneYearLater = new Date(now)
     oneYearLater.setFullYear(oneYearLater.getFullYear() + 1)
     
-    const sub5 = await addDoc(subscriptionsRef, {
+    const sub5 = await subscriptionsRef.add({
       userId: 'test-user-005',
       email: 'yearly.user@example.com',
       phoneNumber: '+254742345678',
@@ -114,7 +121,7 @@ export async function POST() {
     createdIds.push(sub5.id)
     
     // Test subscription 6: Failed
-    const sub6 = await addDoc(subscriptionsRef, {
+    const sub6 = await subscriptionsRef.add({
       userId: 'test-user-006',
       email: 'failed.user@example.com',
       phoneNumber: '+254752345678',

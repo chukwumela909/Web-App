@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/firebase'
-import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore'
+import { adminDb } from '@/lib/firebase-admin-server'
+import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 
 // POST /api/admin/subscriptions/set-subscribed - Set a user as subscribed (for testing)
 export async function POST(request: NextRequest) {
   try {
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Firebase Admin SDK not initialized' },
+        { status: 500 }
+      )
+    }
+    
     const body = await request.json()
     const { userId, email, isSubscribed = true } = body
 
@@ -20,12 +27,12 @@ export async function POST(request: NextRequest) {
     endDate.setMonth(endDate.getMonth() + 1) // 1 month subscription
 
     // Check if user profile exists
-    const userRef = doc(db, 'users', userId)
-    const userSnap = await getDoc(userRef)
+    const userRef = adminDb.collection('users').doc(userId)
+    const userSnap = await userRef.get()
 
-    if (!userSnap.exists()) {
+    if (!userSnap.exists) {
       // Create user document if it doesn't exist
-      await setDoc(userRef, {
+      await userRef.set({
         uid: userId,
         email: email || '',
         fullName: email?.split('@')[0] || 'Test User',
@@ -39,7 +46,7 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Update existing user with subscription status
-      await setDoc(userRef, {
+      await userRef.set({
         isSubscribed: isSubscribed,
         subscriptionId: isSubscribed ? 'manual-test-subscription' : null,
         subscriptionEndDate: isSubscribed ? Timestamp.fromDate(endDate) : null,
@@ -48,8 +55,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Also update/create userProfiles document
-    const userProfileRef = doc(db, 'userProfiles', userId)
-    await setDoc(userProfileRef, {
+    const userProfileRef = adminDb.collection('userProfiles').doc(userId)
+    await userProfileRef.set({
       isSubscribed: isSubscribed,
       subscriptionId: isSubscribed ? 'manual-test-subscription' : null,
       subscriptionEndDate: isSubscribed ? Timestamp.fromDate(endDate) : null,

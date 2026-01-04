@@ -3,14 +3,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { revokeSubscription, getSubscription } from '@/lib/subscription-service'
-import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { revokeSubscriptionAdmin, getSubscriptionAdmin } from '@/lib/subscription-service-admin'
+import { adminDb } from '@/lib/firebase-admin-server'
+import { FieldValue } from 'firebase-admin/firestore'
 
 // Helper function to send in-app notification
 async function sendInAppNotification(userId: string, userEmail: string, subscriptionId: string) {
   try {
-    await addDoc(collection(db, 'notifications'), {
+    if (!adminDb) return false
+    await adminDb.collection('notifications').add({
       userId,
       userEmail,
       title: 'Subscription Cancelled',
@@ -22,7 +23,7 @@ async function sendInAppNotification(userId: string, userEmail: string, subscrip
         subscriptionId,
         action: 'revoke'
       },
-      createdAt: serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     })
     return true
   } catch (error) {
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if subscription exists
-    const existing = await getSubscription(subscriptionId)
+    const existing = await getSubscriptionAdmin(subscriptionId)
     if (!existing) {
       return NextResponse.json(
         { error: 'Subscription not found' },
@@ -122,12 +123,12 @@ export async function POST(request: NextRequest) {
     const userId = existing.userId
     const userEmail = existing.email
     
-    // Revoke the subscription
-    const updatedSubscription = await revokeSubscription({
+    // Revoke the subscription using Admin SDK
+    const updatedSubscription = await revokeSubscriptionAdmin(
       subscriptionId,
       adminId,
       reason,
-    })
+    )
     
     // Send notifications (don't block the response)
     const notificationPromises: Promise<boolean>[] = []
