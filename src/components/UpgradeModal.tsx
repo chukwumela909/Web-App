@@ -33,7 +33,7 @@ export function UpgradeModal({
 
   const handleUpgrade = () => {
     onOpenChange(false)
-    router.push('/dashboard/pricing')
+    router.push('/dashboard/subscription')
   }
 
   const featureName = feature ? FEATURE_NAMES[feature] : 'This feature'
