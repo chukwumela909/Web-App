@@ -12,23 +12,23 @@ export default function Footer() {
             <h3 className="text-[14px] font-semibold text-[#64748b] font-dm-sans tracking-wide uppercase">Company</h3>
             <ul className="flex flex-col gap-3">
               <li>
-                <Link href="#" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
+                <Link href="/about" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
                   About Us
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
+                <Link href="/privacy" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
                   Privacy
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
-                  Legal
+                <Link href="/terms" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
+                  Terms of Service
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
-                  Terms of Service
+                <Link href="/contact-information" className="text-[14px] font-medium text-white hover:text-[#004aad] transition-colors font-dm-sans">
+                  Contact Information
                 </Link>
               </li>
             </ul>
@@ -41,6 +41,11 @@ export default function Footer() {
               <li>
                 <Link href="/#faq" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
                   FAQ
+                </Link>
+              </li>
+              <li>
+                <Link href="/user-guide" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
+                  User Guide
                 </Link>
               </li>
               <li>
@@ -74,7 +79,7 @@ export default function Footer() {
             <div className="flex flex-row gap-3 flex-wrap">
               <div className="relative w-[150px] h-[44px] hover:opacity-90 transition-opacity cursor-pointer">
                 <Image 
-                  src="https://www.figma.com/api/mcp/asset/857eef64-c95f-4261-b645-28da8574d939" 
+                  src="/google_play.png" 
                   alt="Get it on Google Play" 
                   fill
                   className="object-contain"
@@ -82,7 +87,7 @@ export default function Footer() {
               </div>
               <div className="relative w-[150px] h-[44px] hover:opacity-90 transition-opacity cursor-pointer">
                 <Image 
-                  src="https://www.figma.com/api/mcp/asset/0f2fc24a-bc49-4daa-9adc-485f5355fae3" 
+                  src="/app_store.png" 
                   alt="Download on the App Store" 
                   fill
                   className="object-contain"
