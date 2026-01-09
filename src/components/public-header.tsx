@@ -47,7 +47,6 @@ export default function PublicHeader({ onOpenDownload }: PublicHeaderProps) {
 
           {/* Desktop Nav */}
           <nav className="hidden lg:flex items-center gap-8">
-            <Link href="/about" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-6 py-4 rounded-[12px] hover:bg-[#E6F0FF] transition-colors">About Us</Link>
             <Link href="/#product" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-6 py-4 rounded-[12px] hover:bg-[#E6F0FF] transition-colors">Products</Link>
             <Link href="/#who-we-serve" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-6 py-4 rounded-[12px] hover:bg-[#E6F0FF] transition-colors">Benefits</Link>
             <Link href="/dashboard/subscription" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-6 py-4 rounded-[12px] hover:bg-[#E6F0FF] transition-colors">Pricing</Link>
@@ -93,7 +92,6 @@ export default function PublicHeader({ onOpenDownload }: PublicHeaderProps) {
       {mobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 top-[80px] z-40 bg-white border-t border-gray-100 p-4">
           <nav className="flex flex-col gap-2">
-            <Link href="/about" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-4 py-3 rounded-[12px] hover:bg-[#E6F0FF] transition-colors" onClick={() => setMobileMenuOpen(false)}>About Us</Link>
             <Link href="/#product" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-4 py-3 rounded-[12px] hover:bg-[#E6F0FF] transition-colors" onClick={() => setMobileMenuOpen(false)}>Products</Link>
             <Link href="/#who-we-serve" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-4 py-3 rounded-[12px] hover:bg-[#E6F0FF] transition-colors" onClick={() => setMobileMenuOpen(false)}>Benefits</Link>
             <Link href="/dashboard/subscription" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-4 py-3 rounded-[12px] hover:bg-[#E6F0FF] transition-colors" onClick={() => setMobileMenuOpen(false)}>Pricing</Link>

@@ -1,10 +1,18 @@
+'use client'
+
+import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Instagram } from "lucide-react"
+import { DownloadModal } from "@/components/DownloadModal"
 
 export default function Footer() {
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false)
+
   return (
-    <footer className="bg-[#001223] text-white py-16 relative overflow-hidden">
+    <>
+      <DownloadModal open={downloadModalOpen} onOpenChange={setDownloadModalOpen} />
+      <footer className="bg-[#001223] text-white py-16 relative overflow-hidden">
       <div className="mx-auto max-w-7xl px-6 lg:px-[100px]">
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-10 mb-12 lg:mb-[100px]">
           {/* COMPANY */}
@@ -44,11 +52,6 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/user-guide" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
-                  User Guide
-                </Link>
-              </li>
-              <li>
                 <Link href="https://wa.me/message/55YQ3IBJHOQCM1" target="_blank" rel="noopener noreferrer" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
                   WhatsApp Support
                 </Link>
@@ -66,26 +69,40 @@ export default function Footer() {
             <h3 className="text-[14px] font-semibold text-[#64748b] font-dm-sans tracking-wide uppercase">Get the App</h3>
             <ul className="flex flex-col gap-3 mb-4">
               <li>
-                <Link href="#" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
+                <button 
+                  onClick={() => setDownloadModalOpen(true)}
+                  className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans text-left"
+                >
                   Desktop for Windows
-                </Link>
+                </button>
               </li>
               <li>
-                <Link href="#" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
+                <button 
+                  onClick={() => setDownloadModalOpen(true)}
+                  className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans text-left"
+                >
                   Desktop for Mac
-                </Link>
+                </button>
               </li>
             </ul>
             <div className="flex flex-row gap-3 flex-wrap">
-              <div className="relative w-[150px] h-[44px] hover:opacity-90 transition-opacity cursor-pointer">
+              <Link 
+                href="https://play.google.com/store/apps/details?id=com.fahampesa.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative w-[150px] h-[44px] hover:opacity-90 transition-opacity cursor-pointer"
+              >
                 <Image 
                   src="/google_play.png" 
                   alt="Get it on Google Play" 
                   fill
                   className="object-contain"
                 />
-              </div>
-              <div className="relative w-[150px] h-[44px] hover:opacity-90 transition-opacity cursor-pointer">
+              </Link>
+              <div 
+                className="relative w-[150px] h-[44px] hover:opacity-90 transition-opacity cursor-pointer"
+                onClick={() => alert("iOS app coming soon!")}
+              >
                 <Image 
                   src="/app_store.png" 
                   alt="Download on the App Store" 
@@ -124,5 +141,6 @@ export default function Footer() {
         </div>
       </div>
     </footer>
+    </>
   )
 }

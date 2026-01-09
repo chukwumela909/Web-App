@@ -652,7 +652,7 @@ export default function SubscriptionPage() {
                     ))}
                 </div>
 
-                <img className='hidden md:block mx-auto max-w-6xl' src="/assets/figma/subscription/image.png" alt=""  />
+                <img className='hidden md:block mx-auto max-w-6xl' src="/assets/pricing-table.svg" alt="Feature comparison table"  />
 
                   <div className="flex justify-center items-center mt-12">
                         <button 
