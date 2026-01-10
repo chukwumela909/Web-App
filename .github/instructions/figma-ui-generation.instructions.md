@@ -10,3 +10,6 @@ Provide project context and coding guidelines that AI should follow when generat
 - Keep naming conventions coherent: frames, layers, and components should mirror the source names; preserve variant/property naming for components.
 - Verify completeness: compare against the screenshot and source frame to ensure no element is missing or altered; re-run MCP extractions if any value is uncertain. Avoid approximations—use the exact values returned by the MCP tool.
 - Export/download assets at the same resolution/density as specified in the source file. Respect vector vs raster formats; do not upscale low-res assets—fetch originals via MCP.
+
+- Document any deviations from the source design with clear notes explaining the rationale (e.g., technical constraints, accessibility improvements).
+- Before finalizing, conduct a thorough review comparing the recreated design against the original screenshot and source Figma frame to ensure pixel-perfect accuracy and functional parity.

@@ -46,7 +46,7 @@ const navigationItems = [
 
 // Page titles and subtitles matching mobile app
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
-  '/dashboard': { title: 'Hello, {{username}}', subtitle: undefined },
+  '/dashboard': { title: 'Dashboard', subtitle: undefined },
   '/dashboard/products': { title: 'Products', subtitle: 'Manage Product Catalog' },
   '/dashboard/inventory': { title: 'Inventory', subtitle: 'Manage Products & Stock' },
   '/dashboard/sales': { title: 'Sales', subtitle: 'Record & Track Sales' },

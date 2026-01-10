@@ -4,6 +4,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import StaffProtectedRoute from '@/components/auth/StaffProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 import { 
   ArchiveBoxIcon,
   ShoppingCartIcon,
@@ -18,7 +19,8 @@ import {
   CurrencyDollarIcon,
   EyeIcon,
   ArrowUpIcon,
-  ArrowDownIcon
+  ArrowDownIcon,
+  PlusIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
@@ -52,6 +54,18 @@ ChartJS.register(
   Tooltip,
   Legend
 )
+
+// Dashboard asset paths
+const dashboardAssets = {
+  cartIcon: '/assets/dashboard/cart-icon.svg',
+  receiptIcon: '/assets/dashboard/receipt-icon.svg',
+  growthIcon: '/assets/dashboard/growth-icon.svg',
+  calendarIcon: '/assets/dashboard/calendar-icon.svg',
+  arrowDownIcon: '/assets/dashboard/arrow-down-icon.svg',
+  addIcon: '/assets/dashboard/add-icon.svg',
+  chartIcon: '/assets/dashboard/chart-icon.svg',
+  emptyBoxIcon: '/assets/dashboard/empty-box-icon.svg',
+}
 
 const fadeInUp = {
   initial: { opacity: 0, y: 60 },
@@ -348,6 +362,12 @@ export default function DashboardPage() {
     }
   }
 
+  // Check if dashboard is in empty state (no products AND no sales)
+  const isEmptyState = products.length === 0 && sales.length === 0
+
+  // Get user's first name for greeting
+  const userName = user?.displayName?.split(' ')[0] || 'there'
+
   if (loading) {
     return (
       <ProtectedRoute>
@@ -356,6 +376,239 @@ export default function DashboardPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         </DashboardLayout>
+      </ProtectedRoute>
+    )
+  }
+
+  // Empty State UI
+  if (isEmptyState) {
+    return (
+      <ProtectedRoute>
+        <StaffProtectedRoute requiredPermission="dashboard:read">
+          <DashboardLayout>
+            <div className="space-y-6">
+              {/* Title Section */}
+              <div className="flex flex-col gap-2">
+                <h1 className="font-dm-sans font-black text-[28px] text-black">
+                  Hello {userName},
+                </h1>
+                <p className="font-dm-sans font-normal text-[16px] text-[#717171]">
+                  Monitor your business performance
+                </p>
+              </div>
+
+              {/* Filter and Actions Row */}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                {/* Date Filter - Left Side */}
+                <div className="relative">
+                    <button
+                      onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                      className="flex items-center gap-2 px-4 py-3.5 bg-white border border-[#ececf2] rounded-[10px] hover:bg-gray-50 transition-colors"
+                    >
+                      <Image src={dashboardAssets.calendarIcon} alt="Calendar" width={20} height={20} />
+                      <span className="font-dm-sans font-semibold text-[14px] text-[#717171]">
+                        {dateFilter === 'today' ? 'Today' : dateFilter === 'week' ? 'This Week' : 'This Month'}
+                      </span>
+                      <Image 
+                        src={dashboardAssets.arrowDownIcon} 
+                        alt="Arrow" 
+                        width={20} 
+                        height={20} 
+                        className="transform rotate-180"
+                      />
+                    </button>
+                    
+                    {showFilterDropdown && (
+                      <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-[#ececf2] rounded-lg shadow-lg z-10">
+                        {[
+                          { value: 'today' as DateFilter, label: 'Today' },
+                          { value: 'week' as DateFilter, label: 'This Week' },
+                          { value: 'month' as DateFilter, label: 'This Month' }
+                        ].map((filter) => (
+                          <button
+                            key={filter.value}
+                            onClick={() => {
+                              setDateFilter(filter.value)
+                              setShowFilterDropdown(false)
+                            }}
+                            className={`w-full text-left px-4 py-3 hover:bg-[#e9f2f8] transition-colors text-sm first:rounded-t-lg last:rounded-b-lg ${
+                              dateFilter === filter.value ? 'bg-[#e9f2f8] text-[#004aad] font-medium' : 'text-[#717171]'
+                            }`}
+                          >
+                            {filter.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                {/* Action Buttons - Right Side */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Record Sale Button */}
+                  <button
+                    onClick={() => router.push('/dashboard/sales?new=1')}
+                    className="flex items-center gap-1.5 px-2.5 py-3.5 bg-[#e9f2f8] rounded-[14px] hover:bg-[#004aad] transition-colors group"
+                  >
+                    <PlusIcon className="w-5 h-5 text-[#004aad] group-hover:text-white transition-colors" />
+                    <span className="font-dm-sans font-semibold text-[14px] text-[#004aad] group-hover:text-white transition-colors">Record Sale</span>
+                  </button>
+
+                  {/* Add Product Button */}
+                  <button
+                    onClick={() => router.push('/dashboard/products?new=1')}
+                    className="flex items-center gap-1.5 px-2.5 py-3.5 bg-[#e9f2f8] rounded-[14px] hover:bg-[#004aad] transition-colors group"
+                  >
+                    <PlusIcon className="w-5 h-5 text-[#004aad] group-hover:text-white transition-colors" />
+                    <span className="font-dm-sans font-medium text-[14px] text-[#004aad] group-hover:text-white transition-colors">Add Product</span>
+                  </button>
+
+                  {/* Add Expense Button */}
+                  <button
+                    onClick={() => router.push('/dashboard/expenses?new=1')}
+                    className="flex items-center gap-1.5 px-2.5 py-3.5 bg-[#e9f2f8] rounded-[14px] hover:bg-[#004aad] transition-colors group"
+                  >
+                    <PlusIcon className="w-5 h-5 text-[#004aad] group-hover:text-white transition-colors" />
+                    <span className="font-dm-sans font-medium text-[14px] text-[#004aad] group-hover:text-white transition-colors">Add Expense</span>
+                  </button>
+
+                  {/* View Report Button */}
+                  <button
+                    onClick={() => router.push('/dashboard/reports')}
+                    className="flex items-center gap-1.5 px-2.5 py-3.5 bg-[#e9f2f8] rounded-[14px] hover:bg-[#004aad] transition-colors group"
+                  >
+                    <ChartBarIcon className="w-5 h-5 text-[#004aad] group-hover:text-white transition-colors" />
+                    <span className="font-dm-sans font-medium text-[14px] text-[#004aad] group-hover:text-white transition-colors">View Report</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Metric Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Today's Sales Card */}
+                <div 
+                  onClick={() => router.push('/dashboard/sales')}
+                  className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
+                >
+                  <div className="bg-[#155dfc] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
+                    <Image src={dashboardAssets.cartIcon} alt="Cart" width={24} height={24} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="font-inter font-bold text-[18px] text-[#09090b]">
+                      {currencySymbol} 0
+                    </p>
+                    <p className="font-inter font-medium text-[14px] text-[#71717a]">
+                      Today&apos;s Sales
+                    </p>
+                  </div>
+                </div>
+
+                {/* Today's Expenses Card */}
+                <div 
+                  onClick={() => router.push('/dashboard/expenses')}
+                  className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
+                >
+                  <div className="bg-[#e7000b] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
+                    <Image src={dashboardAssets.receiptIcon} alt="Receipt" width={24} height={24} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="font-inter font-bold text-[18px] text-[#09090b]">
+                      {currencySymbol} 0
+                    </p>
+                    <p className="font-inter font-medium text-[14px] text-[#71717a]">
+                      Today&apos;s Expenses
+                    </p>
+                  </div>
+                </div>
+
+                {/* Today's Profit Card */}
+                <div className="bg-white border border-[#ececf2] rounded-[12px] p-5 flex flex-col gap-6">
+                  <div className="bg-[#82cd7e] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
+                    <Image src={dashboardAssets.growthIcon} alt="Growth" width={24} height={24} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="font-inter font-bold text-[18px] text-[#09090b]">
+                      {currencySymbol} 0
+                    </p>
+                    <p className="font-inter font-medium text-[14px] text-[#71717a]">
+                      Today&apos;s Profit
+                    </p>
+                  </div>
+                </div>
+
+                {/* Total Products Card */}
+                <div 
+                  onClick={() => router.push('/dashboard/inventory')}
+                  className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
+                >
+                  <div className="bg-[#71717a] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
+                    <Image src={dashboardAssets.emptyBoxIcon} alt="Products" width={24} height={24} className="brightness-0 invert" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="font-inter font-bold text-[18px] text-[#09090b]">
+                      0
+                    </p>
+                    <p className="font-inter font-medium text-[14px] text-[#71717a]">
+                      Total Products
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Sales and Latest Products Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                {/* Recent Sales */}
+                <div className="lg:col-span-3 bg-white border border-[#ececf2] rounded-[12px] p-5 flex flex-col gap-10">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-dm-sans font-semibold text-[18px] text-black">
+                      Recent Sales
+                    </h3>
+                    <button 
+                      onClick={() => router.push('/dashboard/sales')}
+                      className="px-4 py-2 bg-white border border-[#ececf2] rounded-[8px] hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="font-dm-sans font-bold text-[14px] text-[#1c1d21]">View all</span>
+                    </button>
+                  </div>
+                  
+                  {/* Empty State */}
+                  <div className="flex-1 border border-[#ececf2] rounded-lg flex flex-col items-center justify-center py-20 gap-4">
+                    <div className="w-[50px] h-[50px] flex items-center justify-center">
+                      <Image src={dashboardAssets.emptyBoxIcon} alt="No Sales" width={50} height={50} className="opacity-50" />
+                    </div>
+                    <p className="font-inter font-normal text-[16px] text-[#71717a]">
+                      No Sales data yet
+                    </p>
+                  </div>
+                </div>
+
+                {/* Latest Products */}
+                <div className="lg:col-span-2 bg-white border border-[#ececf2] rounded-[12px] p-5 flex flex-col gap-10">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-dm-sans font-semibold text-[18px] text-black">
+                      Latest Products
+                    </h3>
+                    <button 
+                      onClick={() => router.push('/dashboard/products')}
+                      className="px-4 py-2 bg-white border border-[#ececf2] rounded-[8px] hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="font-dm-sans font-bold text-[14px] text-[#1c1d21]">View all</span>
+                    </button>
+                  </div>
+                  
+                  {/* Empty State */}
+                  <div className="flex-1 border border-[#ececf2] rounded-lg flex flex-col items-center justify-center py-20 gap-4">
+                    <div className="w-[50px] h-[50px] flex items-center justify-center">
+                      <Image src={dashboardAssets.emptyBoxIcon} alt="No Products" width={50} height={50} className="opacity-50" />
+                    </div>
+                    <p className="font-inter font-normal text-[16px] text-[#71717a]">
+                      No Product added yet
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </DashboardLayout>
+        </StaffProtectedRoute>
       </ProtectedRoute>
     )
   }

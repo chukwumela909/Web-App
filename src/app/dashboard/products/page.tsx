@@ -23,7 +23,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
 import { Product as FPProduct, ProductImage, createProduct, getProducts, updateProduct } from '@/lib/firestore'
-import { uploadMultipleProductImages, UploadProgress } from '@/lib/imagekit'
+import { uploadMultipleProductImages, UploadProgress } from '@/lib/firebase-storage'
 import { addSupplierLinkToProduct } from '@/lib/product-enhancements'
 import SupplierSelection from '@/components/products/SupplierSelection'
 import EnhancedProductDetail from '@/components/products/EnhancedProductDetail'
