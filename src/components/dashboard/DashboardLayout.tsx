@@ -29,6 +29,7 @@ import { useState, useEffect } from 'react'
 import { getBranches } from '@/lib/branches-service'
 import { Branch } from '@/lib/branches-types'
 import CreditCardIcon from './icons/CreditCardIcon'
+import { PhoneVerificationModal } from './PhoneVerificationModal'
 
 // Navigation items with required permissions
 const navigationItems = [
@@ -78,6 +79,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   // Branch state management
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranch, setSelectedBranch] = useState<string>('')
+  
+  // Check if user needs phone verification
+  // User needs to verify if they did NOT authenticate via phone (e.g., email/Google auth)
+  const needsPhoneVerification = user ? !user.providerData.some(
+    provider => provider.providerId === 'phone'
+  ) : false
   const [branchesLoading, setBranchesLoading] = useState(true)
   const [showBranchDropdown, setShowBranchDropdown] = useState(false)
 
@@ -171,6 +178,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="h-screen flex bg-background chrome-flex-row chrome-gpu-acceleration">
+      {/* Phone Verification Modal - blocks access until phone is verified */}
+      <PhoneVerificationModal isOpen={needsPhoneVerification} />
       {/* Sidebar Navigation - replacing bottom navigation */}
       <div className="hidden md:flex fixed inset-y-0 left-0 w-64 bg-card/98 border-r border-border/50 shadow-2xl z-50 supports-[backdrop-filter]:bg-card/95 supports-[backdrop-filter]:backdrop-blur-md backdrop-blur-fallback chrome-transition chrome-shadow chrome-performance">
         <div className="flex flex-col w-full">
