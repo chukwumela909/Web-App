@@ -37,7 +37,7 @@ const assets = {
   appStore: '/app_store.png',
   googlePlay: '/google_play.png',
   
-  visualSection: 'https://www.figma.com/api/mcp/asset/0b078838-baad-42e0-a0f2-bae33da9702f',
+  visualSection: '/benefit_bg.png',
   testimonialThumbnail: '/testimonial-thumbnail.png',
   testimonialVideo: '/testimonial-mohammed.mp4',
   playIcon: 'https://www.figma.com/api/mcp/asset/8720f529-7764-486a-8aff-9b42c29a01fc',
