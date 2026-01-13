@@ -1,13 +1,19 @@
 'use client'
 
-import { Info } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 interface PhoneVerificationModalProps {
     isOpen: boolean
 }
 
 export function PhoneVerificationModal({ isOpen }: PhoneVerificationModalProps) {
+    const router = useRouter()
+
     if (!isOpen) return null
+
+    const handleVerifyClick = () => {
+        router.push('/dashboard/verify-phone')
+    }
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -48,6 +54,7 @@ export function PhoneVerificationModal({ isOpen }: PhoneVerificationModalProps) 
                     {/* Button Row */}
                     <div className="flex items-center w-full">
                         <button
+                            onClick={handleVerifyClick}
                             className="bg-[#004aad] text-white font-dm-sans font-semibold text-[16px] px-[24px] py-[10px] rounded-[12px] hover:bg-[#003d8f] transition-colors"
                         >
                             Verify Phone Number

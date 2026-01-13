@@ -36,6 +36,7 @@ const assets = {
   xIcon: '/assets/figma/landing/x-icon.svg',
   appStore: '/app_store.png',
   googlePlay: '/google_play.png',
+  
   visualSection: 'https://www.figma.com/api/mcp/asset/0b078838-baad-42e0-a0f2-bae33da9702f',
   testimonialThumbnail: '/testimonial-thumbnail.png',
   testimonialVideo: '/testimonial-mohammed.mp4',

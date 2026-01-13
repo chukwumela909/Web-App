@@ -28,6 +28,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { getBranches } from '@/lib/branches-service'
 import { Branch } from '@/lib/branches-types'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 import CreditCardIcon from './icons/CreditCardIcon'
 import { PhoneVerificationModal } from './PhoneVerificationModal'
 
@@ -80,11 +82,54 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranch, setSelectedBranch] = useState<string>('')
   
+  // Phone verification state - check both Firebase auth provider AND Firestore profile
+  const [phoneVerified, setPhoneVerified] = useState<boolean | null>(null)
+  const [phoneCheckLoading, setPhoneCheckLoading] = useState(true)
+  
   // Check if user needs phone verification
-  // User needs to verify if they did NOT authenticate via phone (e.g., email/Google auth)
-  const needsPhoneVerification = user ? !user.providerData.some(
-    provider => provider.providerId === 'phone'
-  ) : false
+  useEffect(() => {
+    const checkPhoneVerification = async () => {
+      if (!user) {
+        setPhoneVerified(null)
+        setPhoneCheckLoading(false)
+        return
+      }
+
+      // First check if user has phone provider (authenticated via phone)
+      const hasPhoneProvider = user.providerData.some(
+        provider => provider.providerId === 'phone'
+      )
+      
+      if (hasPhoneProvider) {
+        setPhoneVerified(true)
+        setPhoneCheckLoading(false)
+        return
+      }
+
+      // If no phone provider, check Firestore profile for phoneVerified flag
+      try {
+        const profileDoc = await getDoc(doc(db, 'userProfiles', user.uid))
+        if (profileDoc.exists()) {
+          const data = profileDoc.data()
+          setPhoneVerified(data.phoneVerified === true)
+        } else {
+          setPhoneVerified(false)
+        }
+      } catch (error) {
+        console.error('Error checking phone verification status:', error)
+        setPhoneVerified(false)
+      } finally {
+        setPhoneCheckLoading(false)
+      }
+    }
+
+    checkPhoneVerification()
+  }, [user])
+
+  // Determine if modal should show (user exists, not staff, phone not verified, check is complete, and not on verify-phone page)
+  const isOnVerifyPhonePage = pathname === '/dashboard/verify-phone'
+  const needsPhoneVerification = user && !staff && phoneVerified === false && !phoneCheckLoading && !isOnVerifyPhonePage
+  
   const [branchesLoading, setBranchesLoading] = useState(true)
   const [showBranchDropdown, setShowBranchDropdown] = useState(false)
 
