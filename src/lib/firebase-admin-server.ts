@@ -1,6 +1,9 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
-import { getFirestore } from 'firebase-admin/firestore'
+import { getFirestore, Timestamp } from 'firebase-admin/firestore'
+
+// Re-export Timestamp for use in API routes
+export { Timestamp }
 
 // Initialize Firebase Admin SDK
 function initializeFirebaseAdmin() {
