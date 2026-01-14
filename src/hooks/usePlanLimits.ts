@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore'
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { PLAN_LIMITS, PlanTier, getNumericLimit, FEATURE_NAMES } from '@/lib/plan-limits'
 
@@ -44,7 +44,9 @@ export function usePlanLimits(): UsePlanLimitsReturn {
       }
 
       try {
-        // Check subscription status from subscriptions collection
+        let isPro = false
+
+        // First, check subscription status from subscriptions collection
         const subscriptionsRef = collection(db, 'subscriptions')
         const q = query(
           subscriptionsRef,
@@ -66,13 +68,30 @@ export function usePlanLimits(): UsePlanLimitsReturn {
 
           // Verify subscription hasn't expired
           if (endDate && endDate > new Date()) {
-            setPlanTier('pro')
-          } else {
-            setPlanTier('free')
+            isPro = true
           }
-        } else {
-          setPlanTier('free')
         }
+
+        // Fallback: Also check userProfiles collection for subscription status
+        if (!isPro) {
+          const userProfileRef = doc(db, 'userProfiles', user.uid)
+          const userProfileSnap = await getDoc(userProfileRef)
+
+          if (userProfileSnap.exists()) {
+            const data = userProfileSnap.data()
+            const isSubscribed = data.isSubscribed === true
+            const subscriptionEndDate = data.subscriptionEndDate 
+              ? new Date(data.subscriptionEndDate.seconds ? data.subscriptionEndDate.seconds * 1000 : data.subscriptionEndDate)
+              : null
+
+            // Check if subscription is still valid (not expired)
+            if (isSubscribed && subscriptionEndDate && subscriptionEndDate > new Date()) {
+              isPro = true
+            }
+          }
+        }
+
+        setPlanTier(isPro ? 'pro' : 'free')
       } catch (error) {
         console.error('Error checking plan tier:', error)
         setPlanTier('free') // Default to free on error
@@ -160,14 +179,14 @@ export function usePlanLimits(): UsePlanLimitsReturn {
         const collectionRef = collection(db, collectionName)
         let q = query(collectionRef, where('userId', '==', user.uid))
 
-        // For daily sales, filter by today's date
+        // For daily sales, filter by today's date using numeric timestamp (milliseconds)
         if (feature === 'dailySales') {
           const { startOfDay, endOfDay } = getTodayRange()
           q = query(
             collectionRef,
             where('userId', '==', user.uid),
-            where('timestamp', '>=', Timestamp.fromDate(startOfDay)),
-            where('timestamp', '<=', Timestamp.fromDate(endOfDay))
+            where('timestamp', '>=', startOfDay.getTime()),
+            where('timestamp', '<=', endOfDay.getTime())
           )
         }
 
