@@ -17,6 +17,7 @@ import {
   SaleCalculations,
   PAYMENT_METHODS 
 } from '@/lib/multi-item-sales-types'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 
 interface MultiItemSalesFormProps {
   isOpen: boolean
@@ -52,6 +53,8 @@ export default function MultiItemSalesForm({
   products, 
   userId 
 }: MultiItemSalesFormProps) {
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const [items, setItems] = useState<FormSaleItem[]>([
     { ...defaultItem, tempId: crypto.randomUUID() }
   ])
@@ -573,7 +576,7 @@ export default function MultiItemSalesForm({
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Discount ({discountType === 'PERCENTAGE' ? '%' : 'KSh'})
+                      Discount ({discountType === 'PERCENTAGE' ? '%' : currencySymbol})
                     </label>
                     <div className="flex gap-2">
                       <input
@@ -589,7 +592,7 @@ export default function MultiItemSalesForm({
                         onChange={(e) => setDiscountType(e.target.value as 'PERCENTAGE' | 'FIXED')}
                         className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="FIXED">KSh</option>
+                        <option value="FIXED">{currencySymbol}</option>
                         <option value="PERCENTAGE">%</option>
                       </select>
                     </div>
@@ -621,24 +624,24 @@ export default function MultiItemSalesForm({
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal:</span>
-                    <span className="font-medium">KSh {calculations.subtotal.toLocaleString()}</span>
+                    <span className="font-medium">{currencySymbol} {calculations.subtotal.toLocaleString()}</span>
                   </div>
                   {calculations.tax > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Tax ({taxRate}%):</span>
-                      <span className="font-medium">KSh {calculations.tax.toLocaleString()}</span>
+                      <span className="font-medium">{currencySymbol} {calculations.tax.toLocaleString()}</span>
                     </div>
                   )}
                   {calculations.discount > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Discount:</span>
-                      <span className="font-medium text-red-600">-KSh {calculations.discount.toLocaleString()}</span>
+                      <span className="font-medium text-red-600">-{currencySymbol} {calculations.discount.toLocaleString()}</span>
                     </div>
                   )}
                   <hr className="border-gray-300" />
                   <div className="flex justify-between text-lg font-semibold">
                     <span className="text-gray-900">Total:</span>
-                    <span className="text-blue-600">KSh {calculations.total.toLocaleString()}</span>
+                    <span className="text-blue-600">{currencySymbol} {calculations.total.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -671,7 +674,7 @@ export default function MultiItemSalesForm({
               ) : (
                 <>
                   <CheckIcon className="h-4 w-4" />
-                  Record Sale (KSh {calculations.total.toLocaleString()})
+                  Record Sale ({currencySymbol} {calculations.total.toLocaleString()})
                 </>
               )}
             </button>

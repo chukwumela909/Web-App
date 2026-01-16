@@ -190,13 +190,6 @@ export default function ExpenseDetailsPage() {
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES'
-    }).format(amount)
-  }
-
   const formatCategory = (category: ExpenseCategory) => {
     return category.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
   }

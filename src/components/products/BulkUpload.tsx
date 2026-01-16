@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { createProduct } from '@/lib/firestore'
 import { Product as FPProduct } from '@/lib/firestore'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 
 interface BulkUploadProps {
   userId: string
@@ -48,6 +49,8 @@ interface ValidationError {
 }
 
 export default function BulkUpload({ userId, onClose, onSuccess, branchId }: BulkUploadProps) {
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const [dragActive, setDragActive] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [parsedProducts, setParsedProducts] = useState<ParsedProduct[]>([])
@@ -581,8 +584,8 @@ export default function BulkUpload({ userId, onClose, onSuccess, branchId }: Bul
                         <tr key={index}>
                           <td className="px-4 py-2 text-sm text-gray-900">{product.name}</td>
                           <td className="px-4 py-2 text-sm text-gray-500">{product.category}</td>
-                          <td className="px-4 py-2 text-sm text-gray-500">KSh {product.costPrice}</td>
-                          <td className="px-4 py-2 text-sm text-gray-500">KSh {product.sellingPrice}</td>
+                          <td className="px-4 py-2 text-sm text-gray-500">{currencySymbol} {product.costPrice}</td>
+                          <td className="px-4 py-2 text-sm text-gray-500">{currencySymbol} {product.sellingPrice}</td>
                           <td className="px-4 py-2 text-sm text-gray-500">{product.quantity}</td>
                         </tr>
                       ))}
