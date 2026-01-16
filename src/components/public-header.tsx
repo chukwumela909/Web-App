@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Menu, X } from 'lucide-react'
-import { DownloadModal } from '@/components/DownloadModal'
+import { Menu, X, ArrowUpRight } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const assets = {
   logo: '/assets/figma/landing/logo-icon.svg',
@@ -17,13 +17,6 @@ interface PublicHeaderProps {
 export default function PublicHeader({ onOpenDownload }: PublicHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   
-  // Use local state for modal if not provided by parent, 
-  // but ideally parent controls modal visibility so it can be shared or at root.
-  // For simplicity here, we assume parent might manage it, but if not we can't open it easily 
-  // without duplicating the modal. 
-  // The LandingPage has the modal at root. 
-  // Let's assume the PAGES (Terms, Privacy, Contact) will render the Modal and pass the open handler.
-  
   const handleOpenDownload = () => {
     if (onOpenDownload) {
       onOpenDownload();
@@ -32,45 +25,44 @@ export default function PublicHeader({ onOpenDownload }: PublicHeaderProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-white h-[80px] lg:h-[100px] flex items-center border-b border-gray-100">
+      {/* Header - Matches Landing Page exactly */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white h-[80px] flex items-center border-b border-gray-100">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px] w-full flex justify-between items-center">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-[7px]">
-            <div className="w-[32px] h-[32px] lg:w-[40px] lg:h-[40px] relative">
+            <div className="w-[32px] h-[32px] relative">
               <Image src={assets.logo} alt="FahamPesa" fill className="object-contain" />
             </div>
             <div className="flex flex-col">
-              <span className="font-roboto font-bold text-[18px] lg:text-[24px] text-[#001223] leading-none">Fahampesa</span>
-              <span className="font-inter font-light text-[10px] lg:text-[12px] text-[#001223]">Smart Business Tools</span>
+              <span className="font-roboto font-bold text-[20px] text-[#001223] leading-none">Fahampesa</span>
+              <span className="font-inter font-light text-[10px] text-[#001223]">Smart Business Tools</span>
             </div>
           </Link>
 
           {/* Desktop Nav */}
           <nav className="hidden lg:flex items-center gap-8">
-            <Link href="/#product" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-6 py-4 rounded-[12px] hover:bg-[#E6F0FF] transition-colors">Products</Link>
-            <Link href="/#who-we-serve" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-6 py-4 rounded-[12px] hover:bg-[#E6F0FF] transition-colors">Benefits</Link>
-            <Link href="/dashboard/subscription" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-6 py-4 rounded-[12px] hover:bg-[#E6F0FF] transition-colors">Pricing</Link>
+            <Link href="/#product" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Product</Link>
+            <Link href="/#who-we-serve" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Customers</Link>
+            <Link href="/dashboard/subscription" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Pricing</Link>
           </nav>
 
           {/* Desktop Actions */}
           <div className="hidden lg:flex items-center gap-4">
-            <Link href="/login" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-6 py-4 rounded-[12px] hover:bg-[#E6F0FF] transition-colors">
+            <Link href="/login" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-6 py-3 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">
               Login
             </Link>
             <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                handleOpenDownload();
-              }}
-              className="font-dm-sans font-semibold text-[16px] text-[#001031] border border-[#001031] rounded-[12px] px-6 py-4 hover:bg-gray-50 transition-colors"
+              onClick={handleOpenDownload}
+              className="font-dm-sans font-semibold text-[14px] text-[#001031] border border-[#001031] rounded-[10px] px-6 py-3 hover:bg-gray-50 hover:border-[#004AAD] hover:text-[#004AAD] transition-colors"
             >
               Get Desktop App
             </button>
             <Link
               href="/login"
-              className="font-dm-sans font-semibold text-[16px] text-white bg-[#004aad] rounded-[12px] px-6 py-4 hover:bg-[#003d8f] transition-colors"
+              className="font-dm-sans font-semibold text-[14px] text-white bg-[#004AAD] rounded-[10px] px-6 py-3 hover:bg-[#003a8c] transition-colors flex items-center gap-2"
             >
               Start a free trial
+              <ArrowUpRight size={16} />
             </Link>
           </div>
 
@@ -79,43 +71,87 @@ export default function PublicHeader({ onOpenDownload }: PublicHeaderProps) {
             className="lg:hidden p-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            {mobileMenuOpen ? (
-              <X className="w-6 h-6 text-[#001223]" />
-            ) : (
-              <Menu className="w-6 h-6 text-[#001223]" />
-            )}
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
+
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] bg-white lg:hidden flex flex-col"
+            >
+              {/* Mobile Menu Header */}
+              <div className="h-[80px] flex items-center justify-between px-4 sm:px-6 border-b border-gray-100 shrink-0">
+                <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-[7px]">
+                  <div className="w-[32px] h-[32px] relative">
+                    <Image src={assets.logo} alt="FahamPesa" fill className="object-contain" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-roboto font-bold text-[20px] text-[#001223] leading-none">Fahampesa</span>
+                    <span className="font-inter font-light text-[10px] text-[#001223]">Smart Business Tools</span>
+                  </div>
+                </Link>
+                <button
+                  className="p-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <X size={24} className="text-[#001031]" />
+                </button>
+              </div>
+
+              {/* Mobile Menu Links */}
+              <div className="flex-1 flex flex-col items-center pt-8 gap-2 px-4">
+                <Link 
+                  href="/#product" 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className="font-dm-sans font-bold text-[16px] text-[#001031] py-3 px-4 rounded-[8px] hover:bg-[#F0F5FF] transition-colors w-full text-center"
+                >
+                  Products
+                </Link>
+                <Link 
+                  href="/#who-we-serve" 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className="font-dm-sans font-bold text-[16px] text-[#001031] py-3 px-4 rounded-[8px] hover:bg-gray-50 w-full text-center"
+                >
+                  Customers
+                </Link>
+                <Link 
+                  href="/dashboard/subscription" 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className="font-dm-sans font-bold text-[16px] text-[#001031] py-3 px-4 rounded-[8px] hover:bg-gray-50 w-full text-center"
+                >
+                  Pricing
+                </Link>
+              </div>
+
+              {/* Mobile Menu Footer Actions */}
+              <div className="p-4 flex flex-col gap-4 mb-4">
+                <Link 
+                  href="/login" 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className="font-dm-sans font-bold text-[16px] text-[#001031] border border-[#001031] rounded-[12px] py-4 w-full text-center hover:bg-gray-50 transition-colors"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="font-dm-sans font-bold text-[16px] text-white bg-[#1D4ED8] rounded-[12px] py-4 w-full text-center hover:bg-[#1e40af] transition-colors"
+                >
+                  Start a free trial
+                </Link>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 top-[80px] z-40 bg-white border-t border-gray-100 p-4">
-          <nav className="flex flex-col gap-2">
-            <Link href="/#product" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-4 py-3 rounded-[12px] hover:bg-[#E6F0FF] transition-colors" onClick={() => setMobileMenuOpen(false)}>Products</Link>
-            <Link href="/#who-we-serve" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-4 py-3 rounded-[12px] hover:bg-[#E6F0FF] transition-colors" onClick={() => setMobileMenuOpen(false)}>Benefits</Link>
-            <Link href="/dashboard/subscription" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-4 py-3 rounded-[12px] hover:bg-[#E6F0FF] transition-colors" onClick={() => setMobileMenuOpen(false)}>Pricing</Link>
-            <hr className="my-2 border-gray-200" />
-            <Link href="/login" className="font-dm-sans font-semibold text-[16px] text-[#001031] px-4 py-3 rounded-[12px] hover:bg-[#E6F0FF] transition-colors" onClick={() => setMobileMenuOpen(false)}>Login</Link>
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false)
-                handleOpenDownload()
-              }}
-              className="font-dm-sans font-semibold text-[16px] text-[#001031] border border-[#001031] rounded-[12px] px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-            >
-              Get Desktop App
-            </button>
-            <Link
-              href="/login"
-              className="font-dm-sans font-semibold text-[16px] text-white bg-[#004aad] rounded-[12px] px-4 py-3 hover:bg-[#003d8f] transition-colors text-center"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Start a free trial
-            </Link>
-          </nav>
-        </div>
-      )}
+      {/* Spacer to account for fixed header */}
+      <div className="h-[80px]" />
     </>
   )
 }

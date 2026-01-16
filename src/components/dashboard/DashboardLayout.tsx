@@ -54,7 +54,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   '/dashboard/products': { title: 'Products', subtitle: 'Manage Product Catalog' },
   '/dashboard/inventory': { title: 'Inventory', subtitle: 'Manage Products & Stock' },
   '/dashboard/sales': { title: 'Sales', subtitle: 'Record & Track Sales' },
-  '/dashboard/reports': { title: 'Reports & Analytics', subtitle: 'Smart Business Insights' },
+  '/dashboard/reports': { title: 'Reports & Analytics', subtitle: '' },
   '/dashboard/debtors': { title: 'Debtor', subtitle: 'Create a new credit customer' },
   '/dashboard/expenses': { title: 'Expenses', subtitle: 'Track Business Expenses' },
   '/dashboard/settings': { title: 'Settings', subtitle: 'Manage Account, Business & System Settings' },
