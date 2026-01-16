@@ -27,7 +27,9 @@ import {
   PhotoIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNotifications } from '@/contexts/NotificationsContext'
 import { Product as FPProduct, getProduct, softDeleteProduct } from '@/lib/firestore'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 30 },
@@ -48,6 +50,9 @@ export default function ProductDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const { user } = useAuth()
+  const { addNotification } = useNotifications()
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const router = useRouter()
   const params = useParams()
   const productId = params.id as string
@@ -85,6 +90,14 @@ export default function ProductDetailsPage() {
     if (confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
       try {
         await softDeleteProduct(product.id)
+        addNotification({
+          id: `deleted-product-${product.id}`,
+          type: 'alert',
+          title: 'Product Deleted',
+          highlightedText: product.name,
+          message: ' product has been removed from your product list.',
+          createdAt: Date.now()
+        })
         router.push('/dashboard/inventory')
       } catch (error) {
         console.error('Failed to delete product:', error)
@@ -330,12 +343,12 @@ export default function ProductDetailsPage() {
                     <div className="text-xs text-muted-foreground">{product.unitOfMeasure}</div>
                   </div>
                   <div className="text-center p-4 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">KSh {getTotalValue().toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">{currencySymbol} {getTotalValue().toLocaleString()}</div>
                     <div className="text-sm text-muted-foreground">Total Value</div>
                     <div className="text-xs text-muted-foreground">At selling price</div>
                   </div>
                   <div className="text-center p-4 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">KSh {getCostValue().toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{currencySymbol} {getCostValue().toLocaleString()}</div>
                     <div className="text-sm text-muted-foreground">Cost Value</div>
                     <div className="text-xs text-muted-foreground">Investment</div>
                   </div>
@@ -358,7 +371,7 @@ export default function ProductDetailsPage() {
                     <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-lg mx-auto mb-3">
                       <CurrencyDollarIcon className="h-6 w-6 text-red-600" />
                     </div>
-                    <div className="text-2xl font-bold text-card-foreground">KSh {product.costPrice.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-card-foreground">{currencySymbol} {product.costPrice.toLocaleString()}</div>
                     <div className="text-sm text-muted-foreground">Cost Price</div>
                     <div className="text-xs text-muted-foreground">Per {product.unitOfMeasure}</div>
                   </div>
@@ -367,7 +380,7 @@ export default function ProductDetailsPage() {
                     <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-lg mx-auto mb-3">
                       <TagIcon className="h-6 w-6 text-green-600" />
                     </div>
-                    <div className="text-2xl font-bold text-card-foreground">KSh {product.sellingPrice.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-card-foreground">{currencySymbol} {product.sellingPrice.toLocaleString()}</div>
                     <div className="text-sm text-muted-foreground">Selling Price</div>
                     <div className="text-xs text-muted-foreground">Per {product.unitOfMeasure}</div>
                   </div>
@@ -378,7 +391,7 @@ export default function ProductDetailsPage() {
                     </div>
                     <div className="text-2xl font-bold text-card-foreground">{getProfitMargin().toFixed(1)}%</div>
                     <div className="text-sm text-muted-foreground">Profit Margin</div>
-                    <div className="text-xs text-muted-foreground">KSh {(product.sellingPrice - product.costPrice).toFixed(2)} profit</div>
+                    <div className="text-xs text-muted-foreground">{currencySymbol} {(product.sellingPrice - product.costPrice).toFixed(2)} profit</div>
                   </div>
                 </div>
               </div>

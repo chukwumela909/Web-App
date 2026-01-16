@@ -851,7 +851,7 @@ export default function ReportsPage() {
                           <div 
                             className="bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-lg w-full min-w-[32px] transition-all duration-700 ease-out hover:from-blue-700 hover:to-blue-500 cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
                             style={{ height: `${height}px` }}
-                            title={`${point.label}: KSh ${Math.round(point.value).toLocaleString()}`}
+                            title={`${point.label}: ${currencySymbol} ${Math.round(point.value).toLocaleString()}`}
                           />
                         </div>
                         <span className="text-xs text-gray-600 font-semibold">{point.label}</span>
@@ -881,7 +881,7 @@ export default function ReportsPage() {
                           <div 
                             className="bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-lg w-full min-w-[32px] transition-all duration-700 ease-out hover:from-emerald-700 hover:to-emerald-500 cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
                             style={{ height: `${height}px` }}
-                            title={`${point.label}: KSh ${Math.round(point.value).toLocaleString()}`}
+                            title={`${point.label}: ${currencySymbol} ${Math.round(point.value).toLocaleString()}`}
                           />
                         </div>
                         <span className="text-xs text-gray-600 font-semibold">{point.label}</span>

@@ -19,7 +19,9 @@ import {
   ArrowLeftIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNotifications } from '@/contexts/NotificationsContext'
 import { Product as FPProduct, getProducts, softDeleteProduct } from '@/lib/firestore'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 
 const categories = [
   "All Categories",
@@ -71,6 +73,9 @@ function BrowseProductsContent() {
   const [selectedFilter, setSelectedFilter] = useState<ProductFilter>(ProductFilter.ALL)
   const [currentPage, setCurrentPage] = useState(0)
   const { user } = useAuth()
+  const { addNotification } = useNotifications()
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const router = useRouter()
 
   const itemsPerPage = 10
@@ -87,10 +92,18 @@ function BrowseProductsContent() {
 
   useEffect(() => { fetchData() }, [user, fetchData])
 
-  const handleDelete = async (productId: string) => {
+  const handleDelete = async (product: FPProduct) => {
     if (confirm('Are you sure you want to delete this product?')) {
       try {
-        await softDeleteProduct(productId)
+        await softDeleteProduct(product.id)
+        addNotification({
+          id: `deleted-product-${product.id}`,
+          type: 'alert',
+          title: 'Product Deleted',
+          highlightedText: product.name,
+          message: ' product has been removed from your product list.',
+          createdAt: Date.now()
+        })
         fetchData()
       } catch (error) {
         console.error('Failed to delete product:', error)
@@ -345,8 +358,8 @@ function BrowseProductsContent() {
                         {/* Price and Actions */}
                         <div className="flex items-center space-x-4">
                           <div className="text-right">
-                            <p className="font-semibold text-[#66BB6A] text-lg">KSh {product.sellingPrice.toLocaleString()}</p>
-                            <p className="text-sm text-muted-foreground">Cost: KSh {product.costPrice.toLocaleString()}</p>
+                            <p className="font-semibold text-[#66BB6A] text-lg">{currencySymbol} {product.sellingPrice.toLocaleString()}</p>
+                            <p className="text-sm text-muted-foreground">Cost: {currencySymbol} {product.costPrice.toLocaleString()}</p>
                           </div>
 
                           <div className="flex items-center space-x-2">
@@ -365,7 +378,7 @@ function BrowseProductsContent() {
                               <PencilIcon className="h-4 w-4" />
                             </button>
                             <button
-                              onClick={() => handleDelete(product.id)}
+                              onClick={() => handleDelete(product)}
                               className="p-2 text-[#DC2626] hover:bg-[#DC2626]/10 rounded-lg transition-colors"
                               title="Delete Product"
                             >

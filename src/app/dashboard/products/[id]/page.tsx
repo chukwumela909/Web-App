@@ -28,7 +28,9 @@ import {
   ChartBarIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNotifications } from '@/contexts/NotificationsContext'
 import { Product, getProducts, updateProduct } from '@/lib/firestore'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { getProductInventoryData, getProductPriceHistory } from '@/lib/product-enhancements'
 import { getSuppliers } from '@/lib/suppliers-service'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
@@ -57,6 +59,9 @@ export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
+  const { addNotification } = useNotifications()
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const productId = params.id as string
 
   const [product, setProduct] = useState<Product | null>(null)
@@ -114,6 +119,14 @@ export default function ProductDetailPage() {
     if (confirm(`Are you sure you want to delete "${product.name}"? This action cannot be undone.`)) {
       try {
         await updateProduct(productId, { isActive: false })
+        addNotification({
+          id: `deleted-product-${product.id}`,
+          type: 'alert',
+          title: 'Product Deleted',
+          highlightedText: product.name,
+          message: ' product has been removed from your product list.',
+          createdAt: Date.now()
+        })
         router.push('/dashboard/products')
       } catch (error) {
         console.error('Error deleting product:', error)
@@ -362,18 +375,18 @@ export default function ProductDetailPage() {
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <div className="text-sm text-gray-600 mb-1">Selling Price</div>
-                    <div className="text-3xl font-bold text-gray-900">KSh {product.sellingPrice.toLocaleString()}</div>
+                    <div className="text-3xl font-bold text-gray-900">{currencySymbol} {product.sellingPrice.toLocaleString()}</div>
                   </div>
                   <div>
                     <div className="text-sm text-gray-600 mb-1">Cost Price</div>
-                    <div className="text-2xl font-semibold text-gray-700">KSh {product.costPrice.toLocaleString()}</div>
+                    <div className="text-2xl font-semibold text-gray-700">{currencySymbol} {product.costPrice.toLocaleString()}</div>
                   </div>
                 </div>
                 <div className="mt-4 pt-4 border-t border-indigo-100">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Profit Margin:</span>
                     <span className="font-medium text-green-600">
-                      KSh {(product.sellingPrice - product.costPrice).toLocaleString()} 
+                      {currencySymbol} {(product.sellingPrice - product.costPrice).toLocaleString()} 
                       ({(((product.sellingPrice - product.costPrice) / product.sellingPrice) * 100).toFixed(1)}%)
                     </span>
                   </div>
@@ -428,7 +441,7 @@ export default function ProductDetailPage() {
                           </div>
                           <div className="text-right text-sm text-gray-600">
                             {link.lastPurchasePrice && (
-                              <div>Last Price: KSh {link.lastPurchasePrice.toFixed(2)}</div>
+                              <div>Last Price: {currencySymbol} {link.lastPurchasePrice.toFixed(2)}</div>
                             )}
                             {link.leadTimeInDays && (
                               <div>Lead Time: {link.leadTimeInDays} days</div>

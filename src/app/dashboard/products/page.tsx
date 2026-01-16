@@ -631,8 +631,8 @@ function ProductsPageContent() {
                 {totalSellingValue > totalCostValue && (
                   <p className="text-sm font-medium text-[#66BB6A]">
                     {showSellingValue 
-                      ? `Profit: KSh ${Math.round(totalSellingValue - totalCostValue).toLocaleString()}`
-                      : `Potential: KSh ${Math.round(totalSellingValue).toLocaleString()}`
+                      ? `Profit: ${currencySymbol} ${Math.round(totalSellingValue - totalCostValue).toLocaleString()}`
+                      : `Potential: ${currencySymbol} ${Math.round(totalSellingValue).toLocaleString()}`
                     }
                   </p>
                 )}
@@ -1054,7 +1054,7 @@ function ProductsPageContent() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Cost Price (KSh) <span className="text-red-500">*</span>
+                                  Cost Price ({currencySymbol}) <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                   type="number"
@@ -1071,7 +1071,7 @@ function ProductsPageContent() {
 
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Selling Price (KSh) <span className="text-red-500">*</span>
+                                  Selling Price ({currencySymbol}) <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                   type="number"

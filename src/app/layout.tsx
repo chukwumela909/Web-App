@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { StaffProvider } from "@/contexts/StaffContext";
 import { AdminAccessProvider } from "@/contexts/AdminAccessContext";
+import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { OnboardingProvider } from "@/components/onboarding/OnboardingProvider";
 import ErrorHandler from "@/components/ErrorHandler";
 import ChatwootWidget from "@/components/ChatwootWidget";
@@ -76,9 +77,11 @@ export default function RootLayout({
         <AuthProvider>
           <StaffProvider>
             <AdminAccessProvider>
-              <OnboardingProvider>
-                {children}
-              </OnboardingProvider>
+              <NotificationsProvider>
+                <OnboardingProvider>
+                  {children}
+                </OnboardingProvider>
+              </NotificationsProvider>
             </AdminAccessProvider>
           </StaffProvider>
         </AuthProvider>

@@ -25,7 +25,7 @@ function SuccessContent() {
     const amount = searchParams.get('amount') || '100'
     const currency = searchParams.get('currency') || 'USD'
     const planName = plan === 'yearly' ? 'Yearly' : 'Monthly'
-    const currencySymbol = getCurrencySymbol(currency as 'KSH' | 'USD')
+    const currencySymbol = getCurrencySymbol(currency)
 
     useEffect(() => {
         const timer = setInterval(() => {

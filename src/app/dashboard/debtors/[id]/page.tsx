@@ -21,6 +21,7 @@ import {
 } from '@heroicons/react/24/outline'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import type { Debtor, PaymentMethod, PaymentStatus } from '@/lib/firestore'
 import { getDebtors, recordDebtorPayment, deleteDebtor } from '@/lib/firestore'
 
@@ -43,6 +44,8 @@ function DebtorDetailsContent() {
   const router = useRouter()
   const params = useParams()
   const debtorId = params.id as string
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   
   const [debtor, setDebtor] = useState<Debtor | null>(null)
   const [loading, setLoading] = useState(true)
@@ -233,7 +236,7 @@ function DebtorDetailsContent() {
                     <BanknotesIcon className="h-5 w-5 text-[#F29F05]" />
                   </div>
                   <p className="text-xl font-bold text-[#F29F05] mb-1">
-                    KSh {debtor.currentDebt.toLocaleString()}
+                    {currencySymbol} {debtor.currentDebt.toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground">Current Debt</p>
                 </div>
@@ -243,7 +246,7 @@ function DebtorDetailsContent() {
                     <CreditCardIcon className="h-5 w-5 text-[#2175C7]" />
                   </div>
                   <p className="text-xl font-bold text-[#2175C7] mb-1">
-                    KSh {debtor.totalCreditLimit.toLocaleString()}
+                    {currencySymbol} {debtor.totalCreditLimit.toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground">Credit Limit</p>
                 </div>
@@ -253,7 +256,7 @@ function DebtorDetailsContent() {
                     <TagIcon className="h-5 w-5 text-[#66BB6A]" />
                   </div>
                   <p className="text-xl font-bold text-[#66BB6A] mb-1">
-                    KSh {availableCredit.toLocaleString()}
+                    {currencySymbol} {availableCredit.toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground">Available Credit</p>
                 </div>
@@ -399,7 +402,7 @@ function DebtorDetailsContent() {
                 <div className="mt-4 p-4 bg-white/10 rounded-xl">
                   <div className="flex justify-between items-center">
                     <span className="text-green-100">Current Debt:</span>
-                    <span className="text-xl font-bold">KSh {debtor.currentDebt.toLocaleString()}</span>
+                    <span className="text-xl font-bold">{currencySymbol} {debtor.currentDebt.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -412,7 +415,7 @@ function DebtorDetailsContent() {
                 className="p-6 space-y-6"
               >
                 <div>
-                  <label className="block text-sm font-medium text-card-foreground mb-2">Payment Amount (KSh)</label>
+                  <label className="block text-sm font-medium text-card-foreground mb-2">Payment Amount ({currencySymbol})</label>
                   <input 
                     type="number" 
                     min="0" 
@@ -427,7 +430,7 @@ function DebtorDetailsContent() {
                   {paymentForm.amount > 0 && (
                     <div className="mt-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                       <p className="text-sm text-green-700 dark:text-green-300">
-                        Remaining debt: <span className="font-bold">KSh {Math.max(0, debtor.currentDebt - paymentForm.amount).toLocaleString()}</span>
+                        Remaining debt: <span className="font-bold">{currencySymbol} {Math.max(0, debtor.currentDebt - paymentForm.amount).toLocaleString()}</span>
                       </p>
                     </div>
                   )}

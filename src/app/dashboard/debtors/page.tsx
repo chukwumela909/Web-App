@@ -36,6 +36,7 @@ import { useEffect, useMemo, useState, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { Debtor, DebtorPayment, PaymentMethod, PaymentStatus, InstallmentFrequency, createDebtor, getDebtors, recordDebtorPayment } from '@/lib/firestore'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { UpgradeModal } from '@/components/UpgradeModal'
 
@@ -53,9 +54,10 @@ interface DebtorDetailsModalProps {
   onClose: () => void
   onEdit: () => void
   onRecordPayment: () => void
+  currencySymbol: string
 }
 
-function DebtorDetailsModal({ debtor, onClose, onEdit, onRecordPayment }: DebtorDetailsModalProps) {
+function DebtorDetailsModal({ debtor, onClose, onEdit, onRecordPayment, currencySymbol }: DebtorDetailsModalProps) {
   return (
     <div className="flex flex-col h-full max-h-[90vh]">
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
@@ -137,20 +139,20 @@ function DebtorDetailsModal({ debtor, onClose, onEdit, onRecordPayment }: Debtor
               <div className="grid grid-cols-1 gap-4">
                 <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
                   <p className="text-sm text-red-700 dark:text-red-300">Current Debt</p>
-                  <p className="text-2xl font-bold text-red-900 dark:text-red-100">
-                    KSh {Number(debtor.currentDebt).toLocaleString()}
+                      <p className="text-2xl font-bold text-red-900 dark:text-red-100">
+                        {currencySymbol} {Number(debtor.currentDebt).toLocaleString()}
                   </p>
                 </div>
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
                   <p className="text-sm text-blue-700 dark:text-blue-300">Credit Limit</p>
-                  <p className="text-xl font-bold text-blue-900 dark:text-blue-100">
-                    KSh {Number(debtor.totalCreditLimit).toLocaleString()}
+                      <p className="text-xl font-bold text-blue-900 dark:text-blue-100">
+                        {currencySymbol} {Number(debtor.totalCreditLimit).toLocaleString()}
                   </p>
                 </div>
                 <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
                   <p className="text-sm text-green-700 dark:text-green-300">Total Payments</p>
-                  <p className="text-xl font-bold text-green-900 dark:text-green-100">
-                    KSh {Number(debtor.totalPayments).toLocaleString()}
+                      <p className="text-xl font-bold text-green-900 dark:text-green-100">
+                        {currencySymbol} {Number(debtor.totalPayments).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -317,7 +319,7 @@ function EditDebtorModal({ debtor, onSave, onCancel }: EditDebtorModalProps) {
 
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-2">
-                Credit Limit (KSh)
+                Credit Limit ({currencySymbol})
               </label>
               <input
                 type="number"
@@ -381,6 +383,8 @@ function EditDebtorModal({ debtor, onSave, onCancel }: EditDebtorModalProps) {
 export default function DebtorsPage() {
   const { user } = useAuth()
   const router = useRouter()
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const [loading, setLoading] = useState(true)
   const [debtors, setDebtors] = useState<Debtor[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -597,7 +601,7 @@ export default function DebtorsPage() {
         
         // Check if the new debt amount exceeds available credit
         if (newDebtAmount > availableCredit) {
-          alert(`Cannot add debt of ${newDebtAmount.toLocaleString()} KSh. Available credit is only ${availableCredit.toLocaleString()} KSh (Limit: ${existingDebtor.totalCreditLimit.toLocaleString()} KSh, Current Debt: ${existingDebtor.currentDebt.toLocaleString()} KSh)`)
+          alert(`Cannot add debt of ${newDebtAmount.toLocaleString()} ${currencySymbol}. Available credit is only ${availableCredit.toLocaleString()} ${currencySymbol} (Limit: ${existingDebtor.totalCreditLimit.toLocaleString()} ${currencySymbol}, Current Debt: ${existingDebtor.currentDebt.toLocaleString()} ${currencySymbol})`)
           return
         }
         
@@ -653,7 +657,7 @@ export default function DebtorsPage() {
           const existingDebtor = debtors.find(d => d.id === existingDebtorId)
           if (existingDebtor) {
             const availableCredit = existingDebtor.totalCreditLimit - existingDebtor.currentDebt
-            return `Add additional debt amount. Available credit: ${availableCredit.toLocaleString()} KSh`
+            return `Add additional debt amount. Available credit: ${availableCredit.toLocaleString()} ${currencySymbol}`
           }
           return 'Add additional debt amount to existing debtor'
         }
@@ -720,7 +724,7 @@ export default function DebtorsPage() {
               <div className="bg-[#FEF3E0] rounded-xl p-4 text-center border border-orange-200/50">
                 <BanknotesIcon className="h-6 w-6 text-[#F29F05] mx-auto mb-2" />
                 <p className="text-2xl font-bold text-[#F29F05] mb-1">
-                  KSh {totalDebt.toLocaleString()}
+                  {currencySymbol} {totalDebt.toLocaleString()}
                 </p>
                 <p className="text-sm text-[#F29F05] font-medium">Outstanding Debt</p>
               </div>
@@ -729,7 +733,7 @@ export default function DebtorsPage() {
               <div className="bg-[#E8F5E8] rounded-xl p-4 text-center border border-green-200/50">
                 <CheckCircleIcon className="h-6 w-6 text-[#66BB6A] mx-auto mb-2" />
                 <p className="text-2xl font-bold text-[#66BB6A] mb-1">
-                  KSh 0
+                  {currencySymbol} 0
                 </p>
                 <p className="text-sm text-[#66BB6A] font-medium">Today&apos;s Payments</p>
               </div>
@@ -849,7 +853,7 @@ export default function DebtorsPage() {
                           <p className="text-sm text-muted-foreground">{debtor.phone}</p>
                           {debtor.currentDebt > 0 && (
                             <p className="text-sm font-medium text-[#F29F05]">
-                              Debt: KSh {Number(debtor.currentDebt).toLocaleString()}
+                              Debt: {currencySymbol} {Number(debtor.currentDebt).toLocaleString()}
                             </p>
                           )}
                         </div>
@@ -858,7 +862,7 @@ export default function DebtorsPage() {
                       <div className="text-right">
                         <p className="text-xs text-muted-foreground">Available Credit</p>
                         <p className="text-lg font-bold text-[#66BB6A]">
-                          KSh {Number(debtor.totalCreditLimit - debtor.currentDebt).toLocaleString()}
+                          {currencySymbol} {Number(debtor.totalCreditLimit - debtor.currentDebt).toLocaleString()}
                         </p>
                         
                         {/* Risk Level Badge */}
@@ -1097,15 +1101,15 @@ export default function DebtorsPage() {
                                 <div className="grid grid-cols-3 gap-4">
                                   <div>
                                     <p className="text-sm text-blue-600 mb-1">Credit Limit</p>
-                                    <p className="text-xl font-bold text-blue-900">{existingDebtor.totalCreditLimit.toLocaleString()} KSh</p>
+                                    <p className="text-xl font-bold text-blue-900">{existingDebtor.totalCreditLimit.toLocaleString()} {currencySymbol}</p>
                                   </div>
                                   <div>
                                     <p className="text-sm text-blue-600 mb-1">Current Debt</p>
-                                    <p className="text-xl font-bold text-orange-600">{existingDebtor.currentDebt.toLocaleString()} KSh</p>
+                                    <p className="text-xl font-bold text-orange-600">{existingDebtor.currentDebt.toLocaleString()} {currencySymbol}</p>
                                   </div>
                                   <div>
                                     <p className="text-sm text-blue-600 mb-1">Available Credit</p>
-                                    <p className="text-xl font-bold text-green-600">{availableCredit.toLocaleString()} KSh</p>
+                                    <p className="text-xl font-bold text-green-600">{availableCredit.toLocaleString()} {currencySymbol}</p>
                                   </div>
                                 </div>
                               </div>
@@ -1117,7 +1121,7 @@ export default function DebtorsPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {mode === 'NEW' && (
                             <div>
-                              <label className="block text-base font-semibold text-gray-700 mb-3">Total Credit Limit (KSh)</label>
+                              <label className="block text-base font-semibold text-gray-700 mb-3">Total Credit Limit ({currencySymbol})</label>
                               <input 
                                 type="number" 
                                 min="0" 
@@ -1130,7 +1134,7 @@ export default function DebtorsPage() {
                           )}
                           <div className={mode === 'NEW' ? '' : 'md:col-span-2'}>
                             <label className="block text-base font-semibold text-gray-700 mb-3">
-                              {mode === 'EXISTING' ? 'New Debt Amount to Add (KSh)' : 'Current Debt Amount (KSh)'}
+                              {mode === 'EXISTING' ? `New Debt Amount to Add (${currencySymbol})` : `Current Debt Amount (${currencySymbol})`}
                             </label>
                             <input 
                               type="number" 
@@ -1204,7 +1208,7 @@ export default function DebtorsPage() {
                             className="grid grid-cols-1 md:grid-cols-2 gap-6"
                           >
                             <div>
-                              <label className="block text-base font-semibold text-gray-700 mb-3">Installment Amount (KSh)</label>
+                              <label className="block text-base font-semibold text-gray-700 mb-3">Installment Amount ({currencySymbol})</label>
                               <input 
                                 type="number" 
                                 min="0" 
@@ -1248,11 +1252,11 @@ export default function DebtorsPage() {
                             )}
                             <div className="flex justify-between">
                               <span className="text-gray-700">Credit Limit:</span>
-                              <span className="font-semibold text-gray-900">KSh {debtorForm.totalCreditLimit.toLocaleString()}</span>
+                              <span className="font-semibold text-gray-900">{currencySymbol} {debtorForm.totalCreditLimit.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-700">Current Debt:</span>
-                              <span className="font-semibold text-gray-900">KSh {debtorForm.originalDebtAmount.toLocaleString()}</span>
+                              <span className="font-semibold text-gray-900">{currencySymbol} {debtorForm.originalDebtAmount.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-700">Payment Type:</span>
@@ -1262,7 +1266,7 @@ export default function DebtorsPage() {
                               <div className="flex justify-between">
                                 <span className="text-gray-700">Installment:</span>
                                 <span className="font-semibold text-gray-900">
-                                  KSh {debtorForm.installmentAmount.toLocaleString()} ({debtorForm.installmentFrequency.toLowerCase()})
+                                  {currencySymbol} {debtorForm.installmentAmount.toLocaleString()} ({debtorForm.installmentFrequency.toLowerCase()})
                                 </span>
                               </div>
                             )}
@@ -1343,7 +1347,7 @@ export default function DebtorsPage() {
                     <div className="mt-4 p-4 bg-white/10 rounded-xl">
                       <div className="flex justify-between items-center">
                         <span className="text-green-100">Current Debt:</span>
-                        <span className="text-xl font-bold">KSh {Number(showPayment.currentDebt).toLocaleString()}</span>
+                        <span className="text-xl font-bold">{currencySymbol} {Number(showPayment.currentDebt).toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
@@ -1375,7 +1379,7 @@ export default function DebtorsPage() {
                     className="p-6 space-y-6"
                   >
                     <div>
-                      <label className="block text-sm font-medium text-card-foreground mb-2">Payment Amount (KSh)</label>
+                      <label className="block text-sm font-medium text-card-foreground mb-2">Payment Amount ({currencySymbol})</label>
                       <input 
                         type="number" 
                         min="0" 
@@ -1390,7 +1394,7 @@ export default function DebtorsPage() {
                       {paymentForm.amount > 0 && (
                         <div className="mt-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                           <p className="text-sm text-green-700 dark:text-green-300">
-                            Remaining debt: <span className="font-bold">KSh {Math.max(0, showPayment.currentDebt - paymentForm.amount).toLocaleString()}</span>
+                            Remaining debt: <span className="font-bold">{currencySymbol} {Math.max(0, showPayment.currentDebt - paymentForm.amount).toLocaleString()}</span>
                           </p>
                     </div>
                       )}
@@ -1455,6 +1459,7 @@ export default function DebtorsPage() {
                 >
                   <DebtorDetailsModal 
                     debtor={showDetails}
+                    currencySymbol={currencySymbol}
                     onClose={() => setShowDetails(null)}
                     onEdit={() => {
                       setEditingDebtor(showDetails)

@@ -4,6 +4,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCurrency, formatCurrency } from '@/hooks/useCurrency'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
@@ -112,6 +113,7 @@ const staggerChildren = {
 function BranchesContent() {
   const { user } = useAuth()
   const router = useRouter()
+  const { currency } = useCurrency()
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [branches, setBranches] = useState<Branch[]>([])
@@ -770,7 +772,7 @@ function BranchesContent() {
                             <CheckCircleIcon className="h-4 w-4 text-green-600 mr-1" />
                           </div>
                           <p className="text-lg font-bold text-green-700">
-                            {formatCurrency(branch.totalInventoryValue || 0).replace('KES', 'K').replace('Ksh', 'K')}
+                            {formatCurrency(branch.totalInventoryValue || 0, currency)}
                           </p>
                           <p className="text-xs text-green-600 font-medium">Inventory</p>
                         </div>

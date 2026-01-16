@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { Branch, BranchStatus } from '@/lib/branches-types'
@@ -93,6 +94,8 @@ export default function BranchDetailsPage({}: BranchDetailsPageProps) {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   
   const [branch, setBranch] = useState<Branch | null>(null)
   const [staff, setStaff] = useState<Staff[]>([])
@@ -735,7 +738,7 @@ export default function BranchDetailsPage({}: BranchDetailsPageProps) {
                     </div>
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <DollarSign className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                      <p className="text-2xl font-bold text-gray-900">Ksh {(branch.totalInventoryValue || 0).toLocaleString()}</p>
+                      <p className="text-2xl font-bold text-gray-900">{currencySymbol} {(branch.totalInventoryValue || 0).toLocaleString()}</p>
                       <p className="text-sm text-gray-600">Inventory Value</p>
                     </div>
                     <div className="text-center p-4 bg-yellow-50 rounded-lg">

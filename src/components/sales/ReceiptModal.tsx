@@ -7,6 +7,7 @@ import {
   PrinterIcon,
   DocumentArrowDownIcon
 } from '@heroicons/react/24/outline'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import type { Sale } from '@/lib/firestore'
 import type { MultiItemSale } from '@/lib/multi-item-sales-types'
 
@@ -28,6 +29,8 @@ export default function ReceiptModal({
   businessAddress = "Nairobi, Kenya"
 }: ReceiptModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null)
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
 
   if (!isOpen || !sale) return null
 
@@ -40,14 +43,7 @@ export default function ReceiptModal({
     minute: '2-digit'
   })
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    }).format(amount)
-  }
+  const formatCurrency = (amount: number) => `${currencySymbol} ${amount.toLocaleString()}`
 
   const formatPaymentMethod = (method: string) => {
     switch (method) {

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import AdvancedAnalyticsService, { SegmentationData, CohortData, WeeklyTrend } from '@/lib/advanced-analytics-service'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 
 interface AdvancedAnalyticsDashboardProps {
   className?: string
@@ -33,6 +34,8 @@ export default function AdvancedAnalyticsDashboard({ className = '' }: AdvancedA
   const [cohortData, setCohortData] = useState<CohortData[]>([])
   const [weeklyTrends, setWeeklyTrends] = useState<WeeklyTrend[]>([])
   const [loading, setLoading] = useState(true)
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
 
   useEffect(() => {
     fetchAnalyticsData()
@@ -58,13 +61,7 @@ export default function AdvancedAnalyticsDashboard({ className = '' }: AdvancedA
     }
   }
 
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      minimumFractionDigits: 0
-    }).format(amount)
-  }
+  const formatCurrency = (amount: number): string => `${currencySymbol} ${amount.toLocaleString()}`
 
   const getRetentionColor = (rate: number): string => {
     if (rate >= 80) return 'text-green-600'

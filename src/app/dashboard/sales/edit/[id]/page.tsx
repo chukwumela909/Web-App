@@ -505,7 +505,7 @@ function EditSalePageContent() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Unit Price (KSh)
+                      Unit Price ({currencySymbol})
                     </label>
                     <input
                       type="number"
@@ -522,7 +522,7 @@ function EditSalePageContent() {
                 {/* Total Amount */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Total Amount (KSh)
+                    Total Amount ({currencySymbol})
                   </label>
                   <input
                     type="number"

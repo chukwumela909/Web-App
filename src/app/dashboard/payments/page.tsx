@@ -15,7 +15,7 @@ interface SubscriptionHistory {
   planName: string
   planType: 'monthly' | 'yearly'
   amount: number
-  currency: 'KSH' | 'USD'
+  currency: string
   status: 'active' | 'expired' | 'failed' | 'pending' | 'cancelled'
   startDate: Date | null
   endDate: Date | null
@@ -25,7 +25,7 @@ interface SubscriptionHistory {
 function PaymentsPageContent() {
   const { user } = useAuth()
   const router = useRouter()
-  const currency = useCurrency()
+  const { currency } = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
   const [subscriptions, setSubscriptions] = useState<SubscriptionHistory[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -68,7 +68,7 @@ function PaymentsPageContent() {
             planName: data.planName || (data.planType === 'yearly' ? '1 Year Pro Plan' : '1 Month Pro Plan'),
             planType: data.planType || 'monthly',
             amount: data.amount || 0,
-            currency: data.currency || 'KSH',
+            currency: data.currency || currency,
             status: data.status || 'pending',
             startDate: parseDate(data.startDate),
             endDate: parseDate(data.endDate),
@@ -210,7 +210,7 @@ function PaymentsPageContent() {
                     1 Month Pro Plan
                   </p>
                   <p className="font-dm-sans text-sm text-[#717171]">
-                    {currency === 'USD' ? '$20' : 'KSH 2,000'} / month
+                    {currency === 'KSH' ? `${currencySymbol} 2,000` : `${currencySymbol} 10`} / month
                   </p>
                 </div>
               </div>
@@ -239,7 +239,7 @@ function PaymentsPageContent() {
                     1 Year Pro Plan
                   </p>
                   <p className="font-dm-sans text-sm text-[#717171]">
-                    {currency === 'USD' ? '$200' : 'KSH 20,000'} / year
+                    {currency === 'KSH' ? `${currencySymbol} 20,000` : `${currencySymbol} 100`} / year
                   </p>
                 </div>
               </div>
@@ -326,7 +326,7 @@ function PaymentsPageContent() {
                   </div>
                   <div className="flex flex-1 gap-[10px] items-center p-[10px] rounded-[4px]">
                     <p className="font-dm-sans font-normal text-[16px] text-[#717171]">
-                      {sub.currency === 'USD' ? '$' : 'KSH'} <span className={isActive ? 'text-[#222222]' : 'text-[#717171]'}>{sub.amount.toLocaleString()}</span>
+                      {getCurrencySymbol(sub.currency)} <span className={isActive ? 'text-[#222222]' : 'text-[#717171]'}>{sub.amount.toLocaleString()}</span>
                     </p>
                   </div>
                   <div className="flex flex-1 gap-[10px] items-center p-[10px] rounded-[4px]">

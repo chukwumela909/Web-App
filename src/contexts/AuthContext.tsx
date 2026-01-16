@@ -11,7 +11,7 @@ import {
   sendPasswordResetEmail,
   ApplicationVerifier
 } from 'firebase/auth'
-import { doc, updateDoc, setDoc, serverTimestamp, query, collection, where, getDocs } from 'firebase/firestore'
+import { doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, signInWithCredential, ConfirmationResult } from '@/lib/firebase'
 import { getUserRole, UserRole } from '@/lib/adminUtils'
 
@@ -251,15 +251,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Send OTP for login
   const sendLoginOtp = async (phoneNumber: string) => {
-    // Check if phone number exists in any user profile
-    const profilesQuery = query(
-      collection(db, 'userProfiles'),
-      where('phoneNumber', '==', phoneNumber)
-    )
-    const querySnapshot = await getDocs(profilesQuery)
-    
-    if (querySnapshot.empty) {
-      throw new Error('No account found with this phone number. Please register first.')
+    // Check if phone number exists using server-side Admin SDK
+    try {
+      const response = await fetch(`/api/auth/phone-exists?phone=${encodeURIComponent(phoneNumber)}`)
+      if (!response.ok) {
+        const data = await response.json().catch(() => null)
+        const message = data?.error || 'Unable to verify phone number. Please try again.'
+        throw new Error(message)
+      }
+      const data = await response.json()
+      if (!data?.exists) {
+        throw new Error('No account found with this phone number. Please register first.')
+      }
+    } catch (error) {
+      throw error
     }
     
     const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier }

@@ -20,7 +20,9 @@ import {
   BuildingOffice2Icon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNotifications } from '@/contexts/NotificationsContext'
 import { Product as FPProduct, getProducts, updateProduct } from '@/lib/firestore'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import EnhancedProductDetail from '@/components/products/EnhancedProductDetail'
 
 const categories = [
@@ -78,6 +80,9 @@ function BrowseProductsContent() {
   const [showEnhancedDetail, setShowEnhancedDetail] = useState(false)
   const [selectedProductForDetail, setSelectedProductForDetail] = useState<FPProduct | null>(null)
   const { user } = useAuth()
+  const { addNotification } = useNotifications()
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const router = useRouter()
 
   const itemsPerPage = 12
@@ -98,10 +103,18 @@ function BrowseProductsContent() {
     router.push(`/dashboard/products?edit=${product.id}`)
   }
 
-  const handleDelete = async (productId: string) => {
+  const handleDelete = async (product: FPProduct) => {
     if (confirm('Are you sure you want to delete this product?')) {
       try {
-        await updateProduct(productId, { isActive: false })
+        await updateProduct(product.id, { isActive: false })
+        addNotification({
+          id: `deleted-product-${product.id}`,
+          type: 'alert',
+          title: 'Product Deleted',
+          highlightedText: product.name,
+          message: ' product has been removed from your product list.',
+          createdAt: Date.now()
+        })
         fetchData()
       } catch (error) {
         console.error('Error deleting product:', error)
@@ -389,13 +402,13 @@ function BrowseProductsContent() {
 
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-lg font-bold text-foreground">KSh {product.sellingPrice.toLocaleString()}</p>
+                            <p className="text-lg font-bold text-foreground">{currencySymbol} {product.sellingPrice.toLocaleString()}</p>
                             <p className="text-sm text-muted-foreground">Stock: {product.quantity} {product.unitOfMeasure}</p>
                           </div>
                           <div className="text-right">
                             {product.lastPurchasePrice && (
                               <p className="text-sm text-muted-foreground">
-                                Cost: KSh {product.lastPurchasePrice.toFixed(2)}
+                                Cost: {currencySymbol} {product.lastPurchasePrice.toFixed(2)}
                               </p>
                             )}
                             {primarySupplier && (
@@ -429,7 +442,7 @@ function BrowseProductsContent() {
                               <MagnifyingGlassIcon className="h-4 w-4" />
                             </button>
                             <button
-                              onClick={() => handleDelete(product.id)}
+                              onClick={() => handleDelete(product)}
                               className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
                               title="Delete Product"
                             >

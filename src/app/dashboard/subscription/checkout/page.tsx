@@ -49,7 +49,7 @@ function CheckoutContent() {
 
     const amount = getAmount()
     const planName = plan === 'yearly' ? 'Yearly' : 'Monthly'
-    const currencySymbol = getCurrencySymbol(currency as 'KSH' | 'USD')
+    const currencySymbol = getCurrencySymbol(currency)
 
     const handleWhatsAppClick = () => {
         if (expandedPayment === 'whatsapp') {

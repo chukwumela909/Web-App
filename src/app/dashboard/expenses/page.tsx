@@ -22,6 +22,7 @@ import {
 import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { Expense, ExpenseCategory, PaymentMethod, createExpense, getExpenses, deleteExpense } from '@/lib/firestore'
 
 const fadeInUp = {
@@ -34,6 +35,8 @@ function ExpensesPageContent() {
   const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const [loading, setLoading] = useState(true)
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [search, setSearch] = useState('')
@@ -203,7 +206,7 @@ function ExpensesPageContent() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">This Month</p>
-                  <p className="text-2xl font-bold text-card-foreground">KSh {totalThisMonth.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-card-foreground">{currencySymbol} {totalThisMonth.toLocaleString()}</p>
                 </div>
                 <div className="bg-red-100 p-3 rounded-lg">
                   <CurrencyDollarIcon className="h-6 w-6 text-red-600" />
@@ -234,7 +237,7 @@ function ExpensesPageContent() {
                 <form onSubmit={handleAddExpense} className="p-6 space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Amount (KSh)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Amount ({currencySymbol})</label>
                       <input 
                         type="number" 
                         min="0" 
@@ -444,7 +447,7 @@ function ExpensesPageContent() {
                         
                         <div className="flex items-center gap-4">
                           <div className="text-right">
-                            <p className="text-lg font-bold text-gray-900">KSh {Number(exp.amount).toLocaleString()}</p>
+                            <p className="text-lg font-bold text-gray-900">{currencySymbol} {Number(exp.amount).toLocaleString()}</p>
                             <p className="text-sm text-gray-500">
                               {exp.paymentMethod === 'MPESA' ? 'M-Pesa' : exp.paymentMethod.replace('_',' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
                             </p>

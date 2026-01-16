@@ -209,12 +209,7 @@ function SuppliersContent() {
     return terms.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency
-    }).format(amount)
-  }
+  const formatCurrency = (amount: number) => `${currencySymbol} ${amount.toLocaleString()}`
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (

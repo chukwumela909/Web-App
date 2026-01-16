@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
 import { useStaffRedirect } from '@/hooks/useStaffRedirect'
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus'
+import { useNotifications } from '@/contexts/NotificationsContext'
 import { 
   Squares2X2Icon,
   ArchiveBoxIcon,
@@ -72,8 +73,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, logout } = useAuth()
   const { staff, hasPermission, loading: staffLoading } = useStaff()
   const { isSubscribed, isLoading: subscriptionLoading } = useSubscriptionStatus()
+  const { notifications } = useNotifications()
   const pathname = usePathname()
   const router = useRouter()
+  const hasUnseenNotifications = notifications.some(notification => !notification.seen)
   
   // Smart redirect for staff members without appropriate permissions
   useStaffRedirect()
@@ -393,7 +396,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 className="inline-flex items-center p-2 rounded-full hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary transition-all duration-200 chrome-flex-fix chrome-transition chrome-border-radius"
                 title="Notifications"
               >
-                <BellIcon className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors" />
+                <span className="relative">
+                  <BellIcon className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors" />
+                  {hasUnseenNotifications && (
+                    <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-background" />
+                  )}
+                </span>
               </button>
             </div>
           </div>

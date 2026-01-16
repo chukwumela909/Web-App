@@ -23,6 +23,7 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { Expense, ExpenseCategory, PaymentMethod, getExpense, updateExpense, deleteExpense } from '@/lib/firestore'
 
 const fadeInUp = {
@@ -46,9 +47,13 @@ export default function ExpenseDetailsPage() {
   const [showEdit, setShowEdit] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { user } = useAuth()
+  const { currency } = useCurrency()
+  const currencySymbol = getCurrencySymbol(currency)
   const router = useRouter()
   const params = useParams()
   const expenseId = params.id as string
+
+  const formatCurrency = (amount: number) => `${currencySymbol} ${amount.toLocaleString()}`
 
   const [editForm, setEditForm] = useState({
     amount: 0,
@@ -447,7 +452,7 @@ export default function ExpenseDetailsPage() {
                     <form onSubmit={handleSaveEdit} className="p-6 space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Amount (KES)</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Amount ({currencySymbol})</label>
                           <input
                             type="number"
                             step="0.01"

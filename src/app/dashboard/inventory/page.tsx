@@ -4,6 +4,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCurrency, formatCurrency } from '@/hooks/useCurrency'
 import { useEffect, useState } from 'react'
 import { 
   ArchiveBoxIcon,
@@ -95,6 +96,7 @@ const staggerChildren = {
 
 function InventoryContent() {
   const { user } = useAuth()
+  const { currency } = useCurrency()
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [branches, setBranches] = useState<Branch[]>([])
@@ -444,7 +446,7 @@ function InventoryContent() {
                     <div>
                       <p className="text-sm font-medium text-gray-600">Inventory Value</p>
                       <p className="text-3xl font-bold text-green-600">
-                        {formatCurrency(dashboard?.totalInventoryValue || 0)}
+                        {formatCurrency(dashboard?.totalInventoryValue || 0, currency)}
                       </p>
                     </div>
                     <TruckIcon className="h-8 w-8 text-green-600" />
@@ -594,7 +596,7 @@ function InventoryContent() {
                         <div className="flex justify-between items-center">
                           <span className="text-green-700 font-medium">Total Value</span>
                           <span className="font-bold text-green-900">
-                            {formatCurrency(dashboard.totalInventoryValue)}
+                            {formatCurrency(dashboard.totalInventoryValue, currency)}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
