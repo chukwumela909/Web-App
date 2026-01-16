@@ -5,62 +5,134 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { 
-  ChartBarIcon,
-  CurrencyDollarIcon,
-  TagIcon,
-  ReceiptPercentIcon,
-  CalculatorIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
   CalendarDaysIcon,
+  ChevronDownIcon,
   ArrowDownTrayIcon,
-  ShareIcon,
-  DocumentArrowDownIcon,
-  PaperAirplaneIcon,
-  LinkIcon,
-  PrinterIcon,
-  ChevronDownIcon
+  BuildingOffice2Icon,
+  TagIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
 import { useEffect, useMemo, useState } from 'react'
 import { DailySummary, getDailySummaries, getSales, Sale } from '@/lib/firestore'
 import { PlanGate } from '@/components/PlanGate'
-import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2'
+import dynamic from 'next/dynamic'
+
+// Dynamically import chart components to avoid SSR issues
+const Line = dynamic(
+  () => import('react-chartjs-2').then((mod) => mod.Line),
+  { 
+    ssr: false,
+    loading: () => <div className="h-[200px] flex items-center justify-center"><span className="text-gray-400">Loading chart...</span></div>
+  }
+)
+
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
   Title,
   Tooltip,
   Legend,
-  ArcElement,
   Filler
 } from 'chart.js'
 
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  Filler
-)
+// Register Chart.js components - only on client side
+if (typeof window !== 'undefined') {
+  ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+  )
+}
 
-type ReportPeriod = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM'
+type ReportPeriod = 'Last 7 Days' | 'Last 30 Days' | 'Last 90 Days' | 'Custom'
 
 const fadeInUp = {
-  initial: { opacity: 0, y: 60 },
+  initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.6 }
+  transition: { duration: 0.4 }
+}
+
+// Stat Card Component
+interface StatCardProps {
+  title: string
+  value: string
+  trend?: 'up' | 'down' | null
+}
+
+function StatCard({ title, value, trend }: StatCardProps) {
+  return (
+    <div className="bg-white border border-[#ececf2] rounded-xl px-4 py-5 flex flex-col gap-4">
+      <span className="text-[#525252] text-base font-normal">{title}</span>
+      <div className="flex items-end justify-between">
+        <span className="text-[#171717] text-2xl font-bold">{value}</span>
+        {trend && (
+          <svg width="50" height="36" viewBox="0 0 50 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {trend === 'up' ? (
+              <path d="M1 35L12.5 23.5L25 28L35.5 13.5L49 1" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            ) : (
+              <path d="M1 1L12.5 12.5L25 8L35.5 22.5L49 35" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            )}
+          </svg>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Payment Method Progress Bar Component
+interface PaymentMethodRowProps {
+  label: string
+  percentage: number
+}
+
+function PaymentMethodRow({ label, percentage }: PaymentMethodRowProps) {
+  return (
+    <div className="flex items-center justify-between w-full">
+      <span className="text-[#525252] text-xs font-normal min-w-[80px]">{label}</span>
+      <div className="bg-[#e9f2f8] h-1 w-[100px] rounded-sm">
+        <div 
+          className="bg-[#004aad] h-1 rounded-sm transition-all duration-300" 
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+// Medal/Award Icon for Product Rankings
+function MedalIcon({ place }: { place: 1 | 2 | 3 }) {
+  const colors = {
+    1: { from: '#fac200', to: '#f4b800' },
+    2: { from: '#7a8291', to: '#9098a6' },
+    3: { from: '#da6a00', to: '#c25400' }
+  }
+  
+  return (
+    <div 
+      className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+      style={{ background: `linear-gradient(to bottom, ${colors[place].from}, ${colors[place].to})` }}
+    >
+      {place}
+    </div>
+  )
+}
+
+// Branch/Staff Icon
+function BranchIcon() {
+  return (
+    <div className="bg-[#e9f2f8] w-[30px] h-[30px] rounded-lg flex items-center justify-center">
+      <BuildingOffice2Icon className="w-[18px] h-[18px] text-[#004aad]" />
+    </div>
+  )
 }
 
 export default function ReportsPage() {
@@ -71,9 +143,8 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true)
   const [summaries, setSummaries] = useState<DailySummary[]>([])
   const [recentSales, setRecentSales] = useState<Sale[]>([])
-  const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('WEEKLY')
-  const [showExportDropdown, setShowExportDropdown] = useState(false)
-  const [showShareDropdown, setShowShareDropdown] = useState(false)
+  const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('Last 7 Days')
+  const [showPeriodDropdown, setShowPeriodDropdown] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
 
   // Determine the effective user ID for data loading
@@ -97,21 +168,20 @@ export default function ReportsPage() {
     load()
   }, [effectiveUserId])
 
-  // Close dropdowns when clicking outside
+  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (showExportDropdown || showShareDropdown) {
+      if (showPeriodDropdown) {
         const target = event.target as Element
-        if (!target.closest('.export-dropdown') && !target.closest('.share-dropdown')) {
-          setShowExportDropdown(false)
-          setShowShareDropdown(false)
+        if (!target.closest('.period-dropdown')) {
+          setShowPeriodDropdown(false)
         }
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showExportDropdown, showShareDropdown])
+  }, [showPeriodDropdown])
 
   // Calculate metrics from actual data
   const metrics = useMemo(() => {
@@ -122,1068 +192,522 @@ export default function ReportsPage() {
       return sum + Math.max(0, revenue - cost)
     }, 0)
     const totalTransactions = recentSales.length
-    const averageValue = totalTransactions > 0 ? totalSales / totalTransactions : 0
+    const debt = 0 // Placeholder for debt calculation
 
     return {
       totalSales,
       totalProfit,
       totalTransactions,
-      averageValue
+      debt
     }
   }, [recentSales])
 
-  // Calculate growth percentages (simplified for demo)
-  const growth = useMemo(() => {
-    return {
-      salesGrowth: 12.5,
-      profitGrowth: 8.3,
-      transactionGrowth: 15.2
-    }
-  }, [])
-
-  // Generate trend data for charts
+  // Generate trend data for Sales vs Profit chart
   const trendData = useMemo(() => {
-    // Generate more realistic trend data with some variation
-    const baseSales = [850, 1200, 950, 1800, 2100, 1650, 1400]
-    const salesTrend = [
-      { label: 'Mon', value: baseSales[0] + (Math.random() * 200 - 100) },
-      { label: 'Tue', value: baseSales[1] + (Math.random() * 200 - 100) },
-      { label: 'Wed', value: baseSales[2] + (Math.random() * 200 - 100) },
-      { label: 'Thu', value: baseSales[3] + (Math.random() * 200 - 100) },
-      { label: 'Fri', value: baseSales[4] + (Math.random() * 200 - 100) },
-      { label: 'Sat', value: baseSales[5] + (Math.random() * 200 - 100) },
-      { label: 'Sun', value: baseSales[6] + (Math.random() * 200 - 100) }
-    ].map(point => ({ ...point, value: Math.max(200, point.value) })) // Ensure minimum value
-    
-    const profitTrend = salesTrend.map(point => ({
-      ...point,
-      value: Math.max(60, point.value * (0.25 + Math.random() * 0.1)) // Profit is 25-35% of sales
-    }))
+    const labels = ['Jan 1', 'Jan 2', 'Jan 3', 'Jan 4', 'Jan 5', 'Jan 6', 'Jan 7']
+    const salesData = [2000, 4000, 3500, 10000, 7000, 6000, 5000]
+    const profitData = [500, 1500, 1200, 4000, 2500, 2000, 1800]
 
-    return { salesTrend, profitTrend }
-  }, [selectedPeriod]) // Regenerate when period changes
+    return { labels, salesData, profitData }
+  }, [selectedPeriod])
 
-  // Best performing days data
-  const bestPerformingDays = useMemo(() => {
-    return [
-      { date: '2024-01-15', sales: 15420, transactions: 47, topProduct: 'Product A' },
-      { date: '2024-01-12', sales: 12800, transactions: 38, topProduct: 'Product B' },
-      { date: '2024-01-10', sales: 11250, transactions: 32, topProduct: 'Product C' }
+  // Payment methods breakdown
+  const paymentMethods = useMemo(() => [
+    { label: 'Cash', percentage: 70 },
+    { label: 'M-Pesa', percentage: 45 },
+    { label: 'Bank Transfer', percentage: 45 },
+    { label: 'Card Payment', percentage: 20 },
+    { label: 'Credit Sale', percentage: 6 },
+    { label: 'Cheque', percentage: 12 },
+    { label: 'Other', percentage: 45 }
+  ], [])
+
+  // Inventory stock data
+  const inventoryData = useMemo(() => [
+    { name: 'Cooking...', stock: 35 },
+    { name: 'Gas co...', stock: 32 },
+    { name: 'iPhone...', stock: 32 },
+    { name: 'Keybo...', stock: 35 },
+    { name: 'Logite...', stock: 45 },
+    { name: 'Samsu...', stock: 45 },
+    { name: 'Standi...', stock: 27 },
+    { name: 'Monito...', stock: 32 },
+    { name: 'Laptop...', stock: 40 },
+    { name: 'TV Sta...', stock: 50, highlighted: true },
+    { name: 'Wristw...', stock: 35 }
+  ], [])
+
+  // Best performing products
+  const bestProducts = useMemo(() => [
+    { name: 'TV Stand', category: 'Furniture', sales: 15420, units: 20, place: 1 as const },
+    { name: 'Logitech Mouse', category: 'Gadget', sales: 10420, units: 10, place: 2 as const },
+    { name: 'iPhone 16', category: 'Gadget', sales: 8000, units: 9, place: 3 as const }
+  ], [])
+
+  // Branch performance data
+  const branchPerformance = useMemo(() => [
+    { name: 'Main Branch', staff: 2, products: 10, costValue: 3890360, sales: 10800, profit: 4000 },
+    { name: 'Northern coast Branch', staff: 1, products: 10, costValue: 3890360, sales: 10800, profit: 4000 },
+    { name: '6th Avenue Branch', staff: 4, products: 10, costValue: 3890360, sales: 10800, profit: 4000 }
+  ], [])
+
+  // Staff performance data
+  const staffPerformance = useMemo(() => [
+    { branch: 'Main Branch', name: 'Leslie Alexander', email: 'name@examplemail.com', transactions: 10, sales: 4000 },
+    { branch: 'Northern coast Branch', name: 'Bessie Cooper', email: 'name@examplemail.com', transactions: 5, sales: 2000 },
+    { branch: '6th Avenue Branch', name: 'Ronald Richards', email: 'name@examplemail.com', transactions: 4, sales: 1200 }
+  ], [])
+
+  // Chart.js configuration for Sales vs Profit
+  const chartData = {
+    labels: trendData.labels,
+    datasets: [
+      {
+        label: 'Sales',
+        data: trendData.salesData,
+        borderColor: '#004aad',
+        backgroundColor: 'rgba(0, 74, 173, 0.1)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 4,
+        pointBackgroundColor: '#004aad',
+        borderWidth: 2
+      },
+      {
+        label: 'Profit',
+        data: trendData.profitData,
+        borderColor: '#027a48',
+        backgroundColor: 'rgba(2, 122, 72, 0.1)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 4,
+        pointBackgroundColor: '#027a48',
+        borderWidth: 2
+      }
     ]
-  }, [])
-
-  // Export Functions
-  const handleExportPDF = async () => {
-    setIsExporting(true)
-    try {
-      // Simulate PDF generation
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // Generate HTML content that looks like a PDF report
-      const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>FahamPesa Business Report - ${selectedPeriod}</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
-        .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
-        .logo { color: #2563eb; font-size: 24px; font-weight: bold; }
-        .report-title { font-size: 20px; margin: 10px 0; }
-        .report-period { color: #666; font-size: 14px; }
-        .metrics-section { margin: 30px 0; }
-        .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-        .metric-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; }
-        .metric-label { font-size: 12px; color: #666; text-transform: uppercase; }
-        .metric-value { font-size: 24px; font-weight: bold; color: #2563eb; }
-        .growth-indicator { color: #10b981; font-size: 12px; }
-        .section-title { font-size: 18px; font-weight: bold; margin: 30px 0 15px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .performance-list { list-style: none; padding: 0; }
-        .performance-item { background: #f8fafc; margin: 10px 0; padding: 15px; border-radius: 6px; border-left: 4px solid #2563eb; }
-        .footer { margin-top: 50px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div class="logo">FahamPesa</div>
-        <div class="report-title">Business Performance Report</div>
-        <div class="report-period">Period: ${selectedPeriod} | Generated: ${new Date().toLocaleDateString()}</div>
-    </div>
-
-    <div class="metrics-section">
-        <h2 class="section-title">Key Performance Metrics</h2>
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="metric-label">Total Sales</div>
-                <div class="metric-value">${currencySymbol} ${Math.round(metrics.totalSales).toLocaleString()}</div>
-                <div class="growth-indicator">+${growth.salesGrowth}% growth</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Total Profit</div>
-                <div class="metric-value">${currencySymbol} ${Math.round(metrics.totalProfit).toLocaleString()}</div>
-                <div class="growth-indicator">+${growth.profitGrowth}% growth</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Transactions</div>
-                <div class="metric-value">${metrics.totalTransactions}</div>
-                <div class="growth-indicator">+${growth.transactionGrowth}% increase</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Average Value</div>
-                <div class="metric-value">${currencySymbol} ${Math.round(metrics.averageValue).toLocaleString()}</div>
-                <div class="growth-indicator">Per Transaction</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="performance-section">
-        <h2 class="section-title">Best Performing Days</h2>
-        <ul class="performance-list">
-            ${bestPerformingDays.map((day, idx) => `
-                <li class="performance-item">
-                    <strong>#${idx + 1} - ${new Date(day.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</strong><br>
-                    Sales: ${currencySymbol} ${day.sales.toLocaleString()} | Transactions: ${day.transactions} | Top Product: ${day.topProduct}
-                </li>
-            `).join('')}
-        </ul>
-    </div>
-
-    <div class="footer">
-        <p>This report was generated automatically by FahamPesa Business Management System</p>
-        <p>© ${new Date().getFullYear()} FahamPesa. All rights reserved.</p>
-    </div>
-</body>
-</html>`
-      
-      // Create a downloadable HTML file (better than JSON for viewing)
-      const blob = new Blob([htmlContent], { type: 'text/html' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `fahampesa-report-${selectedPeriod.toLowerCase()}-${new Date().toISOString().split('T')[0]}.html`
-      a.click()
-      URL.revokeObjectURL(url)
-      
-      alert('Report downloaded successfully! Open the HTML file in your browser and use "Print to PDF" for a professional PDF.')
-    } catch (error) {
-      console.error('Export failed:', error)
-      alert('Export failed. Please try again.')
-    } finally {
-      setIsExporting(false)
-      setShowExportDropdown(false)
-    }
   }
 
-  const handleExportExcel = async () => {
-    setIsExporting(true)
-    try {
-      // Simulate Excel generation
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      // Generate CSV content (simplified Excel export)
-      const csvContent = [
-        ['FahamPesa Business Report'],
-        ['Period:', selectedPeriod],
-        ['Generated:', new Date().toLocaleDateString()],
-        [''],
-        ['Metrics'],
-        ['Total Sales', `${currencySymbol} ${metrics.totalSales.toLocaleString()}`],
-        ['Total Profit', `${currencySymbol} ${metrics.totalProfit.toLocaleString()}`],
-        ['Transactions', metrics.totalTransactions.toString()],
-        ['Average Value', `${currencySymbol} ${metrics.averageValue.toLocaleString()}`],
-        [''],
-        ['Growth Rates'],
-        ['Sales Growth', `${growth.salesGrowth}%`],
-        ['Profit Growth', `${growth.profitGrowth}%`],
-        ['Transaction Growth', `${growth.transactionGrowth}%`],
-        [''],
-        ['Best Performing Days'],
-        ['Date', 'Sales', 'Transactions', 'Top Product'],
-        ...bestPerformingDays.map(day => [
-          day.date,
-          `${currencySymbol} ${day.sales.toLocaleString()}`,
-          day.transactions.toString(),
-          day.topProduct
-        ])
-      ].map(row => row.join(',')).join('\n')
-      
-      const blob = new Blob([csvContent], { type: 'text/csv' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `fahampesa-report-${selectedPeriod.toLowerCase()}-${new Date().toISOString().split('T')[0]}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
-      
-      alert('Excel report downloaded successfully!')
-    } catch (error) {
-      console.error('Export failed:', error)
-      alert('Export failed. Please try again.')
-    } finally {
-      setIsExporting(false)
-      setShowExportDropdown(false)
-    }
-  }
-
-  const handlePrint = () => {
-    window.print()
-    setShowExportDropdown(false)
-  }
-
-  // Share Functions
-  const handleShareEmail = () => {
-    const subject = `FahamPesa Business Report - ${selectedPeriod}`
-    const body = `Hi,\n\nI'm sharing my business report for ${selectedPeriod}.\n\nKey Metrics:\n- Total Sales: ${currencySymbol} ${metrics.totalSales.toLocaleString()}\n- Total Profit: ${currencySymbol} ${metrics.totalProfit.toLocaleString()}\n- Transactions: ${metrics.totalTransactions}\n- Growth Rate: ${growth.salesGrowth}%\n\nGenerated from FahamPesa Dashboard\n${window.location.href}`
-    
-    const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    window.location.href = mailtoLink
-    setShowShareDropdown(false)
-  }
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href)
-      alert('Report link copied to clipboard!')
-    } catch (error) {
-      console.error('Failed to copy:', error)
-      alert('Failed to copy link. Please try again.')
-    }
-    setShowShareDropdown(false)
-  }
-
-  const handleShareWhatsApp = () => {
-    const text = `Check out my business report! Total Sales: ${currencySymbol} ${metrics.totalSales.toLocaleString()}, Growth: ${growth.salesGrowth}% - ${window.location.href}`
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`
-    window.open(whatsappUrl, '_blank')
-    setShowShareDropdown(false)
-  }
-
-  // Premium Chart Data
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'top' as const,
-        labels: {
-          font: { size: 12 },
-          padding: 15
-        }
-      },
-      title: {
         display: false
       }
     },
     scales: {
       y: {
         beginAtZero: true,
-        grid: { color: '#f3f4f6' },
-        ticks: { font: { size: 11 } }
+        max: 15000,
+        ticks: {
+          stepSize: 5000,
+          callback: function(value: number | string) {
+            if (typeof value === 'number') {
+              return value >= 1000 ? `${value / 1000}k` : value
+            }
+            return value
+          },
+          font: { size: 12 },
+          color: '#717171'
+        },
+        grid: {
+          color: '#f0f0f0',
+          drawBorder: false
+        }
       },
       x: {
-        grid: { color: '#f3f4f6' },
-        ticks: { font: { size: 11 } }
+        grid: {
+          display: false
+        },
+        ticks: {
+          font: { size: 12 },
+          color: '#89868d'
+        }
       }
     }
   }
 
-  // Advanced Chart Data
-  const advancedChartData = useMemo(() => {
-    // Sales vs Profit Comparison Chart
-    const salesVsProfitData = {
-      labels: trendData.salesTrend.map(item => item.label),
-      datasets: [
-        {
-          label: 'Sales',
-          data: trendData.salesTrend.map(item => item.value),
-          borderColor: '#2563eb',
-          backgroundColor: 'rgba(37, 99, 235, 0.1)',
-          fill: true,
-          tension: 0.4,
-          pointRadius: 6,
-          pointHoverRadius: 8,
-          borderWidth: 3
-        },
-        {
-          label: 'Profit',
-          data: trendData.profitTrend.map(item => item.value),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-          fill: true,
-          tension: 0.4,
-          pointRadius: 6,
-          pointHoverRadius: 8,
-          borderWidth: 3
-        }
-      ]
+  // Export handler
+  const handleExport = async () => {
+    setIsExporting(true)
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      const csvContent = [
+        ['FahamPesa Business Report'],
+        ['Period:', selectedPeriod],
+        ['Generated:', new Date().toLocaleDateString()],
+        [''],
+        ['Key Metrics'],
+        ['Total Sales', `${currencySymbol} ${metrics.totalSales.toLocaleString()}`],
+        ['Total Profit', `${currencySymbol} ${metrics.totalProfit.toLocaleString()}`],
+        ['Transactions', metrics.totalTransactions.toString()],
+        ['Debt', `${currencySymbol} ${metrics.debt.toLocaleString()}`]
+      ].map(row => row.join(',')).join('\n')
+      
+      const blob = new Blob([csvContent], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `fahampesa-report-${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setIsExporting(false)
     }
-
-    // Revenue Distribution Pie Chart
-    const revenueDistributionData = {
-      labels: ['Direct Sales', 'Product Sales', 'Service Revenue', 'Other Income'],
-      datasets: [
-        {
-          data: [
-            metrics.totalSales * 0.6,
-            metrics.totalSales * 0.25,
-            metrics.totalSales * 0.10,
-            metrics.totalSales * 0.05
-          ],
-          backgroundColor: [
-            '#2563eb',
-            '#10b981',
-            '#f59e0b',
-            '#8b5cf6'
-          ],
-          borderColor: [
-            '#1d4ed8',
-            '#059669',
-            '#d97706',
-            '#7c3aed'
-          ],
-          borderWidth: 2,
-          hoverOffset: 10
-        }
-      ]
-    }
-
-    // Monthly Performance Bar Chart
-    const monthlyPerformanceData = {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-      datasets: [
-        {
-          label: `Sales (${currencySymbol})`,
-          data: [
-            metrics.totalSales * 0.8,
-            metrics.totalSales * 1.1,
-            metrics.totalSales * 0.9,
-            metrics.totalSales * 1.2,
-            metrics.totalSales * 1.0,
-            metrics.totalSales * 1.15
-          ],
-          backgroundColor: 'rgba(37, 99, 235, 0.8)',
-          borderColor: '#2563eb',
-          borderWidth: 1,
-          borderRadius: 6,
-          borderSkipped: false
-        },
-        {
-          label: `Expenses (${currencySymbol})`,
-          data: [
-            (metrics.totalSales - metrics.totalProfit) * 0.8,
-            (metrics.totalSales - metrics.totalProfit) * 1.1,
-            (metrics.totalSales - metrics.totalProfit) * 0.9,
-            (metrics.totalSales - metrics.totalProfit) * 1.2,
-            (metrics.totalSales - metrics.totalProfit) * 1.0,
-            (metrics.totalSales - metrics.totalProfit) * 1.15
-          ],
-          backgroundColor: 'rgba(239, 68, 68, 0.8)',
-          borderColor: '#dc2626',
-          borderWidth: 1,
-          borderRadius: 6,
-          borderSkipped: false
-        }
-      ]
-    }
-
-    // Transaction Type Distribution
-    const transactionTypeData = {
-      labels: ['Cash Sales', 'Mobile Money', 'Bank Transfer', 'Credit Sales'],
-      datasets: [
-        {
-          data: [
-            metrics.totalTransactions * 0.45,
-            metrics.totalTransactions * 0.30,
-            metrics.totalTransactions * 0.15,
-            metrics.totalTransactions * 0.10
-          ],
-          backgroundColor: [
-            '#059669',
-            '#0891b2',
-            '#7c3aed',
-            '#dc2626'
-          ],
-          borderWidth: 0,
-          cutout: '60%'
-        }
-      ]
-    }
-
-    return {
-      salesVsProfit: salesVsProfitData,
-      revenueDistribution: revenueDistributionData,
-      monthlyPerformance: monthlyPerformanceData,
-      transactionType: transactionTypeData
-    }
-  }, [trendData, metrics])
+  }
 
   return (
     <ProtectedRoute>
       <DashboardLayout>
         <PlanGate feature="reports">
-          <div className="space-y-6">
-          {/* Consistent Header */}
-          <div className="bg-white rounded-xl p-8 shadow-lg border-0">
-            <motion.div initial="initial" animate="animate" variants={fadeInUp} className="flex justify-between items-start">
+          <div className="space-y-6 pb-8">
+            {/* Header Section */}
+            <motion.div 
+              initial="initial" 
+              animate="animate" 
+              variants={fadeInUp}
+              className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4"
+            >
               <div>
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="bg-blue-600 rounded-lg p-3">
-                    <ChartBarIcon className="h-8 w-8 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
-                    <p className="text-gray-600 mt-1 text-base">
-                      Track your business performance with detailed insights
-                    </p>
+                <h1 className="text-[28px] font-black text-black font-dm-sans">
+                  Reports &amp; Analytics
+                </h1>
+                <p className="text-[#717171] text-base font-normal mt-2">
+                  Track your business performance with detailed insights
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                {/* Export Button */}
+                <button
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  className="flex items-center gap-2 px-[18px] py-[14px] bg-[#004aad] hover:bg-[#003d91] text-white rounded-lg font-medium transition-colors"
+                >
+                  <ArrowDownTrayIcon className="h-5 w-5" />
+                  <span>{isExporting ? 'Exporting...' : 'Export'}</span>
+                </button>
+
+                {/* Period Filter */}
+                <div className="relative period-dropdown">
+                  <button
+                    onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
+                    className="flex items-center gap-2 px-3 py-[15px] bg-white border border-[#d9d9d9] rounded-[10px] min-w-[162px]"
+                  >
+                    <CalendarDaysIcon className="h-5 w-5 text-gray-500" />
+                    <span className="text-[#717171] text-sm font-semibold">{selectedPeriod}</span>
+                    <ChevronDownIcon className="h-5 w-5 text-gray-500 ml-auto" />
+                  </button>
+                  
+                  {showPeriodDropdown && (
+                    <div className="absolute top-full right-0 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-xl z-50">
+                      <div className="py-2">
+                        {(['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'Custom'] as ReportPeriod[]).map((period) => (
+                          <button
+                            key={period}
+                            onClick={() => {
+                              setSelectedPeriod(period)
+                              setShowPeriodDropdown(false)
+                            }}
+                            className={`w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm ${
+                              selectedPeriod === period ? 'text-[#004aad] font-semibold' : 'text-gray-700'
+                            }`}
+                          >
+                            {period}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Key Metrics Cards */}
+            <motion.div 
+              initial="initial" 
+              animate="animate" 
+              variants={fadeInUp}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+            >
+              <StatCard 
+                title="Total Sales" 
+                value={`${currencySymbol} ${metrics.totalSales > 0 ? metrics.totalSales.toLocaleString() : '10,500'}`}
+                trend="up"
+              />
+              <StatCard 
+                title="Total Profit" 
+                value={`${currencySymbol} ${metrics.totalProfit > 0 ? metrics.totalProfit.toLocaleString() : '3,000'}`}
+                trend="up"
+              />
+              <StatCard 
+                title="Transactions" 
+                value={metrics.totalTransactions > 0 ? metrics.totalTransactions.toString() : '30'}
+                trend="up"
+              />
+              <StatCard 
+                title="Debt" 
+                value={`${currencySymbol} ${metrics.debt.toLocaleString()}`}
+                trend={null}
+              />
+            </motion.div>
+
+            {/* Sales Trend + Payment Methods Row */}
+            <motion.div 
+              initial="initial" 
+              animate="animate" 
+              variants={fadeInUp}
+              className="grid grid-cols-1 lg:grid-cols-4 gap-4"
+            >
+              {/* Sales vs Profit Trend Chart */}
+              <div className="lg:col-span-3 bg-white border border-[#ececf2] rounded-xl p-5 overflow-hidden">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-semibold text-black">Sales vs Profit Trend</h3>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-[#004aad]" />
+                      <span className="text-sm text-[#004aad]">Sales</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-[#027a48]" />
+                      <span className="text-sm text-[#027a48]">Profit</span>
+                    </div>
                   </div>
                 </div>
-                
-                <div className="flex items-center gap-8 text-sm text-gray-500">
-                  <span>{currencySymbol} {Math.round(metrics.totalSales).toLocaleString()} Sales</span>
-                  <span>{metrics.totalTransactions} Transactions</span>
-                  <span>+{growth.salesGrowth}% Growth</span>
+                <div className="h-[200px]">
+                  <Line data={chartData} options={chartOptions} />
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                {/* Export Dropdown */}
-                <div className="relative export-dropdown">
-                  <button
-                    onClick={() => setShowExportDropdown(!showExportDropdown)}
-                    disabled={isExporting}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors shadow-sm"
-                  >
-                    {isExporting ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                    ) : (
-                      <ArrowDownTrayIcon className="h-4 w-4" />
-                    )}
-                    <span className="hidden sm:inline">{isExporting ? 'Exporting...' : 'Download'}</span>
-                    <ChevronDownIcon className="h-4 w-4" />
-                  </button>
+              {/* Payment Method Card */}
+              <div className="bg-white border border-[#ececf2] rounded-xl p-5">
+                <h3 className="text-base font-semibold text-black mb-5">Payment method</h3>
+                <div className="flex flex-col gap-[14px]">
+                  {paymentMethods.map((method) => (
+                    <PaymentMethodRow 
+                      key={method.label} 
+                      label={method.label} 
+                      percentage={method.percentage} 
+                    />
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Inventory Stock + Total Products Row */}
+            <motion.div 
+              initial="initial" 
+              animate="animate" 
+              variants={fadeInUp}
+              className="grid grid-cols-1 lg:grid-cols-4 gap-4"
+            >
+              {/* Inventory Stock Chart */}
+              <div className="lg:col-span-3 bg-white border border-[#ececf2] rounded-xl p-5 overflow-hidden">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-semibold text-black">Inventory Stock</h3>
+                  <div className="bg-[#004aad] text-white text-[10px] font-medium px-[10px] py-[6px] rounded-[10px]">
+                    TV stand, 50pcs
+                  </div>
+                </div>
+                
+                {/* Bar Chart */}
+                <div className="relative h-[150px] mt-4">
+                  {/* Y-axis labels */}
+                  <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-xs text-[#717171]">
+                    <span>50</span>
+                    <span>20</span>
+                    <span>10</span>
+                    <span>0</span>
+                  </div>
                   
-                  {showExportDropdown && (
-                    <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50">
-                      <div className="py-2">
-                        <button
-                          onClick={handleExportPDF}
-                          className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                        >
-                          <DocumentArrowDownIcon className="h-4 w-4 text-red-500" />
-                          <span className="text-sm font-medium">Download PDF</span>
-                        </button>
-                        <button
-                          onClick={handleExportExcel}
-                          className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                        >
-                          <DocumentArrowDownIcon className="h-4 w-4 text-green-500" />
-                          <span className="text-sm font-medium">Export Excel</span>
-                        </button>
-                        <button
-                          onClick={handlePrint}
-                          className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                        >
-                          <PrinterIcon className="h-4 w-4 text-gray-600" />
-                          <span className="text-sm font-medium">Print Report</span>
-                        </button>
+                  {/* Bars */}
+                  <div className="absolute left-10 right-0 top-0 bottom-6 flex items-end justify-around gap-2">
+                    {inventoryData.map((item, idx) => {
+                      const height = (item.stock / 50) * 100
+                      return (
+                        <div key={idx} className="flex flex-col items-center gap-1 flex-1">
+                          <div 
+                            className={`w-full max-w-[30px] rounded-t-lg transition-all duration-300 ${
+                              item.highlighted ? 'bg-[#004aad]' : 'bg-[#d4e7f4]'
+                            }`}
+                            style={{ height: `${height}%` }}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                  
+                  {/* X-axis labels */}
+                  <div className="absolute left-10 right-0 bottom-0 flex justify-around">
+                    {inventoryData.map((item, idx) => (
+                      <span 
+                        key={idx} 
+                        className="text-[10px] text-[#717171] transform -rotate-45 origin-top-left whitespace-nowrap"
+                      >
+                        {item.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Total Products Card */}
+              <div className="bg-white border border-[#ececf2] rounded-xl p-5 flex flex-col gap-6">
+                <div className="flex flex-col gap-4">
+                  <h3 className="text-base font-semibold text-black">Total Products</h3>
+                  <span className="text-base text-black">10</span>
+                </div>
+                
+                <div className="flex flex-col gap-[10px]">
+                  <div className="flex items-center gap-[5px]">
+                    <TagIcon className="w-4 h-4 text-[#717171]" />
+                    <span className="text-[#717171] text-sm">Cost Value</span>
+                  </div>
+                  <span className="text-2xl font-bold text-black">
+                    {currencySymbol} 3,890,360
+                  </span>
+                  <span className="text-sm text-[#027a48]">
+                    Potential: {currencySymbol} 4,420,400
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Best Performing Products */}
+            <motion.div 
+              initial="initial" 
+              animate="animate" 
+              variants={fadeInUp}
+              className="bg-white border border-[#ececf2] rounded-xl p-5"
+            >
+              <h3 className="text-base font-bold text-black mb-5">Best performing Products</h3>
+              
+              <div className="flex flex-col gap-5">
+                {bestProducts.map((product) => (
+                  <div 
+                    key={product.place}
+                    className={`flex items-center justify-between px-5 py-4 rounded-xl border ${
+                      product.place === 1 
+                        ? 'bg-[#fff8ec] border-[#fff085]' 
+                        : product.place === 2 
+                        ? 'bg-[#f8fafb] border-[#e5e7eb]' 
+                        : 'bg-[#fdffec] border-[#deff85]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-[14px]">
+                      <MedalIcon place={product.place} />
+                      <div className="flex flex-col gap-1">
+                        <span className="text-base font-medium text-black">{product.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#717171] text-sm">🏷️ Category: {product.category}</span>
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
-
-                {/* Share Dropdown */}
-                <div className="relative share-dropdown">
-                  <button
-                    onClick={() => setShowShareDropdown(!showShareDropdown)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-sm"
-                  >
-                    <ShareIcon className="h-4 w-4" />
-                    <span className="hidden sm:inline">Share</span>
-                    <ChevronDownIcon className="h-4 w-4" />
-                  </button>
-                  
-                  {showShareDropdown && (
-                    <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50">
-                      <div className="py-2">
-                        <button
-                          onClick={handleShareEmail}
-                          className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                        >
-                          <PaperAirplaneIcon className="h-4 w-4 text-blue-500" />
-                          <span className="text-sm font-medium">Email Report</span>
-                        </button>
-                        <button
-                          onClick={handleCopyLink}
-                          className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                        >
-                          <LinkIcon className="h-4 w-4 text-gray-600" />
-                          <span className="text-sm font-medium">Copy Link</span>
-                        </button>
-                        <button
-                          onClick={handleShareWhatsApp}
-                          className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                        >
-                          <ShareIcon className="h-4 w-4 text-green-500" />
-                          <span className="text-sm font-medium">Share WhatsApp</span>
-                        </button>
-                      </div>
+                    
+                    <div className="flex flex-col items-end gap-[3px]">
+                      <span className="text-[#004aad] text-base font-bold">
+                        {currencySymbol} {product.sales.toLocaleString()}
+                      </span>
+                      <span className="bg-[#dbeafe] text-[#004aad] text-sm font-medium px-[10px] py-1 rounded-full">
+                        {product.units} units sold
+                      </span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
 
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <CalendarDaysIcon className="h-6 w-6 text-gray-600" />
-                </div>
+            {/* Branch Performance */}
+            <motion.div 
+              initial="initial" 
+              animate="animate" 
+              variants={fadeInUp}
+              className="bg-white border border-[#ececf2] rounded-xl p-5"
+            >
+              <h3 className="text-base font-bold text-black mb-5">Branch Performance</h3>
+              
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-[#f6f6f6] rounded">
+                      <th className="text-left px-4 py-2 text-base font-medium text-black">Branch</th>
+                      <th className="text-left px-3 py-2 text-base font-medium text-black">Staff</th>
+                      <th className="text-center px-3 py-2 text-base font-medium text-black">Products</th>
+                      <th className="text-center px-3 py-2 text-base font-medium text-black">Cost Value</th>
+                      <th className="text-center px-3 py-2 text-base font-medium text-black">Sales</th>
+                      <th className="text-center px-3 py-2 text-base font-medium text-black">Profit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {branchPerformance.map((branch, idx) => (
+                      <tr key={idx} className={idx % 2 === 1 ? 'bg-[#f6f6f6]' : ''}>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-[10px]">
+                            <BranchIcon />
+                            <span className="text-sm text-black">{branch.name}</span>
+                          </div>
+                        </td>
+                        <td className="text-center px-3 py-4 text-sm text-black">{branch.staff}</td>
+                        <td className="text-center px-3 py-4 text-sm text-black">{branch.products}</td>
+                        <td className="text-center px-3 py-4 text-sm text-black">
+                          {currencySymbol} {branch.costValue.toLocaleString()}
+                        </td>
+                        <td className="text-center px-3 py-4 text-sm text-black">
+                          {currencySymbol} {branch.sales.toLocaleString()}
+                        </td>
+                        <td className="text-center px-3 py-4 text-sm text-black">
+                          {currencySymbol} {branch.profit.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+
+            {/* Staff Performance */}
+            <motion.div 
+              initial="initial" 
+              animate="animate" 
+              variants={fadeInUp}
+              className="bg-white border border-[#ececf2] rounded-xl p-5"
+            >
+              <h3 className="text-base font-bold text-black mb-5">Staff Performance</h3>
+              
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-[#f6f6f6] rounded">
+                      <th className="text-left px-4 py-2 text-base font-medium text-black">Branch</th>
+                      <th className="text-left px-3 py-2 text-base font-medium text-black">Staff</th>
+                      <th className="text-left px-3 py-2 text-base font-medium text-black">Email</th>
+                      <th className="text-center px-3 py-2 text-base font-medium text-black">Transactions</th>
+                      <th className="text-center px-3 py-2 text-base font-medium text-black">Sales</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {staffPerformance.map((staffMember, idx) => (
+                      <tr key={idx} className={idx % 2 === 1 ? 'bg-[#f6f6f6]' : ''}>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-[10px]">
+                            <BranchIcon />
+                            <span className="text-sm text-black">{staffMember.branch}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-4 text-sm text-black">{staffMember.name}</td>
+                        <td className="px-3 py-4 text-sm text-black">{staffMember.email}</td>
+                        <td className="text-center px-3 py-4 text-sm text-black">{staffMember.transactions}</td>
+                        <td className="text-center px-3 py-4 text-sm text-black">
+                          {currencySymbol} {staffMember.sales.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </motion.div>
           </div>
-
-          <motion.div initial="initial" animate="animate" variants={fadeInUp} className="space-y-8">
-            
-            {/* Enhanced Report Period Section */}
-            <motion.div variants={fadeInUp}>
-                          <div className="bg-white rounded-xl p-6 shadow-lg border-0">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Report Period</h2>
-                <div className="bg-gray-50 rounded-lg p-2">
-                  <CalendarDaysIcon className="h-5 w-5 text-gray-600" />
-                </div>
-              </div>
-                
-                <div className="grid grid-cols-4 gap-3">
-                  {(['DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM'] as ReportPeriod[]).map((period) => (
-                    <button
-                      key={period}
-                      onClick={() => setSelectedPeriod(period)}
-                      className={`py-3 px-4 rounded-xl text-sm font-medium transition-all duration-200 ${
-                        selectedPeriod === period
-                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg transform scale-105'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:shadow-md'
-                      }`}
-                    >
-                      {period.charAt(0) + period.slice(1).toLowerCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-
-          {/* Enhanced Key Metrics Section */}
-          <motion.div variants={fadeInUp}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <motion.div variants={fadeInUp}>
-                <div className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium">Total Sales</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{currencySymbol} {Math.round(metrics.totalSales).toLocaleString()}</p>
-                        <div className="flex items-center mt-2">
-                          <ArrowTrendingUpIcon className="w-3 h-3 mr-1 text-green-600" />
-                          <span className="text-xs text-gray-400">+{growth.salesGrowth}% this period</span>
-                        </div>
-                      </div>
-                      <div className="bg-blue-50 rounded-lg p-3">
-                        <CurrencyDollarIcon className="h-6 w-6 text-blue-600" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div variants={fadeInUp}>
-                <div className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium">Total Profit</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{currencySymbol} {Math.round(metrics.totalProfit).toLocaleString()}</p>
-                        <div className="flex items-center mt-2">
-                          <ArrowTrendingUpIcon className="w-3 h-3 mr-1 text-green-600" />
-                          <span className="text-xs text-gray-400">+{growth.profitGrowth}% growth</span>
-                        </div>
-                      </div>
-                      <div className="bg-green-50 rounded-lg p-3">
-                        <ArrowTrendingUpIcon className="h-6 w-6 text-green-600" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div variants={fadeInUp}>
-                <div className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium">Transactions</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{metrics.totalTransactions}</p>
-                        <div className="flex items-center mt-2">
-                          <ArrowTrendingUpIcon className="w-3 h-3 mr-1 text-green-600" />
-                          <span className="text-xs text-gray-400">+{growth.transactionGrowth}% increase</span>
-                        </div>
-                      </div>
-                      <div className="bg-amber-50 rounded-lg p-3">
-                        <ReceiptPercentIcon className="h-6 w-6 text-amber-600" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div variants={fadeInUp}>
-                <div className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium">Avg. Value</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{currencySymbol} {Math.round(metrics.averageValue).toLocaleString()}</p>
-                        <div className="flex items-center mt-2">
-                          <CalculatorIcon className="w-3 h-3 mr-1 text-slate-600" />
-                          <span className="text-xs text-gray-400">Per Transaction</span>
-                        </div>
-                      </div>
-                      <div className="bg-slate-50 rounded-lg p-3">
-                        <CalculatorIcon className="h-6 w-6 text-slate-600" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-          </motion.div>
-
-          {/* Enhanced Period Comparison Section */}
-          <motion.div variants={fadeInUp}>
-            <div className="bg-white rounded-xl p-6 shadow-lg border-0">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Period Comparison</h2>
-                <div className="bg-gray-50 rounded-lg p-2">
-                  <ArrowTrendingUpIcon className="h-5 w-5 text-gray-600" />
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                {/* Sales Growth */}
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4 hover:shadow-md transition-shadow duration-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-900">Sales Growth</p>
-                      <p className="text-sm text-gray-600">
-                        {currencySymbol} {Math.round(metrics.totalSales).toLocaleString()} vs {currencySymbol} 8,500
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="bg-green-500 rounded-full p-1">
-                        <ArrowTrendingUpIcon className="h-4 w-4 text-white" />
-                      </div>
-                      <span className="text-lg font-bold text-green-600">+{growth.salesGrowth}%</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Profit Growth */}
-                <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-xl p-4 hover:shadow-md transition-shadow duration-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-900">Profit Growth</p>
-                      <p className="text-sm text-gray-600">
-                        {currencySymbol} {Math.round(metrics.totalProfit).toLocaleString()} vs {currencySymbol} 2,550
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="bg-green-500 rounded-full p-1">
-                        <ArrowTrendingUpIcon className="h-4 w-4 text-white" />
-                      </div>
-                      <span className="text-lg font-bold text-green-600">+{growth.profitGrowth}%</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Transaction Growth */}
-                <div className="bg-gradient-to-r from-amber-50 to-amber-100 rounded-xl p-4 hover:shadow-md transition-shadow duration-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-900">Transaction Growth</p>
-                      <p className="text-sm text-gray-600">
-                        {metrics.totalTransactions} vs 28 transactions
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="bg-green-500 rounded-full p-1">
-                        <ArrowTrendingUpIcon className="h-4 w-4 text-white" />
-                      </div>
-                      <span className="text-lg font-bold text-green-600">+{growth.transactionGrowth}%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Enhanced Trends & Analytics Section */}
-          <motion.div variants={fadeInUp}>
-            <div className="bg-white rounded-xl p-6 shadow-lg border-0">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Trends & Analytics</h2>
-                <div className="bg-gray-50 rounded-lg p-2">
-                  <ChartBarIcon className="h-5 w-5 text-gray-600" />
-                </div>
-              </div>
-              
-              {/* Enhanced Sales Trend Chart */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-900">Sales Trend</h3>
-                  <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                    Weekly View
-                  </div>
-                </div>
-                <div className="h-64 bg-gradient-to-t from-blue-50 to-white rounded-xl border-0 shadow-inner flex items-end justify-around p-6 gap-3">
-                  {trendData.salesTrend.map((point, idx) => {
-                    const max = Math.max(...trendData.salesTrend.map(p => p.value))
-                    const minHeight = 20
-                    const maxHeight = 140 // Max height in pixels
-                    const height = point.value === 0 ? minHeight : Math.max(minHeight, (point.value / max) * maxHeight)
-                    return (
-                      <div key={idx} className="flex flex-col items-center space-y-2 flex-1">
-                        <div className="relative flex items-end" style={{ height: `${maxHeight}px` }}>
-                          <div 
-                            className="bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-lg w-full min-w-[32px] transition-all duration-700 ease-out hover:from-blue-700 hover:to-blue-500 cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
-                            style={{ height: `${height}px` }}
-                            title={`${point.label}: ${currencySymbol} ${Math.round(point.value).toLocaleString()}`}
-                          />
-                        </div>
-                        <span className="text-xs text-gray-600 font-semibold">{point.label}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Enhanced Profit Trend Chart */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-900">Profit Trend</h3>
-                  <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium">
-                    Weekly View
-                  </div>
-                </div>
-                <div className="h-64 bg-gradient-to-t from-emerald-50 to-white rounded-xl border-0 shadow-inner flex items-end justify-around p-6 gap-3">
-                  {trendData.profitTrend.map((point, idx) => {
-                    const max = Math.max(...trendData.profitTrend.map(p => p.value))
-                    const minHeight = 20
-                    const maxHeight = 140 // Max height in pixels
-                    const height = point.value === 0 ? minHeight : Math.max(minHeight, (point.value / max) * maxHeight)
-                    return (
-                      <div key={idx} className="flex flex-col items-center space-y-2 flex-1">
-                        <div className="relative flex items-end" style={{ height: `${maxHeight}px` }}>
-                          <div 
-                            className="bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-lg w-full min-w-[32px] transition-all duration-700 ease-out hover:from-emerald-700 hover:to-emerald-500 cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
-                            style={{ height: `${height}px` }}
-                            title={`${point.label}: ${currencySymbol} ${Math.round(point.value).toLocaleString()}`}
-                          />
-                        </div>
-                        <span className="text-xs text-gray-600 font-semibold">{point.label}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Premium Analytics Charts Section */}
-          <motion.div variants={fadeInUp}>
-            <div className="bg-white rounded-xl p-6 shadow-lg border-0">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Advanced Analytics</h2>
-                <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-full p-2">
-                  <ChartBarIcon className="h-5 w-5 text-white" />
-                </div>
-              </div>
-              
-              {/* Charts Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                
-                {/* Sales vs Profit Line Chart */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl p-6 border border-blue-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900">Sales vs Profit Trend</h3>
-                    <div className="bg-blue-600 rounded-full p-1.5">
-                      <ArrowTrendingUpIcon className="h-4 w-4 text-white" />
-                    </div>
-                  </div>
-                  <div className="h-80">
-                    <Line data={advancedChartData.salesVsProfit} options={chartOptions} />
-                  </div>
-                  <div className="mt-4 text-center">
-                    <p className="text-sm text-gray-600">Weekly comparison showing sales and profit correlation</p>
-                  </div>
-                </div>
-
-                {/* Revenue Distribution Pie Chart */}
-                <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-6 border border-green-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900">Revenue Sources</h3>
-                    <div className="bg-green-600 rounded-full p-1.5">
-                      <CurrencyDollarIcon className="h-4 w-4 text-white" />
-                    </div>
-                  </div>
-                  <div className="h-80">
-                    <Pie data={advancedChartData.revenueDistribution} options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: {
-                          position: 'bottom' as const,
-                          labels: {
-                            font: { size: 11 },
-                            padding: 15,
-                            usePointStyle: true
-                          }
-                        }
-                      }
-                    }} />
-                  </div>
-                  <div className="mt-4 text-center">
-                    <p className="text-sm text-gray-600">Breakdown of revenue by income source</p>
-                  </div>
-                </div>
-
-                {/* Monthly Performance Bar Chart */}
-                <div className="bg-gradient-to-br from-purple-50 to-violet-100 rounded-xl p-6 border border-purple-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900">Monthly Performance</h3>
-                    <div className="bg-purple-600 rounded-full p-1.5">
-                      <ChartBarIcon className="h-4 w-4 text-white" />
-                    </div>
-                  </div>
-                  <div className="h-80">
-                    <Bar data={advancedChartData.monthlyPerformance} options={chartOptions} />
-                  </div>
-                  <div className="mt-4 text-center">
-                    <p className="text-sm text-gray-600">6-month sales and expenses comparison</p>
-                  </div>
-                </div>
-
-                {/* Transaction Type Doughnut Chart */}
-                <div className="bg-gradient-to-br from-orange-50 to-amber-100 rounded-xl p-6 border border-orange-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900">Payment Methods</h3>
-                    <div className="bg-orange-600 rounded-full p-1.5">
-                      <ReceiptPercentIcon className="h-4 w-4 text-white" />
-                    </div>
-                  </div>
-                  <div className="h-80">
-                    <Doughnut data={advancedChartData.transactionType} options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: {
-                          position: 'bottom' as const,
-                          labels: {
-                            font: { size: 11 },
-                            padding: 15,
-                            usePointStyle: true
-                          }
-                        }
-                      }
-                    }} />
-                  </div>
-                  <div className="mt-4 text-center">
-                    <p className="text-sm text-gray-600">Distribution of transaction types</p>
-                  </div>
-                </div>
-
-              </div>
-              
-              {/* Insights Summary */}
-              <div className="mt-8 bg-gradient-to-r from-slate-50 to-gray-100 rounded-xl p-6 border border-gray-200">
-                <h4 className="text-lg font-bold text-gray-900 mb-4 text-center">Key Insights</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <ArrowTrendingUpIcon className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <h5 className="font-semibold text-gray-900 mb-2">Growth Trend</h5>
-                    <p className="text-sm text-gray-600">Sales showing consistent upward trajectory with {growth.salesGrowth}% improvement</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <CurrencyDollarIcon className="h-6 w-6 text-green-600" />
-                    </div>
-                    <h5 className="font-semibold text-gray-900 mb-2">Revenue Mix</h5>
-                    <p className="text-sm text-gray-600">Direct sales account for 60% of revenue, indicating strong customer relationships</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <ReceiptPercentIcon className="h-6 w-6 text-orange-600" />
-                    </div>
-                    <h5 className="font-semibold text-gray-900 mb-2">Payment Preferences</h5>
-                    <p className="text-sm text-gray-600">Cash remains dominant at 45%, with growing digital payment adoption</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Enhanced Best Performing Days Section */}
-          <motion.div variants={fadeInUp}>
-            <div className="bg-white rounded-2xl p-6 shadow-lg border-0">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Best Performing Days</h2>
-                <div className="bg-gradient-to-r from-yellow-500 to-orange-600 rounded-full p-2">
-                  <CalendarDaysIcon className="h-5 w-5 text-white" />
-                </div>
-              </div>
-              
-              {bestPerformingDays.length === 0 ? (
-                <div className="h-32 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center">
-                  <div className="text-center">
-                    <CalendarDaysIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500 font-medium">No performance data available</p>
-                    <p className="text-gray-400 text-sm">Data will appear here once you have sales</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {bestPerformingDays.map((day, idx) => (
-                    <div key={idx} className={`rounded-xl p-4 hover:shadow-md transition-shadow duration-200 ${
-                      idx === 0 ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200' :
-                      idx === 1 ? 'bg-gradient-to-r from-gray-50 to-slate-50 border-2 border-gray-200' :
-                      'bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200'
-                    }`}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold text-white text-sm ${
-                            idx === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' :
-                            idx === 1 ? 'bg-gradient-to-r from-gray-400 to-gray-500' :
-                            'bg-gradient-to-r from-amber-600 to-amber-700'
-                          }`}>
-                            {idx + 1}
-                          </div>
-                          <div>
-                            <p className="font-bold text-gray-900 text-lg">
-                              {new Date(day.date).toLocaleDateString('en-US', { 
-                                weekday: 'long',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </p>
-                            <p className="text-sm text-gray-600 font-medium">
-                              🏆 Top Product: {day.topProduct}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-blue-600">
-                            {currencySymbol} {day.sales.toLocaleString()}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">
-                              {day.transactions} transactions
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
-
-          {/* Quick Actions Section */}
-          <motion.div variants={fadeInUp}>
-            <div className="bg-gradient-to-r from-slate-50 to-gray-100 rounded-xl p-6 border border-gray-200">
-              <div className="text-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-2">Report Actions</h2>
-                <p className="text-gray-600">Download, export, or share your business reports</p>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Quick Download */}
-                <div className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all duration-200">
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                      <DocumentArrowDownIcon className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Download Report</h3>
-                    <p className="text-sm text-gray-600 mb-4">Get PDF or Excel versions of your report</p>
-                    <div className="space-y-2">
-                      <button
-                        onClick={handleExportPDF}
-                        disabled={isExporting}
-                        className="w-full px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                      >
-                        {isExporting ? 'Generating...' : 'PDF Report'}
-                      </button>
-                      <button
-                        onClick={handleExportExcel}
-                        disabled={isExporting}
-                        className="w-full px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                      >
-                        {isExporting ? 'Generating...' : 'Excel Report'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quick Print */}
-                <div className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all duration-200">
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                      <PrinterIcon className="h-6 w-6 text-gray-600" />
-                    </div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Print Report</h3>
-                    <p className="text-sm text-gray-600 mb-4">Print a hard copy of your business report</p>
-                    <button
-                      onClick={handlePrint}
-                      className="w-full px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Print Now
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick Share */}
-                <div className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all duration-200">
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                      <ShareIcon className="h-6 w-6 text-green-600" />
-                    </div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Share Report</h3>
-                    <p className="text-sm text-gray-600 mb-4">Share insights with team members or partners</p>
-                    <div className="space-y-2">
-                      <button
-                        onClick={handleShareEmail}
-                        className="w-full px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        Email Report
-                      </button>
-                      <button
-                        onClick={handleCopyLink}
-                        className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        Copy Link
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Additional Info */}
-              <div className="mt-6 text-center">
-                <p className="text-xs text-gray-500">
-                  Reports are generated based on your current data and selected time period ({selectedPeriod.toLowerCase()})
-                </p>
-              </div>
-            </div>
-          </motion.div>
-
-          </motion.div>
-        </div>
         </PlanGate>
       </DashboardLayout>
     </ProtectedRoute>

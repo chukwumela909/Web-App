@@ -319,7 +319,7 @@ export default function DashboardPage() {
 
               {/* Metric Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Today's Sales Card */}
+                {/* Sales Card */}
                 <div 
                   onClick={() => router.push('/dashboard/sales')}
                   className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
@@ -329,15 +329,15 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <p className="font-inter font-bold text-[18px] text-[#09090b]">
-                      {currencySymbol} 0
+                      {currencySymbol} {totalSalesAmount.toLocaleString()}
                     </p>
                     <p className="font-inter font-medium text-[14px] text-[#71717a]">
-                      Today&apos;s Sales
+                      {dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : "This Month's"} Sales
                     </p>
                   </div>
                 </div>
 
-                {/* Today's Expenses Card */}
+                {/* Expenses Card */}
                 <div 
                   onClick={() => router.push('/dashboard/expenses')}
                   className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
@@ -347,25 +347,25 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <p className="font-inter font-bold text-[18px] text-[#09090b]">
-                      {currencySymbol} 0
+                      {currencySymbol} {totalExpenses.toLocaleString()}
                     </p>
                     <p className="font-inter font-medium text-[14px] text-[#71717a]">
-                      Today&apos;s Expenses
+                      {dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : "This Month's"} Expenses
                     </p>
                   </div>
                 </div>
 
-                {/* Today's Profit Card */}
+                {/* Profit Card */}
                 <div className="bg-white border border-[#ececf2] rounded-[12px] p-5 flex flex-col gap-6">
                   <div className="bg-[#82cd7e] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
                     <Image src={dashboardAssets.growthIcon} alt="Growth" width={24} height={24} />
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <p className="font-inter font-bold text-[18px] text-[#09090b]">
-                      {currencySymbol} 0
+                      {currencySymbol} {totalProfit.toLocaleString()}
                     </p>
                     <p className="font-inter font-medium text-[14px] text-[#71717a]">
-                      Today&apos;s Profit
+                      {dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : "This Month's"} Profit
                     </p>
                   </div>
                 </div>
@@ -597,7 +597,7 @@ export default function DashboardPage() {
 
             {/* Metric Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Today's Sales Card */}
+              {/* Sales Card */}
               <div 
                 onClick={() => router.push('/dashboard/sales')}
                 className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
@@ -607,15 +607,15 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <p className="font-inter font-bold text-[18px] text-[#09090b]">
-                    {currencySymbol} {todaysSalesTotal.toLocaleString()}
+                    {currencySymbol} {totalSalesAmount.toLocaleString()}
                   </p>
                   <p className="font-inter font-medium text-[14px] text-[#71717a]">
-                    Today&apos;s Sales
+                    {dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : "This Month's"} Sales
                   </p>
                 </div>
               </div>
 
-              {/* Today's Expenses Card */}
+              {/* Expenses Card */}
               <div 
                 onClick={() => router.push('/dashboard/expenses')}
                 className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
@@ -625,25 +625,25 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <p className="font-inter font-bold text-[18px] text-[#09090b]">
-                    {currencySymbol} {todaysExpensesTotal.toLocaleString()}
+                    {currencySymbol} {totalExpenses.toLocaleString()}
                   </p>
                   <p className="font-inter font-medium text-[14px] text-[#71717a]">
-                    Today&apos;s Expenses
+                    {dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : "This Month's"} Expenses
                   </p>
                 </div>
               </div>
 
-              {/* Today's Profit Card */}
+              {/* Profit Card */}
               <div className="bg-white border border-[#ececf2] rounded-[12px] p-5 flex flex-col gap-6">
                 <div className="bg-[#82cd7e] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
                   <Image src={dashboardAssets.growthIcon} alt="Growth" width={24} height={24} />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <p className="font-inter font-bold text-[18px] text-[#09090b]">
-                    {currencySymbol} {todaysProfit.toLocaleString()}
+                    {currencySymbol} {totalProfit.toLocaleString()}
                   </p>
                   <p className="font-inter font-medium text-[14px] text-[#71717a]">
-                    Today&apos;s Profit
+                    {dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : "This Month's"} Profit
                   </p>
                 </div>
               </div>

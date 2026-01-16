@@ -25,8 +25,8 @@ function CheckoutContent() {
     // Determine if user is in Kenya
     const isKenyan = country === 'KE'
 
-    const [selectedPayment, setSelectedPayment] = useState<'mpesa' | 'stripe' | 'whatsapp' | null>(null)
-    const [expandedPayment, setExpandedPayment] = useState<'mpesa' | 'stripe' | 'whatsapp' | null>(null)
+    const [selectedPayment, setSelectedPayment] = useState<'mpesa' | 'stripe' | 'whatsapp' | null>('whatsapp')
+    const [expandedPayment, setExpandedPayment] = useState<'mpesa' | 'stripe' | 'whatsapp' | null>('whatsapp')
     const [phoneNumber, setPhoneNumber] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
     const [isWaitingConfirmation, setIsWaitingConfirmation] = useState(false)
@@ -632,16 +632,15 @@ function CheckoutContent() {
                                             If you are having issues with the subscription, connect with our support team for assisted subscription plan setup. Click the button below
                                         </p>
                                     </div>
-                                    <a
-                                        href="https://wa.me/your-whatsapp-number"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="bg-[#0F866C] border-[1.5px] border-[#0F866C] rounded-[24px] px-3 py-[6px] h-[50px] w-[327px] flex items-center justify-center gap-1 hover:bg-[#FF9500] hover:border-[#FF9500] transition-all duration-300 group"
+                                    <button
+                                        onClick={() => window.open('https://wa.me/message/55YQ3IBJHOQCM1', '_blank')}
+                                        type="button"
+                                        className="bg-[#0F866C] border-[1.5px] border-[#0F866C] rounded-[24px] px-3 py-[6px] h-[50px] w-[327px] flex items-center justify-center gap-1 hover:bg-[#FF9500] hover:border-[#FF9500] transition-all duration-300 group cursor-pointer z-50"
                                     >
                                         <span className="font-dm-sans font-semibold text-[18px] text-white text-center leading-normal group-hover:text-[#004AAD] transition-colors duration-300">
                                             Chat on WhatsApp
                                         </span>
-                                    </a>
+                                    </button>
                                 </div>
                             )}
                         </div>
