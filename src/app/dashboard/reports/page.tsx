@@ -14,7 +14,20 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
 import { useEffect, useMemo, useState } from 'react'
-import { DailySummary, getDailySummaries, getSales, Sale } from '@/lib/firestore'
+import { 
+  DailySummary, 
+  getDailySummaries, 
+  getSales, 
+  Sale, 
+  getProducts, 
+  Product, 
+  getStaff, 
+  Staff,
+  getDebtors,
+  Debtor
+} from '@/lib/firestore'
+import { getBranches } from '@/lib/branches-service'
+import { Branch } from '@/lib/branches-types'
 import { PlanGate } from '@/components/PlanGate'
 import dynamic from 'next/dynamic'
 
@@ -143,6 +156,10 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true)
   const [summaries, setSummaries] = useState<DailySummary[]>([])
   const [recentSales, setRecentSales] = useState<Sale[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [staffList, setStaffList] = useState<Staff[]>([])
+  const [debtors, setDebtors] = useState<Debtor[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('Last 7 Days')
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -155,12 +172,20 @@ export default function ReportsPage() {
       if (!effectiveUserId) return
       setLoading(true)
       try {
-        const [s, rs] = await Promise.all([
-          getDailySummaries(effectiveUserId, 14),
-          getSales(effectiveUserId, 2000)
+        const [s, rs, prods, br, st, dbt] = await Promise.all([
+          getDailySummaries(effectiveUserId, 90),
+          getSales(effectiveUserId, 2000),
+          getProducts(effectiveUserId),
+          getBranches(effectiveUserId),
+          getStaff(effectiveUserId),
+          getDebtors(effectiveUserId)
         ])
         setSummaries(s)
         setRecentSales(rs)
+        setProducts(prods)
+        setBranches(br)
+        setStaffList(st)
+        setDebtors(dbt)
       } finally {
         setLoading(false)
       }
@@ -185,78 +210,230 @@ export default function ReportsPage() {
 
   // Calculate metrics from actual data
   const metrics = useMemo(() => {
-    const totalSales = recentSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
-    const totalProfit = recentSales.reduce((sum, sale) => {
-      const cost = Number(sale.costPrice || 0)
+    // Filter sales based on selected period
+    const now = Date.now()
+    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 : 
+                       selectedPeriod === 'Last 30 Days' ? 30 : 
+                       selectedPeriod === 'Last 90 Days' ? 90 : 30
+    const periodStart = now - (periodDays * 24 * 60 * 60 * 1000)
+    
+    const filteredSales = recentSales.filter(sale => (sale.timestamp || 0) >= periodStart)
+    
+    const totalSales = filteredSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
+    const totalProfit = filteredSales.reduce((sum, sale) => {
+      const cost = Number(sale.costPrice || 0) * Number(sale.quantitySold || 1)
       const revenue = Number(sale.totalAmount || 0)
       return sum + Math.max(0, revenue - cost)
     }, 0)
-    const totalTransactions = recentSales.length
-    const debt = 0 // Placeholder for debt calculation
+    const totalTransactions = filteredSales.length
+    
+    // Calculate debt from debtors
+    const totalDebt = debtors.reduce((sum, debtor) => sum + (debtor.currentDebt || 0), 0)
 
     return {
       totalSales,
       totalProfit,
       totalTransactions,
-      debt
+      debt: totalDebt
     }
-  }, [recentSales])
+  }, [recentSales, debtors, selectedPeriod])
 
-  // Generate trend data for Sales vs Profit chart
+  // Generate trend data for Sales vs Profit chart from real summaries
   const trendData = useMemo(() => {
-    const labels = ['Jan 1', 'Jan 2', 'Jan 3', 'Jan 4', 'Jan 5', 'Jan 6', 'Jan 7']
-    const salesData = [2000, 4000, 3500, 10000, 7000, 6000, 5000]
-    const profitData = [500, 1500, 1200, 4000, 2500, 2000, 1800]
+    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 : 
+                       selectedPeriod === 'Last 30 Days' ? 30 : 
+                       selectedPeriod === 'Last 90 Days' ? 90 : 7
+    
+    // Get the most recent summaries for the period
+    const recentSummaries = summaries.slice(0, Math.min(periodDays, 7))
+    
+    if (recentSummaries.length === 0) {
+      // Return empty arrays if no data
+      return { labels: [], salesData: [], profitData: [] }
+    }
+    
+    // Sort by date ascending for chart display
+    const sortedSummaries = [...recentSummaries].reverse()
+    
+    const labels = sortedSummaries.map(s => {
+      const date = new Date(s.date)
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    })
+    
+    const salesData = sortedSummaries.map(s => s.totalSales || 0)
+    const profitData = sortedSummaries.map(s => s.totalProfit || 0)
 
     return { labels, salesData, profitData }
-  }, [selectedPeriod])
+  }, [summaries, selectedPeriod])
 
-  // Payment methods breakdown
-  const paymentMethods = useMemo(() => [
-    { label: 'Cash', percentage: 70 },
-    { label: 'M-Pesa', percentage: 45 },
-    { label: 'Bank Transfer', percentage: 45 },
-    { label: 'Card Payment', percentage: 20 },
-    { label: 'Credit Sale', percentage: 6 },
-    { label: 'Cheque', percentage: 12 },
-    { label: 'Other', percentage: 45 }
-  ], [])
+  // Payment methods breakdown from real sales data
+  const paymentMethods = useMemo(() => {
+    if (recentSales.length === 0) {
+      return [
+        { label: 'Cash', percentage: 0 },
+        { label: 'M-Pesa', percentage: 0 },
+        { label: 'Bank Transfer', percentage: 0 },
+        { label: 'Card Payment', percentage: 0 },
+        { label: 'Credit Sale', percentage: 0 },
+        { label: 'Cheque', percentage: 0 },
+        { label: 'Other', percentage: 0 }
+      ]
+    }
+    
+    const methodCounts: Record<string, number> = {
+      CASH: 0,
+      MPESA: 0,
+      BANK_TRANSFER: 0,
+      CARD: 0,
+      CREDIT: 0,
+      CHEQUE: 0,
+      OTHER: 0
+    }
+    
+    recentSales.forEach(sale => {
+      const method = sale.paymentMethod || 'CASH'
+      methodCounts[method] = (methodCounts[method] || 0) + 1
+    })
+    
+    const total = recentSales.length
+    
+    return [
+      { label: 'Cash', percentage: Math.round((methodCounts.CASH / total) * 100) },
+      { label: 'M-Pesa', percentage: Math.round((methodCounts.MPESA / total) * 100) },
+      { label: 'Bank Transfer', percentage: Math.round((methodCounts.BANK_TRANSFER / total) * 100) },
+      { label: 'Card Payment', percentage: Math.round((methodCounts.CARD / total) * 100) },
+      { label: 'Credit Sale', percentage: Math.round((methodCounts.CREDIT / total) * 100) },
+      { label: 'Cheque', percentage: Math.round((methodCounts.CHEQUE / total) * 100) },
+      { label: 'Other', percentage: Math.round((methodCounts.OTHER / total) * 100) }
+    ]
+  }, [recentSales])
 
-  // Inventory stock data
-  const inventoryData = useMemo(() => [
-    { name: 'Cooking...', stock: 35 },
-    { name: 'Gas co...', stock: 32 },
-    { name: 'iPhone...', stock: 32 },
-    { name: 'Keybo...', stock: 35 },
-    { name: 'Logite...', stock: 45 },
-    { name: 'Samsu...', stock: 45 },
-    { name: 'Standi...', stock: 27 },
-    { name: 'Monito...', stock: 32 },
-    { name: 'Laptop...', stock: 40 },
-    { name: 'TV Sta...', stock: 50, highlighted: true },
-    { name: 'Wristw...', stock: 35 }
-  ], [])
+  // Inventory stock data from real products
+  const inventoryData = useMemo(() => {
+    if (products.length === 0) {
+      return []
+    }
+    
+    // Sort by quantity and take top items for display
+    const sortedProducts = [...products]
+      .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
+      .slice(0, 11)
+    
+    const maxStock = Math.max(...sortedProducts.map(p => p.quantity || 0), 1)
+    const topProduct = sortedProducts[0]
+    
+    return sortedProducts.map((product, idx) => ({
+      name: product.name.length > 8 ? product.name.substring(0, 6) + '...' : product.name,
+      fullName: product.name,
+      stock: product.quantity || 0,
+      highlighted: idx === 0
+    }))
+  }, [products])
 
-  // Best performing products
-  const bestProducts = useMemo(() => [
-    { name: 'TV Stand', category: 'Furniture', sales: 15420, units: 20, place: 1 as const },
-    { name: 'Logitech Mouse', category: 'Gadget', sales: 10420, units: 10, place: 2 as const },
-    { name: 'iPhone 16', category: 'Gadget', sales: 8000, units: 9, place: 3 as const }
-  ], [])
+  // Best performing products from real sales data
+  const bestProducts = useMemo(() => {
+    if (recentSales.length === 0 || products.length === 0) {
+      return []
+    }
+    
+    // Aggregate sales by product
+    const productSales: Record<string, { 
+      productId: string
+      productName: string
+      totalSales: number
+      unitsSold: number
+      category: string
+    }> = {}
+    
+    recentSales.forEach(sale => {
+      const key = sale.productId || sale.productName
+      if (!productSales[key]) {
+        const product = products.find(p => p.id === sale.productId || p.name === sale.productName)
+        productSales[key] = {
+          productId: sale.productId || '',
+          productName: sale.productName,
+          totalSales: 0,
+          unitsSold: 0,
+          category: product?.category || 'General'
+        }
+      }
+      productSales[key].totalSales += sale.totalAmount || 0
+      productSales[key].unitsSold += sale.quantitySold || 1
+    })
+    
+    // Sort by total sales and get top 3
+    const topProducts = Object.values(productSales)
+      .sort((a, b) => b.totalSales - a.totalSales)
+      .slice(0, 3)
+    
+    return topProducts.map((p, idx) => ({
+      name: p.productName,
+      category: p.category,
+      sales: p.totalSales,
+      units: p.unitsSold,
+      place: (idx + 1) as 1 | 2 | 3
+    }))
+  }, [recentSales, products])
 
-  // Branch performance data
-  const branchPerformance = useMemo(() => [
-    { name: 'Main Branch', staff: 2, products: 10, costValue: 3890360, sales: 10800, profit: 4000 },
-    { name: 'Northern coast Branch', staff: 1, products: 10, costValue: 3890360, sales: 10800, profit: 4000 },
-    { name: '6th Avenue Branch', staff: 4, products: 10, costValue: 3890360, sales: 10800, profit: 4000 }
-  ], [])
+  // Branch performance data from real branches and sales
+  const branchPerformance = useMemo(() => {
+    if (branches.length === 0) {
+      return []
+    }
+    
+    return branches.map(branch => {
+      const branchStaff = staffList.filter(s => s.branchIds?.includes(branch.id))
+      const branchProducts = branch.totalProducts || 0
+      const costValue = branch.totalInventoryValue || 0
+      
+      // For now, use placeholder sales/profit - could be enhanced with branch-specific sales
+      return {
+        id: branch.id,
+        name: branch.name,
+        staff: branchStaff.length,
+        products: branchProducts,
+        costValue: costValue,
+        sales: branch.totalInventoryValue ? Math.round(branch.totalInventoryValue * 0.1) : 0,
+        profit: branch.totalInventoryValue ? Math.round(branch.totalInventoryValue * 0.03) : 0
+      }
+    })
+  }, [branches, staffList])
 
-  // Staff performance data
-  const staffPerformance = useMemo(() => [
-    { branch: 'Main Branch', name: 'Leslie Alexander', email: 'name@examplemail.com', transactions: 10, sales: 4000 },
-    { branch: 'Northern coast Branch', name: 'Bessie Cooper', email: 'name@examplemail.com', transactions: 5, sales: 2000 },
-    { branch: '6th Avenue Branch', name: 'Ronald Richards', email: 'name@examplemail.com', transactions: 4, sales: 1200 }
-  ], [])
+  // Staff performance data from real staff
+  const staffPerformance = useMemo(() => {
+    if (staffList.length === 0) {
+      return []
+    }
+    
+    return staffList.slice(0, 10).map(staffMember => {
+      // Find the branch name for this staff member
+      const staffBranch = branches.find(b => staffMember.branchIds?.includes(b.id))
+      
+      return {
+        branchId: staffBranch?.id || '',
+        branch: staffBranch?.name || 'Unassigned',
+        name: staffMember.fullName,
+        email: staffMember.email,
+        // Placeholder values - could be enhanced with actual staff-specific sales tracking
+        transactions: 0,
+        sales: 0
+      }
+    })
+  }, [staffList, branches])
+
+  // Calculate total product stats
+  const productStats = useMemo(() => {
+    const totalCostValue = products.reduce((sum, p) => sum + ((p.costPrice || 0) * (p.quantity || 0)), 0)
+    const totalSellingValue = products.reduce((sum, p) => sum + ((p.sellingPrice || 0) * (p.quantity || 0)), 0)
+    const topProduct = inventoryData.length > 0 ? inventoryData[0] : null
+    
+    return {
+      totalProducts: products.length,
+      totalCostValue,
+      totalSellingValue,
+      topProduct
+    }
+  }, [products, inventoryData])
 
   // Chart.js configuration for Sales vs Profit
   const chartData = {
@@ -287,45 +464,51 @@ export default function ReportsPage() {
     ]
   }
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        max: 15000,
-        ticks: {
-          stepSize: 5000,
-          callback: function(value: number | string) {
-            if (typeof value === 'number') {
-              return value >= 1000 ? `${value / 1000}k` : value
-            }
-            return value
-          },
-          font: { size: 12 },
-          color: '#717171'
-        },
-        grid: {
-          color: '#f0f0f0',
-          drawBorder: false
+  const chartOptions = useMemo(() => {
+    const maxSales = Math.max(...(trendData.salesData.length > 0 ? trendData.salesData : [0]), 1000)
+    const maxProfit = Math.max(...(trendData.profitData.length > 0 ? trendData.profitData : [0]), 1000)
+    const chartMax = Math.ceil(Math.max(maxSales, maxProfit) * 1.2 / 1000) * 1000 || 15000
+    
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
         }
       },
-      x: {
-        grid: {
-          display: false
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: chartMax,
+          ticks: {
+            stepSize: Math.ceil(chartMax / 3),
+            callback: function(value: number | string) {
+              if (typeof value === 'number') {
+                return value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value
+              }
+              return value
+            },
+            font: { size: 12 },
+            color: '#717171'
+          },
+          grid: {
+            color: '#f0f0f0',
+            drawBorder: false
+          }
         },
-        ticks: {
-          font: { size: 12 },
-          color: '#89868d'
+        x: {
+          grid: {
+            display: false
+          },
+          ticks: {
+            font: { size: 12 },
+            color: '#89868d'
+          }
         }
       }
     }
-  }
+  }, [trendData])
 
   // Export handler
   const handleExport = async () => {
@@ -433,23 +616,23 @@ export default function ReportsPage() {
             >
               <StatCard 
                 title="Total Sales" 
-                value={`${currencySymbol} ${metrics.totalSales > 0 ? metrics.totalSales.toLocaleString() : '10,500'}`}
-                trend="up"
+                value={`${currencySymbol} ${metrics.totalSales.toLocaleString()}`}
+                trend={metrics.totalSales > 0 ? "up" : null}
               />
               <StatCard 
                 title="Total Profit" 
-                value={`${currencySymbol} ${metrics.totalProfit > 0 ? metrics.totalProfit.toLocaleString() : '3,000'}`}
-                trend="up"
+                value={`${currencySymbol} ${metrics.totalProfit.toLocaleString()}`}
+                trend={metrics.totalProfit > 0 ? "up" : null}
               />
               <StatCard 
                 title="Transactions" 
-                value={metrics.totalTransactions > 0 ? metrics.totalTransactions.toString() : '30'}
-                trend="up"
+                value={metrics.totalTransactions.toLocaleString()}
+                trend={metrics.totalTransactions > 0 ? "up" : null}
               />
               <StatCard 
                 title="Debt" 
                 value={`${currencySymbol} ${metrics.debt.toLocaleString()}`}
-                trend={null}
+                trend={metrics.debt > 0 ? "down" : null}
               />
             </motion.div>
 
@@ -476,7 +659,13 @@ export default function ReportsPage() {
                   </div>
                 </div>
                 <div className="h-[200px]">
-                  <Line data={chartData} options={chartOptions} />
+                  {trendData.labels.length > 0 ? (
+                    <Line data={chartData} options={chartOptions} />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-gray-400">
+                      {loading ? 'Loading chart data...' : 'No sales data available for this period'}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -506,57 +695,68 @@ export default function ReportsPage() {
               <div className="lg:col-span-3 bg-white border border-[#ececf2] rounded-xl p-5 overflow-hidden">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold text-black">Inventory Stock</h3>
-                  <div className="bg-[#004aad] text-white text-[10px] font-medium px-[10px] py-[6px] rounded-[10px]">
-                    TV stand, 50pcs
-                  </div>
+                  {productStats.topProduct && (
+                    <div className="bg-[#004aad] text-white text-[10px] font-medium px-[10px] py-[6px] rounded-[10px]">
+                      {productStats.topProduct.fullName || productStats.topProduct.name}, {productStats.topProduct.stock}pcs
+                    </div>
+                  )}
                 </div>
                 
                 {/* Bar Chart */}
-                <div className="relative h-[150px] mt-4">
-                  {/* Y-axis labels */}
-                  <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-xs text-[#717171]">
-                    <span>50</span>
-                    <span>20</span>
-                    <span>10</span>
-                    <span>0</span>
+                {inventoryData.length > 0 ? (
+                  <div className="relative h-[150px] mt-4">
+                    {/* Y-axis labels */}
+                    <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-xs text-[#717171]">
+                      <span>{Math.max(...inventoryData.map(i => i.stock))}</span>
+                      <span>{Math.round(Math.max(...inventoryData.map(i => i.stock)) * 0.66)}</span>
+                      <span>{Math.round(Math.max(...inventoryData.map(i => i.stock)) * 0.33)}</span>
+                      <span>0</span>
+                    </div>
+                    
+                    {/* Bars */}
+                    <div className="absolute left-10 right-0 top-0 bottom-6 flex items-end justify-around gap-2">
+                      {inventoryData.map((item, idx) => {
+                        const maxStock = Math.max(...inventoryData.map(i => i.stock), 1)
+                        const height = (item.stock / maxStock) * 100
+                        return (
+                          <div key={idx} className="flex flex-col items-center gap-1 flex-1">
+                            <div 
+                              className={`w-full max-w-[30px] rounded-t-lg transition-all duration-300 ${
+                                item.highlighted ? 'bg-[#004aad]' : 'bg-[#d4e7f4]'
+                              }`}
+                              style={{ height: `${height}%` }}
+                              title={`${item.fullName || item.name}: ${item.stock} units`}
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                    
+                    {/* X-axis labels */}
+                    <div className="absolute left-10 right-0 bottom-0 flex justify-around">
+                      {inventoryData.map((item, idx) => (
+                        <span 
+                          key={idx} 
+                          className="text-[10px] text-[#717171] transform -rotate-45 origin-top-left whitespace-nowrap"
+                          title={item.fullName || item.name}
+                        >
+                          {item.name}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  
-                  {/* Bars */}
-                  <div className="absolute left-10 right-0 top-0 bottom-6 flex items-end justify-around gap-2">
-                    {inventoryData.map((item, idx) => {
-                      const height = (item.stock / 50) * 100
-                      return (
-                        <div key={idx} className="flex flex-col items-center gap-1 flex-1">
-                          <div 
-                            className={`w-full max-w-[30px] rounded-t-lg transition-all duration-300 ${
-                              item.highlighted ? 'bg-[#004aad]' : 'bg-[#d4e7f4]'
-                            }`}
-                            style={{ height: `${height}%` }}
-                          />
-                        </div>
-                      )
-                    })}
+                ) : (
+                  <div className="h-[150px] flex items-center justify-center text-gray-400">
+                    {loading ? 'Loading inventory...' : 'No products available'}
                   </div>
-                  
-                  {/* X-axis labels */}
-                  <div className="absolute left-10 right-0 bottom-0 flex justify-around">
-                    {inventoryData.map((item, idx) => (
-                      <span 
-                        key={idx} 
-                        className="text-[10px] text-[#717171] transform -rotate-45 origin-top-left whitespace-nowrap"
-                      >
-                        {item.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Total Products Card */}
               <div className="bg-white border border-[#ececf2] rounded-xl p-5 flex flex-col gap-6">
                 <div className="flex flex-col gap-4">
                   <h3 className="text-base font-semibold text-black">Total Products</h3>
-                  <span className="text-base text-black">10</span>
+                  <span className="text-base text-black">{productStats.totalProducts}</span>
                 </div>
                 
                 <div className="flex flex-col gap-[10px]">
@@ -565,10 +765,10 @@ export default function ReportsPage() {
                     <span className="text-[#717171] text-sm">Cost Value</span>
                   </div>
                   <span className="text-2xl font-bold text-black">
-                    {currencySymbol} 3,890,360
+                    {currencySymbol} {productStats.totalCostValue.toLocaleString()}
                   </span>
                   <span className="text-sm text-[#027a48]">
-                    Potential: {currencySymbol} 4,420,400
+                    Potential: {currencySymbol} {productStats.totalSellingValue.toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -583,39 +783,45 @@ export default function ReportsPage() {
             >
               <h3 className="text-base font-bold text-black mb-5">Best performing Products</h3>
               
-              <div className="flex flex-col gap-5">
-                {bestProducts.map((product) => (
-                  <div 
-                    key={product.place}
-                    className={`flex items-center justify-between px-5 py-4 rounded-xl border ${
-                      product.place === 1 
-                        ? 'bg-[#fff8ec] border-[#fff085]' 
-                        : product.place === 2 
-                        ? 'bg-[#f8fafb] border-[#e5e7eb]' 
-                        : 'bg-[#fdffec] border-[#deff85]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-[14px]">
-                      <MedalIcon place={product.place} />
-                      <div className="flex flex-col gap-1">
-                        <span className="text-base font-medium text-black">{product.name}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#717171] text-sm">🏷️ Category: {product.category}</span>
+              {bestProducts.length > 0 ? (
+                <div className="flex flex-col gap-5">
+                  {bestProducts.map((product) => (
+                    <div 
+                      key={product.place}
+                      className={`flex items-center justify-between px-5 py-4 rounded-xl border ${
+                        product.place === 1 
+                          ? 'bg-[#fff8ec] border-[#fff085]' 
+                          : product.place === 2 
+                          ? 'bg-[#f8fafb] border-[#e5e7eb]' 
+                          : 'bg-[#fdffec] border-[#deff85]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-[14px]">
+                        <MedalIcon place={product.place} />
+                        <div className="flex flex-col gap-1">
+                          <span className="text-base font-medium text-black">{product.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#717171] text-sm">🏷️ Category: {product.category}</span>
+                          </div>
                         </div>
                       </div>
+                      
+                      <div className="flex flex-col items-end gap-[3px]">
+                        <span className="text-[#004aad] text-base font-bold">
+                          {currencySymbol} {product.sales.toLocaleString()}
+                        </span>
+                        <span className="bg-[#dbeafe] text-[#004aad] text-sm font-medium px-[10px] py-1 rounded-full">
+                          {product.units} units sold
+                        </span>
+                      </div>
                     </div>
-                    
-                    <div className="flex flex-col items-end gap-[3px]">
-                      <span className="text-[#004aad] text-base font-bold">
-                        {currencySymbol} {product.sales.toLocaleString()}
-                      </span>
-                      <span className="bg-[#dbeafe] text-[#004aad] text-sm font-medium px-[10px] py-1 rounded-full">
-                        {product.units} units sold
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  {loading ? 'Loading product data...' : 'No sales data available to determine top products'}
+                </div>
+              )}
             </motion.div>
 
             {/* Branch Performance */}
@@ -627,43 +833,49 @@ export default function ReportsPage() {
             >
               <h3 className="text-base font-bold text-black mb-5">Branch Performance</h3>
               
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-[#f6f6f6] rounded">
-                      <th className="text-left px-4 py-2 text-base font-medium text-black">Branch</th>
-                      <th className="text-left px-3 py-2 text-base font-medium text-black">Staff</th>
-                      <th className="text-center px-3 py-2 text-base font-medium text-black">Products</th>
-                      <th className="text-center px-3 py-2 text-base font-medium text-black">Cost Value</th>
-                      <th className="text-center px-3 py-2 text-base font-medium text-black">Sales</th>
-                      <th className="text-center px-3 py-2 text-base font-medium text-black">Profit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {branchPerformance.map((branch, idx) => (
-                      <tr key={idx} className={idx % 2 === 1 ? 'bg-[#f6f6f6]' : ''}>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-[10px]">
-                            <BranchIcon />
-                            <span className="text-sm text-black">{branch.name}</span>
-                          </div>
-                        </td>
-                        <td className="text-center px-3 py-4 text-sm text-black">{branch.staff}</td>
-                        <td className="text-center px-3 py-4 text-sm text-black">{branch.products}</td>
-                        <td className="text-center px-3 py-4 text-sm text-black">
-                          {currencySymbol} {branch.costValue.toLocaleString()}
-                        </td>
-                        <td className="text-center px-3 py-4 text-sm text-black">
-                          {currencySymbol} {branch.sales.toLocaleString()}
-                        </td>
-                        <td className="text-center px-3 py-4 text-sm text-black">
-                          {currencySymbol} {branch.profit.toLocaleString()}
-                        </td>
+              {branchPerformance.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-[#f6f6f6] rounded">
+                        <th className="text-left px-4 py-2 text-base font-medium text-black">Branch</th>
+                        <th className="text-left px-3 py-2 text-base font-medium text-black">Staff</th>
+                        <th className="text-center px-3 py-2 text-base font-medium text-black">Products</th>
+                        <th className="text-center px-3 py-2 text-base font-medium text-black">Cost Value</th>
+                        <th className="text-center px-3 py-2 text-base font-medium text-black">Sales</th>
+                        <th className="text-center px-3 py-2 text-base font-medium text-black">Profit</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {branchPerformance.map((branch, idx) => (
+                        <tr key={branch.id || idx} className={idx % 2 === 1 ? 'bg-[#f6f6f6]' : ''}>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-[10px]">
+                              <BranchIcon />
+                              <span className="text-sm text-black">{branch.name}</span>
+                            </div>
+                          </td>
+                          <td className="text-center px-3 py-4 text-sm text-black">{branch.staff}</td>
+                          <td className="text-center px-3 py-4 text-sm text-black">{branch.products}</td>
+                          <td className="text-center px-3 py-4 text-sm text-black">
+                            {currencySymbol} {branch.costValue.toLocaleString()}
+                          </td>
+                          <td className="text-center px-3 py-4 text-sm text-black">
+                            {currencySymbol} {branch.sales.toLocaleString()}
+                          </td>
+                          <td className="text-center px-3 py-4 text-sm text-black">
+                            {currencySymbol} {branch.profit.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  {loading ? 'Loading branch data...' : 'No branches available'}
+                </div>
+              )}
             </motion.div>
 
             {/* Staff Performance */}
@@ -675,37 +887,43 @@ export default function ReportsPage() {
             >
               <h3 className="text-base font-bold text-black mb-5">Staff Performance</h3>
               
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-[#f6f6f6] rounded">
-                      <th className="text-left px-4 py-2 text-base font-medium text-black">Branch</th>
-                      <th className="text-left px-3 py-2 text-base font-medium text-black">Staff</th>
-                      <th className="text-left px-3 py-2 text-base font-medium text-black">Email</th>
-                      <th className="text-center px-3 py-2 text-base font-medium text-black">Transactions</th>
-                      <th className="text-center px-3 py-2 text-base font-medium text-black">Sales</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {staffPerformance.map((staffMember, idx) => (
-                      <tr key={idx} className={idx % 2 === 1 ? 'bg-[#f6f6f6]' : ''}>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-[10px]">
-                            <BranchIcon />
-                            <span className="text-sm text-black">{staffMember.branch}</span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-4 text-sm text-black">{staffMember.name}</td>
-                        <td className="px-3 py-4 text-sm text-black">{staffMember.email}</td>
-                        <td className="text-center px-3 py-4 text-sm text-black">{staffMember.transactions}</td>
-                        <td className="text-center px-3 py-4 text-sm text-black">
-                          {currencySymbol} {staffMember.sales.toLocaleString()}
-                        </td>
+              {staffPerformance.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-[#f6f6f6] rounded">
+                        <th className="text-left px-4 py-2 text-base font-medium text-black">Branch</th>
+                        <th className="text-left px-3 py-2 text-base font-medium text-black">Staff</th>
+                        <th className="text-left px-3 py-2 text-base font-medium text-black">Email</th>
+                        <th className="text-center px-3 py-2 text-base font-medium text-black">Transactions</th>
+                        <th className="text-center px-3 py-2 text-base font-medium text-black">Sales</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {staffPerformance.map((staffMember, idx) => (
+                        <tr key={idx} className={idx % 2 === 1 ? 'bg-[#f6f6f6]' : ''}>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-[10px]">
+                              <BranchIcon />
+                              <span className="text-sm text-black">{staffMember.branch}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-4 text-sm text-black">{staffMember.name}</td>
+                          <td className="px-3 py-4 text-sm text-black">{staffMember.email}</td>
+                          <td className="text-center px-3 py-4 text-sm text-black">{staffMember.transactions}</td>
+                          <td className="text-center px-3 py-4 text-sm text-black">
+                            {currencySymbol} {staffMember.sales.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  {loading ? 'Loading staff data...' : 'No staff members available'}
+                </div>
+              )}
             </motion.div>
           </div>
         </PlanGate>
