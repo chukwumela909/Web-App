@@ -11,7 +11,9 @@ import {
   StaffActivityLog, 
   StaffRole, 
   StaffStatus,
-  STAFF_PERMISSIONS 
+  STAFF_PERMISSIONS,
+  getStaff,
+  getStaffActivityLogs
 } from '@/lib/firestore'
 import { getBranches } from '@/lib/branches-service'
 import { Branch } from '@/lib/branches-types'
@@ -136,14 +138,9 @@ export default function StaffPage() {
   const loadStaff = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/staff?userId=${user?.uid}`)
-      const result = await response.json()
-      
-      if (result.success) {
-        setStaff(result.data)
-      } else {
-        console.error('Failed to load staff:', result.error)
-      }
+      // Call getStaff directly from client-side to use authenticated user context
+      const staffData = await getStaff(user!.uid)
+      setStaff(staffData)
     } catch (error) {
       console.error('Error loading staff:', error)
     } finally {
@@ -153,12 +150,9 @@ export default function StaffPage() {
 
   const loadActivityLogs = async () => {
     try {
-      const response = await fetch(`/api/staff/logs?userId=${user?.uid}&limit=50`)
-      const result = await response.json()
-      
-      if (result.success) {
-        setActivityLogs(result.data)
-      }
+      // Call getStaffActivityLogs directly from client-side to use authenticated user context
+      const logs = await getStaffActivityLogs(user!.uid, {}, 50)
+      setActivityLogs(logs)
     } catch (error) {
       console.error('Error loading activity logs:', error)
     }

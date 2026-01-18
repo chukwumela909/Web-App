@@ -216,7 +216,7 @@ export default function ReportsPage() {
           getStaff(effectiveUserId),
           getDebtors(effectiveUserId)
         ])
-        console.log('Reports fetch - Sales:', rs.length, 'Multi-item Sales:', mis.length)
+        console.log('Reports fetch - Summaries:', s.length, 'Sales:', rs.length, 'Multi-item Sales:', mis.length, 'Products:', prods.length)
         setSummaries(s)
         setRecentSales(rs)
         setMultiItemSales(mis)
@@ -317,33 +317,69 @@ export default function ReportsPage() {
     }
   }, [allSalesData, debtors, selectedPeriod])
 
-  // Generate trend data for Sales vs Profit chart from real summaries
+  // Generate trend data for Sales vs Profit chart from actual sales data
   const trendData = useMemo(() => {
     const periodDays = selectedPeriod === 'Last 7 Days' ? 7 : 
                        selectedPeriod === 'Last 30 Days' ? 30 : 
                        selectedPeriod === 'Last 90 Days' ? 90 : 7
     
-    // Get the most recent summaries for the period
-    const recentSummaries = summaries.slice(0, Math.min(periodDays, 7))
+    // First try to use summaries if available
+    if (summaries.length > 0) {
+      const recentSummaries = summaries.slice(0, Math.min(periodDays, 7))
+      const sortedSummaries = [...recentSummaries].reverse()
+      
+      const labels = sortedSummaries.map(s => {
+        const date = new Date(s.date)
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      })
+      
+      const salesData = sortedSummaries.map(s => s.totalSales || 0)
+      const profitData = sortedSummaries.map(s => s.totalProfit || 0)
+      
+      if (salesData.some(v => v > 0) || profitData.some(v => v > 0)) {
+        return { labels, salesData, profitData }
+      }
+    }
     
-    if (recentSummaries.length === 0) {
-      // Return empty arrays if no data
+    // Fall back to generating from actual sales data
+    if (allSalesData.length === 0) {
       return { labels: [], salesData: [], profitData: [] }
     }
     
-    // Sort by date ascending for chart display
-    const sortedSummaries = [...recentSummaries].reverse()
+    // Group sales by date
+    const salesByDate: Record<string, { sales: number; profit: number }> = {}
+    const now = Date.now()
     
-    const labels = sortedSummaries.map(s => {
-      const date = new Date(s.date)
+    // Initialize last 7 days with zeros
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now - i * 24 * 60 * 60 * 1000)
+      const dateKey = date.toISOString().split('T')[0]
+      salesByDate[dateKey] = { sales: 0, profit: 0 }
+    }
+    
+    // Aggregate sales data
+    allSalesData.forEach(sale => {
+      const saleDate = new Date(sale.timestamp)
+      const dateKey = saleDate.toISOString().split('T')[0]
+      
+      if (salesByDate[dateKey]) {
+        salesByDate[dateKey].sales += sale.totalAmount || 0
+        salesByDate[dateKey].profit += Math.max(0, (sale.totalAmount || 0) - (sale.costPrice || 0))
+      }
+    })
+    
+    // Convert to arrays for chart
+    const sortedDates = Object.keys(salesByDate).sort()
+    const labels = sortedDates.map(dateStr => {
+      const date = new Date(dateStr)
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     })
     
-    const salesData = sortedSummaries.map(s => s.totalSales || 0)
-    const profitData = sortedSummaries.map(s => s.totalProfit || 0)
-
+    const salesData = sortedDates.map(d => salesByDate[d].sales)
+    const profitData = sortedDates.map(d => salesByDate[d].profit)
+    
     return { labels, salesData, profitData }
-  }, [summaries, selectedPeriod])
+  }, [summaries, selectedPeriod, allSalesData])
 
   // Payment methods breakdown from real sales data (combined)
   const paymentMethods = useMemo(() => {
@@ -389,19 +425,26 @@ export default function ReportsPage() {
 
   // Inventory stock data from real products
   const inventoryData = useMemo(() => {
+    console.log('inventoryData - Products count:', products.length)
+    
     if (products.length === 0) {
       return []
     }
     
     // Sort by quantity and take top items for display
     const sortedProducts = [...products]
+      .filter(p => (p.quantity || 0) > 0) // Only show products with stock
       .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
       .slice(0, 11)
     
-    const maxStock = Math.max(...sortedProducts.map(p => p.quantity || 0), 1)
-    const topProduct = sortedProducts[0]
+    // If no products with stock, show first 11 products anyway
+    const displayProducts = sortedProducts.length > 0 
+      ? sortedProducts 
+      : [...products].slice(0, 11)
     
-    return sortedProducts.map((product, idx) => ({
+    console.log('inventoryData - Display products:', displayProducts.length, displayProducts.map(p => ({ name: p.name, qty: p.quantity })))
+    
+    return displayProducts.map((product, idx) => ({
       name: product.name.length > 8 ? product.name.substring(0, 6) + '...' : product.name,
       fullName: product.name,
       stock: product.quantity || 0,
@@ -856,27 +899,27 @@ export default function ReportsPage() {
                 
                 {/* Bar Chart */}
                 {inventoryData.length > 0 ? (
-                  <div className="relative h-[150px] mt-4">
+                  <div className="relative h-[180px] mt-4">
                     {/* Y-axis labels */}
-                    <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-xs text-[#717171]">
+                    <div className="absolute left-0 top-0 h-[120px] w-8 flex flex-col justify-between text-xs text-[#717171]">
                       <span>{Math.max(...inventoryData.map(i => i.stock))}</span>
                       <span>{Math.round(Math.max(...inventoryData.map(i => i.stock)) * 0.66)}</span>
                       <span>{Math.round(Math.max(...inventoryData.map(i => i.stock)) * 0.33)}</span>
                       <span>0</span>
                     </div>
                     
-                    {/* Bars */}
-                    <div className="absolute left-10 right-0 top-0 bottom-6 flex items-end justify-around gap-2">
+                    {/* Bars Container */}
+                    <div className="absolute left-10 right-0 top-0 h-[120px] flex items-end justify-around gap-2">
                       {inventoryData.map((item, idx) => {
                         const maxStock = Math.max(...inventoryData.map(i => i.stock), 1)
-                        const height = (item.stock / maxStock) * 100
+                        const heightPx = Math.max((item.stock / maxStock) * 120, 2) // Min 2px height for visibility
                         return (
-                          <div key={idx} className="flex flex-col items-center gap-1 flex-1">
+                          <div key={idx} className="flex flex-col items-center flex-1 h-full justify-end">
                             <div 
                               className={`w-full max-w-[30px] rounded-t-lg transition-all duration-300 ${
                                 item.highlighted ? 'bg-[#004aad]' : 'bg-[#d4e7f4]'
                               }`}
-                              style={{ height: `${height}%` }}
+                              style={{ height: `${heightPx}px` }}
                               title={`${item.fullName || item.name}: ${item.stock} units`}
                             />
                           </div>
@@ -885,7 +928,7 @@ export default function ReportsPage() {
                     </div>
                     
                     {/* X-axis labels */}
-                    <div className="absolute left-10 right-0 bottom-0 flex justify-around">
+                    <div className="absolute left-10 right-0 top-[130px] flex justify-around">
                       {inventoryData.map((item, idx) => (
                         <span 
                           key={idx} 

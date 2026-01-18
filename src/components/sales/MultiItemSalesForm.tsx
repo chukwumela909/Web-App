@@ -389,7 +389,7 @@ export default function MultiItemSalesForm({
                                 </option>
                                 {getFilteredProducts(item.tempId).map(product => (
                                   <option key={product.id} value={product.id}>
-                                    {product.name} - KSh {product.sellingPrice?.toLocaleString()} 
+                                    {product.name} - {currencySymbol} {product.sellingPrice?.toLocaleString()} 
                                     {product.quantity !== undefined && ` (${product.quantity} in stock)`}
                                   </option>
                                 ))}
@@ -435,7 +435,7 @@ export default function MultiItemSalesForm({
                       {/* Unit Price */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Unit Price (KSh) <span className="text-red-500">*</span>
+                          Unit Price ({currencySymbol}) <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="number"
@@ -450,7 +450,7 @@ export default function MultiItemSalesForm({
                       {/* Cost Price */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Cost Price (KSh)
+                          Cost Price ({currencySymbol})
                         </label>
                         <input
                           type="number"
@@ -468,7 +468,7 @@ export default function MultiItemSalesForm({
                           Line Total
                         </label>
                         <div className="px-3 py-2 bg-gray-100 border rounded-lg text-gray-900 font-medium">
-                          KSh {SaleCalculations.calculateLineTotal(item.quantity, item.unitPrice).toLocaleString()}
+                          {currencySymbol} {SaleCalculations.calculateLineTotal(item.quantity, item.unitPrice).toLocaleString()}
                         </div>
                       </div>
                     </div>
