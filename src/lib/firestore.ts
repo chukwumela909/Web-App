@@ -1282,6 +1282,19 @@ export async function createMultiItemSale(userId: string, data: {
     createdAt: serverTimestamp(), 
     updatedAt: serverTimestamp() 
   })
+
+  // Decrement inventory quantity for each product sold
+  for (const item of items) {
+    if (item.productId) {
+      const productRef = doc(db, 'products', item.productId)
+      const productSnap = await getDoc(productRef)
+      if (productSnap.exists()) {
+        const currentProduct = productSnap.data() as Product
+        const newQty = Math.max(0, Number(currentProduct.quantity || 0) - item.quantity)
+        await updateDoc(productRef, { quantity: newQty, updatedAt: serverTimestamp() })
+      }
+    }
+  }
   
   return saleId
 }
