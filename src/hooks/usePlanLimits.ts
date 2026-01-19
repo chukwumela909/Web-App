@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useStaff } from '@/contexts/StaffContext'
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { PLAN_LIMITS, PlanTier, getNumericLimit, FEATURE_NAMES } from '@/lib/plan-limits'
@@ -28,16 +29,20 @@ interface UsePlanLimitsReturn {
 
 /**
  * Hook to check plan limits and enforce billing restrictions
+ * For staff members, this uses the owner's subscription instead of the staff's
  */
 export function usePlanLimits(): UsePlanLimitsReturn {
   const { user } = useAuth()
+  const { staff } = useStaff()
+  // Use owner's ID for staff members to inherit subscription
+  const effectiveUserId = staff ? staff.userId : user?.uid
   const [planTier, setPlanTier] = useState<PlanTier>('free')
   const [isLoading, setIsLoading] = useState(true)
 
-  // Determine user's plan tier
+  // Determine user's plan tier (using owner's subscription for staff)
   useEffect(() => {
     async function checkPlanTier() {
-      if (!user?.uid) {
+      if (!effectiveUserId) {
         setPlanTier('free')
         setIsLoading(false)
         return
@@ -47,10 +52,11 @@ export function usePlanLimits(): UsePlanLimitsReturn {
         let isPro = false
 
         // First, check subscription status from subscriptions collection
+        // Uses effectiveUserId so staff inherits owner's subscription
         const subscriptionsRef = collection(db, 'subscriptions')
         const q = query(
           subscriptionsRef,
-          where('userId', '==', user.uid),
+          where('userId', '==', effectiveUserId),
           where('status', '==', 'active')
         )
         const snapshot = await getDocs(q)
@@ -73,8 +79,9 @@ export function usePlanLimits(): UsePlanLimitsReturn {
         }
 
         // Fallback: Also check userProfiles collection for subscription status
+        // Uses effectiveUserId so staff inherits owner's subscription
         if (!isPro) {
-          const userProfileRef = doc(db, 'userProfiles', user.uid)
+          const userProfileRef = doc(db, 'userProfiles', effectiveUserId)
           const userProfileSnap = await getDoc(userProfileRef)
 
           if (userProfileSnap.exists()) {
@@ -101,7 +108,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
     }
 
     checkPlanTier()
-  }, [user?.uid])
+  }, [effectiveUserId])
 
   /**
    * Get today's date range in user's local timezone
@@ -115,10 +122,11 @@ export function usePlanLimits(): UsePlanLimitsReturn {
 
   /**
    * Generic limit checker
+   * Uses effectiveUserId so staff members count against owner's limits
    */
   const checkLimit = useCallback(
     async (feature: keyof typeof PLAN_LIMITS.free): Promise<PlanLimitCheck> => {
-      if (!user?.uid) {
+      if (!effectiveUserId) {
         return {
           allowed: false,
           currentCount: 0,
@@ -177,14 +185,15 @@ export function usePlanLimits(): UsePlanLimitsReturn {
 
       try {
         const collectionRef = collection(db, collectionName)
-        let q = query(collectionRef, where('userId', '==', user.uid))
+        // Use effectiveUserId so staff counts against owner's data
+        let q = query(collectionRef, where('userId', '==', effectiveUserId))
 
         // For daily sales, filter by today's date using numeric timestamp (milliseconds)
         if (feature === 'dailySales') {
           const { startOfDay, endOfDay } = getTodayRange()
           q = query(
             collectionRef,
-            where('userId', '==', user.uid),
+            where('userId', '==', effectiveUserId),
             where('timestamp', '>=', startOfDay.getTime()),
             where('timestamp', '<=', endOfDay.getTime())
           )
@@ -216,7 +225,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
         }
       }
     },
-    [user?.uid, planTier, getTodayRange]
+    [effectiveUserId, planTier, getTodayRange]
   )
 
   // Feature-specific checkers
@@ -242,8 +251,8 @@ export function usePlanLimits(): UsePlanLimitsReturn {
 
   const refreshLimits = useCallback(async () => {
     setIsLoading(true)
-    // Re-check plan tier
-    if (!user?.uid) {
+    // Re-check plan tier using effectiveUserId (owner's ID for staff)
+    if (!effectiveUserId) {
       setPlanTier('free')
       setIsLoading(false)
       return
@@ -253,7 +262,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
       const subscriptionsRef = collection(db, 'subscriptions')
       const q = query(
         subscriptionsRef,
-        where('userId', '==', user.uid),
+        where('userId', '==', effectiveUserId),
         where('status', '==', 'active')
       )
       const snapshot = await getDocs(q)
@@ -281,7 +290,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
     } finally {
       setIsLoading(false)
     }
-  }, [user?.uid])
+  }, [effectiveUserId])
 
   return {
     planTier,

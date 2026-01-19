@@ -22,6 +22,7 @@ import {
   CloudArrowUpIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
+import { useStaff } from '@/contexts/StaffContext'
 import { Product as FPProduct, ProductImage, createProduct, getProducts, updateProduct } from '@/lib/firestore'
 import { uploadMultipleProductImages, UploadProgress } from '@/lib/firebase-storage'
 import { addSupplierLinkToProduct } from '@/lib/product-enhancements'
@@ -152,6 +153,8 @@ function ProductsPageContent() {
     message: string
   } | null>(null)
   const { user } = useAuth()
+  const { staff } = useStaff()
+  const effectiveUserId = staff ? staff.userId : user?.uid
   const currency = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
   const router = useRouter()
@@ -324,8 +327,8 @@ function ProductsPageContent() {
     try {
       await updateProduct(selectedProductForDetail.id, updates)
       // Refresh products list
-      if (user) {
-        const updatedProducts = await getProducts(user.uid)
+      if (effectiveUserId) {
+        const updatedProducts = await getProducts(effectiveUserId)
         setProducts(updatedProducts)
       }
       // Update the selected product for detail view
@@ -336,25 +339,25 @@ function ProductsPageContent() {
   }
 
   const fetchData = useCallback(async () => {
-    if (!user) return
+    if (!effectiveUserId) return
     try {
-      const list = await getProducts(user.uid)
+      const list = await getProducts(effectiveUserId)
       setProducts(list)
     } catch (error) {
       console.error('Error loading products:', error)
     }
-  }, [user])
+  }, [effectiveUserId])
 
-  useEffect(() => { fetchData() }, [user, fetchData])
+  useEffect(() => { fetchData() }, [effectiveUserId, fetchData])
 
   // Load branches for branch selector
   useEffect(() => {
     const loadBranches = async () => {
-      if (!user?.uid) return
+      if (!effectiveUserId) return
       
       try {
         setBranchesLoading(true)
-        const userBranches = await getBranches(user.uid)
+        const userBranches = await getBranches(effectiveUserId)
         setBranches(userBranches)
         
         // Set default branch for new products
@@ -370,7 +373,7 @@ function ProductsPageContent() {
     }
 
     loadBranches()
-  }, [user?.uid])
+  }, [effectiveUserId])
 
   useEffect(() => {
     const newParam = searchParams?.get('new')
@@ -398,7 +401,7 @@ function ProductsPageContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user) return
+    if (!effectiveUserId) return
 
     // Check product limit for new products only (not when editing)
     if (!editingProduct) {
@@ -455,20 +458,24 @@ function ProductsPageContent() {
       lastSupplierId: null,
       lastPurchasePrice: null,
       averagePurchasePrice: null,
-      lastPurchaseDate: null
+      lastPurchaseDate: null,
+      
+      // Track who created/modified this product (for staff accountability)
+      createdBy: user?.uid || null, // The actual user who created/modified (staff or owner)
     }
 
     try {
       if (editingProduct) {
         // Clean the product data to remove any undefined values before saving to Firestore
-        const cleanedProductData = cleanFirestoreData(productData)
+        const cleanedProductData = cleanFirestoreData({ ...productData, updatedBy: user?.uid || null })
         await updateProduct(editingProduct.id, cleanedProductData)
       } else {
         const productId = productData.sku || crypto.randomUUID()
         
         // Clean the product data to remove any undefined values before saving to Firestore
         const cleanedProductData = cleanFirestoreData({ ...productData, id: productId })
-        await createProduct(user.uid, cleanedProductData)
+        // Use effectiveUserId so products go to owner's account when staff adds them
+        await createProduct(effectiveUserId, cleanedProductData)
         
         // Add supplier links if any
         for (const link of supplierLinks) {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useStaff } from '@/contexts/StaffContext'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
@@ -14,9 +15,14 @@ interface SubscriptionStatus {
 /**
  * Hook to check the current user's subscription status
  * Returns subscription info from user profile
+ * For staff members, this checks the owner's subscription (inherited)
  */
 export function useSubscriptionStatus(): SubscriptionStatus {
   const { user } = useAuth()
+  const { staff } = useStaff()
+  // Use owner's ID for staff members to inherit subscription
+  const effectiveUserId = staff ? staff.userId : user?.uid
+  
   const [status, setStatus] = useState<SubscriptionStatus>({
     isSubscribed: false,
     subscriptionId: null,
@@ -27,7 +33,7 @@ export function useSubscriptionStatus(): SubscriptionStatus {
 
   useEffect(() => {
     async function checkSubscription() {
-      if (!user?.uid) {
+      if (!effectiveUserId) {
         setStatus({
           isSubscribed: false,
           subscriptionId: null,
@@ -40,7 +46,8 @@ export function useSubscriptionStatus(): SubscriptionStatus {
 
       try {
         // Check user profile for subscription status
-        const userProfileRef = doc(db, 'userProfiles', user.uid)
+        // Uses effectiveUserId so staff inherits owner's subscription
+        const userProfileRef = doc(db, 'userProfiles', effectiveUserId)
         const userProfileSnap = await getDoc(userProfileRef)
 
         if (userProfileSnap.exists()) {
@@ -83,7 +90,7 @@ export function useSubscriptionStatus(): SubscriptionStatus {
     }
 
     checkSubscription()
-  }, [user?.uid])
+  }, [effectiveUserId])
 
   return status
 }
