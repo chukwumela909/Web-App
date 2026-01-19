@@ -444,11 +444,10 @@ export default function ReportsPage() {
     
     console.log('inventoryData - Display products:', displayProducts.length, displayProducts.map(p => ({ name: p.name, qty: p.quantity })))
     
-    return displayProducts.map((product, idx) => ({
+    return displayProducts.map((product) => ({
       name: product.name.length > 8 ? product.name.substring(0, 6) + '...' : product.name,
       fullName: product.name,
-      stock: product.quantity || 0,
-      highlighted: idx === 0
+      stock: product.quantity || 0
     }))
   }, [products])
 
@@ -887,19 +886,14 @@ export default function ReportsPage() {
               className="grid grid-cols-1 lg:grid-cols-4 gap-4"
             >
               {/* Inventory Stock Chart */}
-              <div className="lg:col-span-3 bg-white border border-[#ececf2] rounded-xl p-5 overflow-hidden">
+              <div className="lg:col-span-3 bg-white border border-[#ececf2] rounded-xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold text-black">Inventory Stock</h3>
-                  {productStats.topProduct && (
-                    <div className="bg-[#004aad] text-white text-[10px] font-medium px-[10px] py-[6px] rounded-[10px]">
-                      {productStats.topProduct.fullName || productStats.topProduct.name}, {productStats.topProduct.stock}pcs
-                    </div>
-                  )}
                 </div>
                 
                 {/* Bar Chart */}
                 {inventoryData.length > 0 ? (
-                  <div className="relative h-[180px] mt-4">
+                  <div className="relative h-[180px] mt-4 overflow-visible">
                     {/* Y-axis labels */}
                     <div className="absolute left-0 top-0 h-[120px] w-8 flex flex-col justify-between text-xs text-[#717171]">
                       <span>{Math.max(...inventoryData.map(i => i.stock))}</span>
@@ -909,19 +903,22 @@ export default function ReportsPage() {
                     </div>
                     
                     {/* Bars Container */}
-                    <div className="absolute left-10 right-0 top-0 h-[120px] flex items-end justify-around gap-2">
+                    <div className="absolute left-10 right-0 top-0 h-[120px] flex items-end justify-around gap-2 overflow-visible">
                       {inventoryData.map((item, idx) => {
                         const maxStock = Math.max(...inventoryData.map(i => i.stock), 1)
                         const heightPx = Math.max((item.stock / maxStock) * 120, 2) // Min 2px height for visibility
                         return (
-                          <div key={idx} className="flex flex-col items-center flex-1 h-full justify-end">
+                          <div key={idx} className="relative flex-1 h-full flex items-end justify-center overflow-visible">
                             <div 
-                              className={`w-full max-w-[30px] rounded-t-lg transition-all duration-300 ${
-                                item.highlighted ? 'bg-[#004aad]' : 'bg-[#d4e7f4]'
-                              }`}
+                              className="inventory-bar w-full max-w-[30px] rounded-t-lg cursor-pointer"
                               style={{ height: `${heightPx}px` }}
                               title={`${item.fullName || item.name}: ${item.stock} units`}
-                            />
+                            >
+                              <div className="inventory-bar-tooltip">
+                                {item.fullName || item.name}, {item.stock}pcs
+                                <div className="inventory-bar-tooltip-arrow" />
+                              </div>
+                            </div>
                           </div>
                         )
                       })}

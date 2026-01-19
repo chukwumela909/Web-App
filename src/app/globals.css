@@ -191,3 +191,52 @@ textarea {
 .animate-fade-in {
   animation: fadeIn 0.3s ease-in-out;
 }
+
+/* Inventory stock chart bars */
+.inventory-bar {
+  background-color: #d4e7f4;
+  transition: background-color 0.2s ease;
+  pointer-events: auto;
+  position: relative;
+}
+
+.inventory-bar:hover {
+  background-color: #004aad;
+}
+
+.inventory-bar-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  background-color: #004aad;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 6px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.inventory-bar-tooltip-arrow {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #004aad;
+}
+
+.inventory-bar:hover .inventory-bar-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
