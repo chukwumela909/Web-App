@@ -323,67 +323,126 @@ export default function ReportsPage() {
                        selectedPeriod === 'Last 30 Days' ? 30 : 
                        selectedPeriod === 'Last 90 Days' ? 90 : 7
     
-    // First try to use summaries if available
-    if (summaries.length > 0) {
-      const recentSummaries = summaries.slice(0, Math.min(periodDays, 7))
-      const sortedSummaries = [...recentSummaries].reverse()
-      
-      const labels = sortedSummaries.map(s => {
-        const date = new Date(s.date)
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      })
-      
-      const salesData = sortedSummaries.map(s => s.totalSales || 0)
-      const profitData = sortedSummaries.map(s => s.totalProfit || 0)
-      
-      if (salesData.some(v => v > 0) || profitData.some(v => v > 0)) {
-        return { labels, salesData, profitData }
-      }
-    }
+    const now = Date.now()
+    const periodStart = now - (periodDays * 24 * 60 * 60 * 1000)
     
-    // Fall back to generating from actual sales data
-    if (allSalesData.length === 0) {
+    // Filter sales data to selected period
+    const filteredSales = allSalesData.filter(sale => (sale.timestamp || 0) >= periodStart)
+    
+    if (filteredSales.length === 0 && summaries.length === 0) {
       return { labels: [], salesData: [], profitData: [] }
     }
     
-    // Group sales by date
-    const salesByDate: Record<string, { sales: number; profit: number }> = {}
-    const now = Date.now()
-    
-    // Initialize last 7 days with zeros
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(now - i * 24 * 60 * 60 * 1000)
-      const dateKey = date.toISOString().split('T')[0]
-      salesByDate[dateKey] = { sales: 0, profit: 0 }
+    // For 7 days: daily data points
+    if (periodDays === 7) {
+      const salesByDate: Record<string, { sales: number; profit: number }> = {}
+      
+      // Initialize all 7 days with zeros
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now - i * 24 * 60 * 60 * 1000)
+        const dateKey = date.toISOString().split('T')[0]
+        salesByDate[dateKey] = { sales: 0, profit: 0 }
+      }
+      
+      // Aggregate sales data
+      filteredSales.forEach(sale => {
+        const saleDate = new Date(sale.timestamp)
+        const dateKey = saleDate.toISOString().split('T')[0]
+        
+        if (salesByDate[dateKey]) {
+          salesByDate[dateKey].sales += sale.totalAmount || 0
+          salesByDate[dateKey].profit += Math.max(0, (sale.totalAmount || 0) - (sale.costPrice || 0))
+        }
+      })
+      
+      const sortedDates = Object.keys(salesByDate).sort()
+      const labels = sortedDates.map(dateStr => {
+        const date = new Date(dateStr)
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      })
+      
+      return {
+        labels,
+        salesData: sortedDates.map(d => salesByDate[d].sales),
+        profitData: sortedDates.map(d => salesByDate[d].profit)
+      }
     }
     
-    // Aggregate sales data
-    allSalesData.forEach(sale => {
-      const saleDate = new Date(sale.timestamp)
-      const dateKey = saleDate.toISOString().split('T')[0]
+    // For 30 days: weekly aggregation (~4-5 weeks)
+    if (periodDays === 30) {
+      const weeks: { label: string; sales: number; profit: number }[] = []
       
-      if (salesByDate[dateKey]) {
-        salesByDate[dateKey].sales += sale.totalAmount || 0
-        salesByDate[dateKey].profit += Math.max(0, (sale.totalAmount || 0) - (sale.costPrice || 0))
+      // Create 4-5 weekly buckets
+      for (let i = 4; i >= 0; i--) {
+        const weekEnd = new Date(now - i * 7 * 24 * 60 * 60 * 1000)
+        const weekStart = new Date(weekEnd.getTime() - 6 * 24 * 60 * 60 * 1000)
+        
+        if (weekStart.getTime() < periodStart) continue
+        
+        const weekSales = filteredSales.filter(sale => {
+          const saleTime = sale.timestamp || 0
+          return saleTime >= weekStart.getTime() && saleTime <= weekEnd.getTime()
+        })
+        
+        const totalSales = weekSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
+        const totalProfit = weekSales.reduce((sum, sale) => 
+          sum + Math.max(0, (sale.totalAmount || 0) - (sale.costPrice || 0)), 0)
+        
+        const label = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { day: 'numeric' })}`
+        weeks.push({ label, sales: totalSales, profit: totalProfit })
       }
-    })
+      
+      return {
+        labels: weeks.map(w => w.label),
+        salesData: weeks.map(w => w.sales),
+        profitData: weeks.map(w => w.profit)
+      }
+    }
     
-    // Convert to arrays for chart
-    const sortedDates = Object.keys(salesByDate).sort()
-    const labels = sortedDates.map(dateStr => {
-      const date = new Date(dateStr)
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    })
+    // For 90 days: monthly aggregation (3 months)
+    if (periodDays === 90) {
+      const months: { label: string; sales: number; profit: number }[] = []
+      
+      for (let i = 2; i >= 0; i--) {
+        const monthDate = new Date(now)
+        monthDate.setMonth(monthDate.getMonth() - i)
+        const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1)
+        const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59, 999)
+        
+        const monthSales = filteredSales.filter(sale => {
+          const saleTime = sale.timestamp || 0
+          return saleTime >= monthStart.getTime() && saleTime <= monthEnd.getTime()
+        })
+        
+        const totalSales = monthSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
+        const totalProfit = monthSales.reduce((sum, sale) => 
+          sum + Math.max(0, (sale.totalAmount || 0) - (sale.costPrice || 0)), 0)
+        
+        const label = monthDate.toLocaleDateString('en-US', { month: 'long' })
+        months.push({ label, sales: totalSales, profit: totalProfit })
+      }
+      
+      return {
+        labels: months.map(m => m.label),
+        salesData: months.map(m => m.sales),
+        profitData: months.map(m => m.profit)
+      }
+    }
     
-    const salesData = sortedDates.map(d => salesByDate[d].sales)
-    const profitData = sortedDates.map(d => salesByDate[d].profit)
-    
-    return { labels, salesData, profitData }
-  }, [summaries, selectedPeriod, allSalesData])
+    // Default fallback (Custom or unknown)
+    return { labels: [], salesData: [], profitData: [] }
+  }, [selectedPeriod, allSalesData])
 
-  // Payment methods breakdown from real sales data (combined)
+  // Payment methods breakdown from real sales data (combined) - filtered by period
   const paymentMethods = useMemo(() => {
-    if (allSalesData.length === 0) {
+    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 : 
+                       selectedPeriod === 'Last 30 Days' ? 30 : 
+                       selectedPeriod === 'Last 90 Days' ? 90 : 30
+    const periodStart = Date.now() - (periodDays * 24 * 60 * 60 * 1000)
+    
+    const filteredSales = allSalesData.filter(sale => (sale.timestamp || 0) >= periodStart)
+    
+    if (filteredSales.length === 0) {
       return [
         { label: 'Cash', percentage: 0 },
         { label: 'M-Pesa', percentage: 0 },
@@ -405,12 +464,12 @@ export default function ReportsPage() {
       OTHER: 0
     }
     
-    allSalesData.forEach(sale => {
+    filteredSales.forEach(sale => {
       const method = sale.paymentMethod || 'CASH'
       methodCounts[method] = (methodCounts[method] || 0) + 1
     })
     
-    const total = allSalesData.length
+    const total = filteredSales.length
     
     return [
       { label: 'Cash', percentage: Math.round((methodCounts.CASH / total) * 100) },
@@ -421,7 +480,7 @@ export default function ReportsPage() {
       { label: 'Cheque', percentage: Math.round((methodCounts.CHEQUE / total) * 100) },
       { label: 'Other', percentage: Math.round((methodCounts.OTHER / total) * 100) }
     ]
-  }, [allSalesData])
+  }, [allSalesData, selectedPeriod])
 
   // Inventory stock data from real products
   const inventoryData = useMemo(() => {
@@ -451,11 +510,20 @@ export default function ReportsPage() {
     }))
   }, [products])
 
-  // Best performing products from real sales data (combined)
+  // Best performing products from real sales data (combined) - filtered by period
   const bestProducts = useMemo(() => {
     if ((recentSales.length === 0 && multiItemSales.length === 0) || products.length === 0) {
       return []
     }
+    
+    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 : 
+                       selectedPeriod === 'Last 30 Days' ? 30 : 
+                       selectedPeriod === 'Last 90 Days' ? 90 : 30
+    const periodStart = Date.now() - (periodDays * 24 * 60 * 60 * 1000)
+    
+    // Filter sales by period
+    const filteredRecentSales = recentSales.filter(sale => (sale.timestamp || 0) >= periodStart)
+    const filteredMultiItemSales = multiItemSales.filter(sale => (sale.timestamp || 0) >= periodStart)
     
     // Aggregate sales by product
     const productSales: Record<string, { 
@@ -467,7 +535,7 @@ export default function ReportsPage() {
     }> = {}
     
     // Process single-item sales
-    recentSales.forEach(sale => {
+    filteredRecentSales.forEach(sale => {
       const key = sale.productId || sale.productName
       if (!productSales[key]) {
         const product = products.find(p => p.id === sale.productId || p.name === sale.productName)
@@ -484,7 +552,7 @@ export default function ReportsPage() {
     })
     
     // Process multi-item sales (each item separately)
-    multiItemSales.forEach(sale => {
+    filteredMultiItemSales.forEach(sale => {
       (sale.items || []).forEach(item => {
         const key = item.productId || item.productName
         if (!productSales[key]) {
@@ -514,7 +582,7 @@ export default function ReportsPage() {
       units: p.unitsSold,
       place: (idx + 1) as 1 | 2 | 3
     }))
-  }, [recentSales, multiItemSales, products])
+  }, [recentSales, multiItemSales, products, selectedPeriod])
 
   // Branch performance data from real branches and sales
   const branchPerformance = useMemo(() => {
