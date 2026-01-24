@@ -42,8 +42,8 @@ export function DownloadModal({ open, onOpenChange }: DownloadModalProps) {
 
   const handleMacDownload = () => {
     const link = document.createElement('a')
-    link.href = '/FahaMpesa-mac.zip'
-    link.download = 'FahaMpesa-mac.zip'
+    link.href = '/fahampesa.dmg'
+    link.download = 'fahampesa.dmg'
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -164,6 +164,17 @@ export function DownloadModal({ open, onOpenChange }: DownloadModalProps) {
                 </button>
               </div>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-[10px] w-full">
+            <p className="font-inter font-medium text-[18px] text-[#001031] leading-none">
+              Quick install (macOS)
+            </p>
+            <ol className="list-decimal pl-5 font-inter text-[16px] text-[#001031] space-y-2">
+              <li>Double-click fahampesa.dmg</li>
+              <li>Drag fahampesa.app to the Applications folder</li>
+              <li>Open it from Applications</li>
+            </ol>
           </div>
         </div>
       </div>
