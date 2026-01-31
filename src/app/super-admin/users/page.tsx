@@ -91,14 +91,14 @@ export default function UsersPage() {
   
   // Action states
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [actionType, setActionType] = useState<'reset' | 'disable' | 'delete' | null>(null)
+  const [actionType, setActionType] = useState<'reset' | 'disable' | 'delete' | 'activate-subscription' | 'revoke-subscription' | null>(null)
   const [showActionDialog, setShowActionDialog] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   
   // Bulk selection states
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
   const [showBulkActionDialog, setShowBulkActionDialog] = useState(false)
-  const [bulkActionType, setBulkActionType] = useState<'reset' | 'disable' | 'delete' | null>(null)
+  const [bulkActionType, setBulkActionType] = useState<'reset' | 'disable' | 'delete' | 'activate-subscription' | 'revoke-subscription' | null>(null)
   
   const { toast } = useToast()
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -222,7 +222,7 @@ export default function UsersPage() {
   }, [toast])
 
   // User action handlers
-  const handleUserAction = async (user: User, action: 'reset' | 'disable' | 'delete') => {
+  const handleUserAction = async (user: User, action: 'reset' | 'disable' | 'delete' | 'activate-subscription' | 'revoke-subscription') => {
     setSelectedUser(user)
     setActionType(action)
     setShowActionDialog(true)
@@ -263,6 +263,56 @@ export default function UsersPage() {
           } else {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
             throw new Error(errorData.error || `Failed to update user status (${response.status})`)
+          }
+          break
+          
+        case 'activate-subscription':
+          const activateResponse = await fetch('/api/admin/subscriptions/set-subscribed', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userId: selectedUser.id,
+              email: selectedUser.email,
+              isSubscribed: true
+            })
+          })
+          
+          if (activateResponse.ok) {
+            toast({
+              title: 'Success',
+              description: `Subscription activated for ${selectedUser.email}`,
+              variant: 'success'
+            })
+          } else {
+            const errorData = await activateResponse.json().catch(() => ({ error: 'Unknown error' }))
+            throw new Error(errorData.error || 'Failed to activate subscription')
+          }
+          break
+          
+        case 'revoke-subscription':
+          const revokeResponse = await fetch('/api/admin/subscriptions/set-subscribed', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userId: selectedUser.id,
+              email: selectedUser.email,
+              isSubscribed: false
+            })
+          })
+          
+          if (revokeResponse.ok) {
+            toast({
+              title: 'Subscription Revoked',
+              description: `Subscription revoked for ${selectedUser.email}`,
+              variant: 'success'
+            })
+          } else {
+            const errorData = await revokeResponse.json().catch(() => ({ error: 'Unknown error' }))
+            throw new Error(errorData.error || 'Failed to revoke subscription')
           }
           break
           
@@ -347,7 +397,7 @@ export default function UsersPage() {
   }
 
   // Bulk action handlers
-  const handleBulkAction = (action: 'reset' | 'disable' | 'delete') => {
+  const handleBulkAction = (action: 'reset' | 'disable' | 'delete' | 'activate-subscription' | 'revoke-subscription') => {
     if (selectedUsers.size === 0) {
       toast({
         title: 'No users selected',
@@ -371,6 +421,28 @@ export default function UsersPage() {
         switch (bulkActionType) {
           case 'reset':
             await userManagementActions.resetPassword(user.email)
+            break
+          case 'activate-subscription':
+            const bulkActivateResponse = await fetch('/api/admin/subscriptions/set-subscribed', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: user.id, email: user.email, isSubscribed: true })
+            })
+            if (!bulkActivateResponse.ok) {
+              const errorData = await bulkActivateResponse.json().catch(() => ({ error: 'Unknown error' }))
+              throw new Error(`Failed to activate subscription for ${user.email}: ${errorData.error}`)
+            }
+            break
+          case 'revoke-subscription':
+            const bulkRevokeResponse = await fetch('/api/admin/subscriptions/set-subscribed', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: user.id, email: user.email, isSubscribed: false })
+            })
+            if (!bulkRevokeResponse.ok) {
+              const errorData = await bulkRevokeResponse.json().catch(() => ({ error: 'Unknown error' }))
+              throw new Error(`Failed to revoke subscription for ${user.email}: ${errorData.error}`)
+            }
             break
           case 'disable':
             const disableResponse = await fetch(`/api/admin/users/${user.id}/disable`, {
@@ -965,6 +1037,24 @@ export default function UsersPage() {
                             {user.status === 'active' ? 'Disable Account' : 'Enable Account'}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
+                          {user.isSubscribed ? (
+                            <DropdownMenuItem 
+                              onClick={() => handleUserAction(user, 'revoke-subscription')}
+                              className="text-orange-600 dark:text-orange-400"
+                            >
+                              <Crown className="h-4 w-4 mr-2" />
+                              Revoke Subscription
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem 
+                              onClick={() => handleUserAction(user, 'activate-subscription')}
+                              className="text-purple-600 dark:text-purple-400"
+                            >
+                              <Crown className="h-4 w-4 mr-2" />
+                              Activate Subscription
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             onClick={() => handleUserAction(user, 'delete')}
                             className="text-red-600 dark:text-red-400"
@@ -1189,6 +1279,8 @@ export default function UsersPage() {
                 {actionType === 'reset' && 'Reset Password'}
                 {actionType === 'disable' && `${selectedUser?.status === 'active' ? 'Disable' : 'Enable'} Account`}
                 {actionType === 'delete' && 'Delete Account'}
+                {actionType === 'activate-subscription' && 'Activate Subscription'}
+                {actionType === 'revoke-subscription' && 'Revoke Subscription'}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {actionType === 'reset' && `A password reset email will be sent to ${selectedUser?.email}.`}
@@ -1198,6 +1290,10 @@ export default function UsersPage() {
                   `This will enable ${selectedUser?.email}'s account. They will be able to log in again.`}
                 {actionType === 'delete' && 
                   `This will permanently delete ${selectedUser?.email}'s account. This action cannot be undone.`}
+                {actionType === 'activate-subscription' && 
+                  `This will activate Pro subscription for ${selectedUser?.email}. They will have access to all Pro features until you revoke it.`}
+                {actionType === 'revoke-subscription' && 
+                  `This will revoke the Pro subscription for ${selectedUser?.email}. They will lose access to Pro features immediately.`}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -1205,7 +1301,7 @@ export default function UsersPage() {
               <AlertDialogAction
                 onClick={confirmAction}
                 disabled={actionLoading}
-                className={actionType === 'delete' ? 'bg-red-600 hover:bg-red-700' : ''}
+                className={actionType === 'delete' ? 'bg-red-600 hover:bg-red-700' : actionType === 'revoke-subscription' ? 'bg-orange-600 hover:bg-orange-700' : actionType === 'activate-subscription' ? 'bg-purple-600 hover:bg-purple-700' : ''}
               >
                 {actionLoading ? (
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -1213,6 +1309,8 @@ export default function UsersPage() {
                 {actionType === 'reset' && 'Send Reset Email'}
                 {actionType === 'disable' && (selectedUser?.status === 'active' ? 'Disable Account' : 'Enable Account')}
                 {actionType === 'delete' && 'Delete Account'}
+                {actionType === 'activate-subscription' && 'Activate Subscription'}
+                {actionType === 'revoke-subscription' && 'Revoke Subscription'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -1226,6 +1324,8 @@ export default function UsersPage() {
                 {bulkActionType === 'reset' && `Reset Password for ${selectedUsers.size} Users`}
                 {bulkActionType === 'disable' && `Disable ${selectedUsers.size} User Accounts`}
                 {bulkActionType === 'delete' && `Delete ${selectedUsers.size} User Accounts`}
+                {bulkActionType === 'activate-subscription' && `Activate Subscription for ${selectedUsers.size} Users`}
+                {bulkActionType === 'revoke-subscription' && `Revoke Subscription for ${selectedUsers.size} Users`}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {bulkActionType === 'reset' && 
@@ -1234,6 +1334,10 @@ export default function UsersPage() {
                   `This will disable ${selectedUsers.size} user accounts. They will not be able to log in.`}
                 {bulkActionType === 'delete' && 
                   `This will permanently delete ${selectedUsers.size} user accounts. This action cannot be undone.`}
+                {bulkActionType === 'activate-subscription' && 
+                  `This will activate Pro subscription for ${selectedUsers.size} users. They will have access to all Pro features until you revoke it.`}
+                {bulkActionType === 'revoke-subscription' && 
+                  `This will revoke the Pro subscription for ${selectedUsers.size} users. They will lose access to Pro features immediately.`}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -1241,7 +1345,7 @@ export default function UsersPage() {
               <AlertDialogAction
                 onClick={confirmBulkAction}
                 disabled={actionLoading}
-                className={bulkActionType === 'delete' ? 'bg-red-600 hover:bg-red-700' : ''}
+                className={bulkActionType === 'delete' ? 'bg-red-600 hover:bg-red-700' : bulkActionType === 'revoke-subscription' ? 'bg-orange-600 hover:bg-orange-700' : bulkActionType === 'activate-subscription' ? 'bg-purple-600 hover:bg-purple-700' : ''}
               >
                 {actionLoading ? (
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -1249,6 +1353,8 @@ export default function UsersPage() {
                 {bulkActionType === 'reset' && `Send Reset Emails (${selectedUsers.size})`}
                 {bulkActionType === 'disable' && `Disable Accounts (${selectedUsers.size})`}
                 {bulkActionType === 'delete' && `Delete Accounts (${selectedUsers.size})`}
+                {bulkActionType === 'activate-subscription' && `Activate Subscriptions (${selectedUsers.size})`}
+                {bulkActionType === 'revoke-subscription' && `Revoke Subscriptions (${selectedUsers.size})`}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
