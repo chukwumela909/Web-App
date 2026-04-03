@@ -44,6 +44,7 @@ export default function PublicHeader({ onOpenDownload }: PublicHeaderProps) {
             <Link href="/#product" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Product</Link>
             <Link href="/#who-we-serve" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Customers</Link>
             <Link href="/dashboard/subscription" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Pricing</Link>
+            <Link href="/installation" className="font-dm-sans font-semibold text-[14px] text-[#001031] px-4 py-2 rounded-[8px] hover:bg-[#E6F0FF] transition-colors">Installation</Link>
           </nav>
 
           {/* Desktop Actions */}
@@ -125,6 +126,13 @@ export default function PublicHeader({ onOpenDownload }: PublicHeaderProps) {
                   className="font-dm-sans font-bold text-[16px] text-[#001031] py-3 px-4 rounded-[8px] hover:bg-gray-50 w-full text-center"
                 >
                   Pricing
+                </Link>
+                <Link 
+                  href="/installation" 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className="font-dm-sans font-bold text-[16px] text-[#001031] py-3 px-4 rounded-[8px] hover:bg-gray-50 w-full text-center"
+                >
+                  Installation
                 </Link>
               </div>
 

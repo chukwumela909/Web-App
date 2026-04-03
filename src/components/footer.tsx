@@ -61,6 +61,11 @@ export default function Footer() {
                   support@fahampesa.com
                 </a>
               </li>
+              <li>
+                <Link href="/installation" className="text-[14px] font-medium text-white hover:text-[#004AAD] transition-colors font-dm-sans">
+                  Installation Guide
+                </Link>
+              </li>
             </ul>
           </div>
 
