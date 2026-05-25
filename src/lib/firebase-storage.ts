@@ -1,8 +1,18 @@
-import { storage } from './firebase'
+import { BACKEND_API_BASE_URL } from './backend-api'
+import { auth, storage } from './firebase'
 import { 
   ref, 
   deleteObject
 } from 'firebase/storage'
+
+export interface UploadedProductImage {
+  url: string
+  fileId: string
+  name: string
+  storagePath?: string
+  contentType?: string
+  size?: number
+}
 
 export interface UploadProgress {
   file: File
@@ -13,52 +23,86 @@ export interface UploadProgress {
   error?: string
 }
 
-// Upload a single product image via server-side API to avoid CORS issues
+const PRODUCT_IMAGE_UPLOAD_PATH = '/assets/product-images'
+
+async function parseUploadError(response: Response): Promise<string> {
+  const result = await response.json().catch(() => null) as {
+    error?: { code?: string; message?: string }
+    message?: string
+  } | null
+
+  if (response.status === 403 && result?.error?.code === 'manager_required') {
+    return 'Only owners and managers can upload product images.'
+  }
+
+  return result?.error?.message || result?.message || 'Failed to upload product image'
+}
+
+// Upload a single product image via the backend Firebase Storage asset endpoint.
 export const uploadProductImage = async (
   file: File, 
-  productId: string, 
+  _productId: string, 
   onProgress?: (progress: number) => void
-): Promise<{ url: string; fileId: string; name: string }> => {
-  const fileName = `product_${productId}_${Date.now()}_${file.name}`
-  
-  console.log('Starting server-side upload for:', fileName)
-  
+): Promise<UploadedProductImage> => {
+  const user = auth.currentUser
+
+  if (!user) {
+    throw new Error('You must be signed in to upload product images.')
+  }
+
+  const token = await user.getIdToken()
+
   // Simulate initial progress
   onProgress?.(10)
   
   const formData = new FormData()
-  formData.append('file', file)
-  formData.append('fileName', fileName)
-  formData.append('folder', 'products')
+  formData.append('image', file)
   
   onProgress?.(30)
   
   try {
-    const response = await fetch('/api/imagekit-upload', {
+    const response = await fetch(`${BACKEND_API_BASE_URL}${PRODUCT_IMAGE_UPLOAD_PATH}`, {
       method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
       body: formData,
     })
     
     onProgress?.(80)
     
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Upload failed')
+      throw new Error(await parseUploadError(response))
     }
     
-    const result = await response.json()
+    const result = await response.json() as {
+      data?: {
+        url?: string
+        storagePath?: string
+        contentType?: string
+        size?: number
+      }
+    }
+
+    const upload = result.data
+
+    if (!upload?.url) {
+      throw new Error('Product image upload did not return a URL.')
+    }
     
     onProgress?.(100)
-    console.log('Upload completed. URL:', result.url)
     
     return {
-      url: result.url,
-      fileId: result.fileId || fileName,
-      name: result.name || fileName
+      url: upload.url,
+      fileId: upload.storagePath || upload.url,
+      name: file.name,
+      storagePath: upload.storagePath,
+      contentType: upload.contentType,
+      size: upload.size
     }
   } catch (error) {
     console.error('Upload failed:', error)
-    throw error instanceof Error ? error : new Error('Upload failed')
+    throw error instanceof Error ? error : new Error('Failed to upload product image')
   }
 }
 
@@ -67,7 +111,7 @@ export const uploadMultipleProductImages = async (
   files: File[],
   productId: string,
   onProgressUpdate?: (uploads: UploadProgress[]) => void
-): Promise<{ url: string; fileId: string; name: string }[]> => {
+): Promise<UploadedProductImage[]> => {
   const maxImages = 3
   if (files.length > maxImages) {
     throw new Error(`Maximum ${maxImages} images allowed`)
@@ -82,7 +126,7 @@ export const uploadMultipleProductImages = async (
   
   onProgressUpdate?.(uploads)
   
-  const uploadPromises = files.map(async (file, index) => {
+  const results = await Promise.allSettled(files.map(async (file, index) => {
     uploads[index].status = 'uploading'
     onProgressUpdate?.([...uploads])
     
@@ -104,15 +148,24 @@ export const uploadMultipleProductImages = async (
       onProgressUpdate?.([...uploads])
       throw error
     }
-  })
+  }))
   
-  return Promise.all(uploadPromises)
+  const uploadedImages = results
+    .filter((result): result is PromiseFulfilledResult<UploadedProductImage> => result.status === 'fulfilled')
+    .map(result => result.value)
+
+  if (uploadedImages.length === 0) {
+    const firstError = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+    throw firstError?.reason instanceof Error ? firstError.reason : new Error('Failed to upload product images.')
+  }
+
+  return uploadedImages
 }
 
 // Delete an image from Firebase Storage
 export const deleteProductImage = async (fileId: string): Promise<void> => {
   try {
-    const storageRef = ref(storage, `products/${fileId}`)
+    const storageRef = ref(storage, fileId.includes('/') ? fileId : `products/${fileId}`)
     await deleteObject(storageRef)
     console.log('Image deleted successfully:', fileId)
   } catch (error) {
@@ -127,42 +180,10 @@ export const uploadFile = async (
   folder: string,
   customFileName?: string,
   onProgress?: (progress: number) => void
-): Promise<{ url: string; fileId: string; name: string }> => {
-  const fileName = customFileName || `${Date.now()}_${file.name}`
-  
-  onProgress?.(10)
-  
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('fileName', fileName)
-  formData.append('folder', folder)
-  
-  onProgress?.(30)
-  
-  try {
-    const response = await fetch('/api/imagekit-upload', {
-      method: 'POST',
-      body: formData,
-    })
-    
-    onProgress?.(80)
-    
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Upload failed')
-    }
-    
-    const result = await response.json()
-    
-    onProgress?.(100)
-    
-    return {
-      url: result.url,
-      fileId: result.fileId || fileName,
-      name: result.name || fileName
-    }
-  } catch (error) {
-    console.error('Upload failed:', error)
-    throw error instanceof Error ? error : new Error('Upload failed')
+): Promise<UploadedProductImage> => {
+  if (folder !== 'products') {
+    throw new Error('Only product image uploads are supported by this endpoint.')
   }
+  
+  return uploadProductImage(file, customFileName || `${Date.now()}`, onProgress)
 }

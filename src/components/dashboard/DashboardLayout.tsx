@@ -5,6 +5,7 @@ import { useStaff } from '@/contexts/StaffContext'
 import { useStaffRedirect } from '@/hooks/useStaffRedirect'
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus'
 import { useNotifications } from '@/contexts/NotificationsContext'
+import { useBranch } from '@/contexts/BranchContext'
 import { 
   Squares2X2Icon,
   ArchiveBoxIcon,
@@ -27,8 +28,6 @@ import { Zap } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { getBranches } from '@/lib/branches-service'
-import { Branch } from '@/lib/branches-types'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import CreditCardIcon from './icons/CreditCardIcon'
@@ -74,6 +73,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { staff, hasPermission, loading: staffLoading } = useStaff()
   const { isSubscribed, isLoading: subscriptionLoading } = useSubscriptionStatus()
   const { notifications } = useNotifications()
+  const {
+    branches,
+    selectedBranchId,
+    selectedBranch,
+    loading: branchesLoading,
+    setSelectedBranchId
+  } = useBranch()
   const pathname = usePathname()
   const router = useRouter()
   const hasUnseenNotifications = notifications.some(notification => !notification.seen)
@@ -81,15 +87,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   // Smart redirect for staff members without appropriate permissions
   useStaffRedirect()
   
-  // Branch state management
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [selectedBranch, setSelectedBranch] = useState<string>('')
-  
-  // Phone verification state - check both Firebase auth provider AND Firestore profile
+  // Phone verification state - check both Firebase auth provider AND Firestore profile.
   const [phoneVerified, setPhoneVerified] = useState<boolean | null>(null)
   const [phoneCheckLoading, setPhoneCheckLoading] = useState(true)
-  
-  // Check if user needs phone verification
+  const [showBranchDropdown, setShowBranchDropdown] = useState(false)
+
   useEffect(() => {
     const checkPhoneVerification = async () => {
       if (!user) {
@@ -98,26 +100,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         return
       }
 
-      // First check if user has phone provider (authenticated via phone)
       const hasPhoneProvider = user.providerData.some(
         provider => provider.providerId === 'phone'
       )
-      
+
       if (hasPhoneProvider) {
         setPhoneVerified(true)
         setPhoneCheckLoading(false)
         return
       }
 
-      // If no phone provider, check Firestore profile for phoneVerified flag
       try {
         const profileDoc = await getDoc(doc(db, 'userProfiles', user.uid))
-        if (profileDoc.exists()) {
-          const data = profileDoc.data()
-          setPhoneVerified(data.phoneVerified === true)
-        } else {
-          setPhoneVerified(false)
-        }
+        setPhoneVerified(profileDoc.exists() && profileDoc.data().phoneVerified === true)
       } catch (error) {
         console.error('Error checking phone verification status:', error)
         setPhoneVerified(false)
@@ -126,25 +121,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     }
 
+    setPhoneCheckLoading(true)
     checkPhoneVerification()
   }, [user])
-
-  // Determine if modal should show (user exists, not staff, phone not verified, check is complete, and not on verify-phone page)
-  const isOnVerifyPhonePage = pathname === '/dashboard/verify-phone'
-  const needsPhoneVerification = user && !staff && phoneVerified === false && !phoneCheckLoading && !isOnVerifyPhonePage
-  
-  const [branchesLoading, setBranchesLoading] = useState(true)
-  const [showBranchDropdown, setShowBranchDropdown] = useState(false)
-
-  // Determine the effective user ID for data loading
-  const effectiveUserId = staff ? staff.userId : user?.uid
-
-  // Load branches when user is available
-  useEffect(() => {
-    if (effectiveUserId) {
-      loadBranches()
-    }
-  }, [effectiveUserId])
 
   // Filter navigation items based on staff permissions
   const filteredNavigationItems = navigationItems.filter(item => {
@@ -169,37 +148,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }, [showBranchDropdown])
 
-  const loadBranches = async () => {
-    try {
-      setBranchesLoading(true)
-      if (!effectiveUserId) return
-
-      const allBranches = await getBranches(effectiveUserId)
-      
-      // Filter branches for staff members based on their assigned branches
-      let userBranches = allBranches
-      if (staff && staff.branchIds.length > 0) {
-        userBranches = allBranches.filter(branch => staff.branchIds.includes(branch.id))
-      }
-      
-      setBranches(userBranches)
-      
-      // Set default branch (first active branch or first branch)
-      if (userBranches.length > 0 && !selectedBranch) {
-        const defaultBranch = userBranches.find(b => b.status === 'ACTIVE') || userBranches[0]
-        setSelectedBranch(defaultBranch.id)
-      }
-    } catch (error) {
-      console.error('Error loading branches:', error)
-    } finally {
-      setBranchesLoading(false)
-    }
-  }
-
   const handleBranchChange = (branchId: string) => {
-    setSelectedBranch(branchId)
+    setSelectedBranchId(branchId)
     setShowBranchDropdown(false)
-    // You can add additional logic here to refresh dashboard data
   }
 
   const handleLogout = async () => {
@@ -222,25 +173,29 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const currentPageInfo = pageTitles[pathname] || { title: 'Dashboard', subtitle: undefined }
   const displayName = staff ? staff.fullName : (user?.email?.split('@')[0] || 'User')
   const displayTitle = currentPageInfo.title.replace('{{username}}', displayName)
-  const currentBranch = branches.find(b => b.id === selectedBranch)
+  const currentBranch = selectedBranch
+  const isOnVerifyPhonePage = pathname === '/dashboard/verify-phone'
+  const needsPhoneVerification = user && !staff && phoneVerified === false && !phoneCheckLoading && !isOnVerifyPhonePage
 
   return (
-    <div className="h-screen flex bg-background chrome-flex-row chrome-gpu-acceleration">
-      {/* Phone Verification Modal - blocks access until phone is verified */}
-      <PhoneVerificationModal isOpen={needsPhoneVerification} />
+    <div className="h-screen flex bg-[#f6f8fb] font-dm-sans text-[#0f172a] chrome-flex-row chrome-gpu-acceleration">
+      <PhoneVerificationModal isOpen={Boolean(needsPhoneVerification)} />
       {/* Sidebar Navigation - replacing bottom navigation */}
-      <div className="hidden md:flex fixed inset-y-0 left-0 w-64 bg-card/98 border-r border-border/50 shadow-2xl z-50 supports-[backdrop-filter]:bg-card/95 supports-[backdrop-filter]:backdrop-blur-md backdrop-blur-fallback chrome-transition chrome-shadow chrome-performance">
+      <div className="hidden md:flex fixed inset-y-0 left-0 w-64 bg-white/95 border-r border-[#e7ebf2] shadow-[8px_0_30px_rgba(15,23,42,0.04)] z-50 supports-[backdrop-filter]:bg-white/90 supports-[backdrop-filter]:backdrop-blur-md backdrop-blur-fallback chrome-transition chrome-shadow chrome-performance">
         <div className="flex flex-col w-full">
           {/* Sidebar Header */}
-          <div className="flex-shrink-0 flex items-center justify-center h-16 border-b border-border/30 px-4">
-            <h2 className="text-xl font-bold text-foreground">FahamPesa</h2>
+          <div className="flex-shrink-0 flex items-center h-[72px] border-b border-[#eef2f7] px-5">
+            <div>
+              <h2 className="text-[20px] font-bold leading-tight tracking-[-0.02em] text-[#001031]">FahamPesa</h2>
+              <p className="text-[11px] font-medium text-[#64748b]">Business console</p>
+            </div>
           </div>
           
 
           
           {/* Navigation Items */}
-          <nav className="flex-1 py-6">
-            <div className="space-y-2 px-4">
+          <nav className="flex-1 py-5">
+            <div className="space-y-1.5 px-3">
               {filteredNavigationItems.map((item) => {
                 const isActive = pathname === item.href
                 
@@ -248,23 +203,26 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`flex items-center py-3 px-4 rounded-xl transition-all duration-300 group ${
+                    className={`relative flex items-center py-3 px-3.5 rounded-[10px] transition-all duration-200 group ${
                       isActive
-                        ? 'text-primary bg-primary/10 shadow-lg shadow-primary/20'
-                        : 'text-muted-foreground hover:text-primary hover:bg-accent/50 hover:shadow-md'
+                        ? 'text-[#004aad] bg-[#eef5ff]'
+                        : 'text-[#64748b] hover:text-[#001031] hover:bg-[#f6f8fb]'
                     }`}
                   >
+                    {isActive && (
+                      <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-[#004aad]" />
+                    )}
                     <item.icon
-                      className={`h-6 w-6 mr-3 transition-all duration-300 ${
-                        isActive 
-                          ? 'text-primary scale-110' 
-                          : 'text-muted-foreground group-hover:text-primary group-hover:scale-105'
+                      className={`h-5 w-5 mr-3 transition-colors duration-200 ${
+                        isActive
+                          ? 'text-[#004aad]'
+                          : 'text-[#94a3b8] group-hover:text-[#004aad]'
                       }`}
                     />
-                    <span className={`text-sm font-semibold transition-all duration-300 ${
-                      isActive 
-                        ? 'text-primary' 
-                        : 'text-muted-foreground group-hover:text-primary'
+                    <span className={`text-sm transition-colors duration-200 ${
+                      isActive
+                        ? 'font-semibold text-[#004aad]'
+                        : 'font-medium text-[#64748b] group-hover:text-[#001031]'
                     }`}>
                       {item.name}
                     </span>
@@ -275,14 +233,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </nav>
           
           {/* User Profile Section at Bottom */}
-          <div className="flex-shrink-0 border-t border-border/30 px-4 py-4">
+          <div className="flex-shrink-0 border-t border-[#eef2f7] px-3 py-4">
             <button
               onClick={handleUserIconClick}
-              className="flex items-center w-full py-3 px-4 rounded-xl hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary transition-all duration-200 chrome-flex-fix chrome-transition chrome-border-radius"
+              className="flex items-center w-full py-3 px-3.5 rounded-[10px] text-[#64748b] hover:bg-[#f6f8fb] hover:text-[#001031] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary transition-all duration-200 chrome-flex-fix chrome-transition chrome-border-radius"
               title="Settings"
             >
-              <UserCircleIcon className="h-8 w-8 text-muted-foreground hover:text-foreground transition-colors mr-3" />
-              <span className="text-sm font-medium text-muted-foreground hover:text-foreground">Settings</span>
+              <UserCircleIcon className="h-7 w-7 mr-3" />
+              <span className="text-sm font-medium">Settings</span>
             </button>
           </div>
         </div>
@@ -291,37 +249,37 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main Content Area */}
       <div className="flex flex-col flex-1 md:ml-64">
         {/* Top navigation bar - mobile app style with transparent/white background */}
-        <div className="relative z-10 flex-shrink-0 flex h-16 bg-background/95 border-b border-border/30 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur-md backdrop-blur-fallback chrome-flex-fix chrome-transition chrome-shadow">
-          <div className="flex-1 px-4 flex justify-between items-center">
+        <div className="relative z-10 flex-shrink-0 flex min-h-[72px] bg-white/90 border-b border-[#e7ebf2] supports-[backdrop-filter]:bg-white/80 supports-[backdrop-filter]:backdrop-blur-md backdrop-blur-fallback chrome-flex-fix chrome-transition chrome-shadow">
+          <div className="flex-1 px-4 sm:px-6 flex items-center gap-4">
             {/* Mobile menu button on mobile - user icon on larger screens */}
             <button
               onClick={handleUserIconClick}
-              className="md:hidden inline-flex items-center p-2 rounded-full hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary transition-all duration-200 chrome-flex-fix chrome-transition chrome-border-radius"
+              className="md:hidden inline-flex items-center p-2 rounded-full text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#001031] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary transition-all duration-200 chrome-flex-fix chrome-transition chrome-border-radius"
               title="Settings"
             >
-              <UserCircleIcon className="h-8 w-8 text-muted-foreground hover:text-foreground transition-colors" />
+              <UserCircleIcon className="h-8 w-8 transition-colors" />
             </button>
             
-            {/* Page title in center */}
-            <div className="flex-1 flex flex-col items-center justify-center px-4 ml-32">
-              <h1 className="text-lg font-bold text-foreground text-center">
+            {/* Page title */}
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-[17px] sm:text-[19px] font-semibold tracking-[-0.01em] text-[#0f172a]">
                 {displayTitle}
               </h1>
               {currentPageInfo.subtitle && (
-                <p className="text-sm text-muted-foreground text-center">
+                <p className="truncate text-[13px] font-medium text-[#64748b]">
                   {currentPageInfo.subtitle}
                 </p>
               )}
             </div>
             
             {/* Right side icons */}
-            <div className="flex items-center space-x-3">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               {/* Branch Selector - show if user has multiple branches */}
               {branches.length > 1 && (
                 <div className="relative branch-dropdown">
                   <button
                     onClick={() => setShowBranchDropdown(!showBranchDropdown)}
-                    className="flex items-center px-3 py-2 text-sm font-medium text-muted-foreground bg-muted/50 border border-border/50 rounded-lg hover:bg-muted/80 hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
+                    className="flex items-center px-3 py-2 text-sm font-medium text-[#475569] bg-[#f8fafc] border border-[#e2e8f0] rounded-[10px] hover:bg-white hover:text-[#0f172a] hover:shadow-[0_8px_20px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
                   >
                     <BuildingOfficeIcon className="h-4 w-4 mr-2" />
                     <span className="hidden sm:inline truncate max-w-24">
@@ -332,21 +290,21 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   
                   {/* Branch Dropdown */}
                   {showBranchDropdown && (
-                    <div className="absolute top-full right-0 mt-1 w-64 bg-card border border-border rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                    <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-[#e2e8f0] rounded-[14px] shadow-[0_18px_45px_rgba(15,23,42,0.12)] z-50 max-h-60 overflow-y-auto">
                       <div className="py-1">
                         {branches.map((branch) => (
                           <button
                             key={branch.id}
                             onClick={() => handleBranchChange(branch.id)}
-                            className={`w-full text-left px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors ${
-                              selectedBranch === branch.id 
-                                ? 'bg-primary/10 text-primary font-medium' 
-                                : 'text-foreground hover:text-foreground'
+                            className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
+                              selectedBranchId === branch.id
+                                ? 'bg-[#eef5ff] text-[#004aad] font-medium'
+                                : 'text-[#0f172a] hover:bg-[#f8fafc]'
                             }`}
                           >
                             <div className="flex items-center">
                               <BuildingOfficeIcon className={`h-4 w-4 mr-2 ${
-                                selectedBranch === branch.id ? 'text-primary' : 'text-muted-foreground'
+                                selectedBranchId === branch.id ? 'text-primary' : 'text-muted-foreground'
                               }`} />
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium truncate">{branch.name}</div>
@@ -354,7 +312,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                   <div className="text-xs text-muted-foreground truncate">{branch.branchCode}</div>
                                 )}
                               </div>
-                              {selectedBranch === branch.id && (
+                              {selectedBranchId === branch.id && (
                                 <CheckIcon className="h-4 w-4 text-primary flex-shrink-0 ml-2" />
                               )}
                             </div>
@@ -393,11 +351,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {/* Notification icon */}
               <button
                 onClick={handleNotificationClick}
-                className="inline-flex items-center p-2 rounded-full hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary transition-all duration-200 chrome-flex-fix chrome-transition chrome-border-radius"
+                className="inline-flex items-center p-2 rounded-full text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary transition-all duration-200 chrome-flex-fix chrome-transition chrome-border-radius"
                 title="Notifications"
               >
                 <span className="relative">
-                  <BellIcon className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors" />
+                  <BellIcon className="h-6 w-6 transition-colors" />
                   {hasUnseenNotifications && (
                     <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-background" />
                   )}
@@ -408,9 +366,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
 
         {/* Main content */}
-        <main className="flex-1 relative overflow-y-auto focus:outline-none bg-muted/30">
-          <div className="py-6 md:pb-6 pb-32"> {/* Keep bottom padding for mobile bottom nav */}
-            <div className="w-full px-4 sm:px-6 md:px-8">
+        <main className="flex-1 relative overflow-y-auto focus:outline-none bg-[#f6f8fb]">
+          <div className="py-6 md:pb-8 pb-32"> {/* Keep bottom padding for mobile bottom nav */}
+            <div className="w-full max-w-[1480px] mx-auto px-4 sm:px-6 md:px-8">
               {children}
             </div>
           </div>
@@ -418,9 +376,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </div>
 
       {/* Bottom Navigation Bar for Mobile - hidden on desktop */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card/98 border-t border-border/50 shadow-2xl z-50 supports-[backdrop-filter]:bg-card/95 supports-[backdrop-filter]:backdrop-blur-md backdrop-blur-fallback chrome-transition chrome-shadow chrome-performance">
-        <div className="flex justify-center items-center py-3 px-6">
-          <div className="flex items-center justify-center space-x-8 max-w-md w-full">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 border-t border-[#e7ebf2] shadow-[0_-12px_30px_rgba(15,23,42,0.08)] z-50 supports-[backdrop-filter]:bg-white/90 supports-[backdrop-filter]:backdrop-blur-md backdrop-blur-fallback chrome-transition chrome-shadow chrome-performance">
+        <div className="overflow-x-auto px-3 py-3">
+          <div className="flex min-w-max items-center gap-2">
             {filteredNavigationItems.map((item) => {
               const isActive = pathname === item.href
               
@@ -428,23 +386,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex flex-col items-center justify-center py-3 px-4 rounded-xl transition-all duration-300 group ${
+                  className={`flex min-w-[76px] flex-col items-center justify-center py-2.5 px-3 rounded-[12px] transition-all duration-200 group ${
                     isActive
-                      ? 'text-primary bg-primary/10 shadow-lg shadow-primary/20'
-                      : 'text-muted-foreground hover:text-primary hover:bg-accent/50 hover:shadow-md'
+                      ? 'text-[#004aad] bg-[#eef5ff]'
+                      : 'text-[#64748b] hover:text-[#001031] hover:bg-[#f8fafc]'
                   }`}
                 >
                   <item.icon
-                    className={`h-6 w-6 transition-all duration-300 ${
-                      isActive 
-                        ? 'text-primary scale-110' 
-                        : 'text-muted-foreground group-hover:text-primary group-hover:scale-105'
+                    className={`h-5 w-5 transition-colors duration-200 ${
+                      isActive
+                        ? 'text-[#004aad]'
+                        : 'text-[#94a3b8] group-hover:text-[#004aad]'
                     }`}
                   />
-                  <span className={`text-xs mt-2 font-semibold transition-all duration-300 ${
-                    isActive 
-                      ? 'text-primary' 
-                      : 'text-muted-foreground group-hover:text-primary'
+                  <span className={`text-[11px] mt-1.5 font-semibold transition-colors duration-200 ${
+                    isActive
+                      ? 'text-[#004aad]'
+                      : 'text-[#64748b] group-hover:text-[#001031]'
                   }`}>
                     {item.name}
                   </span>

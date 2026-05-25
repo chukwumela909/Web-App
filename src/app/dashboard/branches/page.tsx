@@ -5,6 +5,7 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCurrency, formatCurrency } from '@/hooks/useCurrency'
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
@@ -27,7 +28,13 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { PlanGate } from '@/components/PlanGate'
+import {
+  createBranch as createBranchRecord,
+  getBranchDashboard,
+  getBranches as getBranchRecords,
+  getBranchTransfers,
+  updateBranch as updateBranchRecord
+} from '@/lib/branches-service'
 
 interface Branch {
   id: string
@@ -114,6 +121,7 @@ function BranchesContent() {
   const { user } = useAuth()
   const router = useRouter()
   const { currency } = useCurrency()
+  const { isSubscribed, isLoading: subscriptionLoading } = useSubscriptionStatus()
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [branches, setBranches] = useState<Branch[]>([])
@@ -130,15 +138,8 @@ function BranchesContent() {
     if (!user) return
     
     try {
-      console.log('Frontend: Loading dashboard for user ID:', user.uid)
-      const response = await fetch(`/api/branches/dashboard?userId=${user.uid}`)
-      const result = await response.json()
-      
-      console.log('Frontend: Dashboard API response:', result)
-      
-      if (result.success) {
-        setDashboard(result.data)
-      }
+      const data = await getBranchDashboard(user.uid)
+      setDashboard(data as any)
     } catch (error) {
       console.error('Error loading dashboard:', error)
     }
@@ -163,15 +164,11 @@ function BranchesContent() {
         params.append('searchTerm', searchTerm.trim())
       }
 
-      const response = await fetch(`/api/branches?${params}`)
-      const result = await response.json()
-      
-      console.log('Frontend: Branches API response:', result)
-      
-      if (result.success) {
-        setBranches(result.data)
-        console.log('Frontend: Set branches count:', result.data.length)
-      }
+      const data = await getBranchRecords(user.uid, {
+        status: statusFilter && statusFilter !== 'ALL' ? [statusFilter as any] : undefined,
+        searchTerm: searchTerm.trim() || undefined
+      })
+      setBranches(data as any)
     } catch (error) {
       console.error('Error loading branches:', error)
     }
@@ -182,12 +179,8 @@ function BranchesContent() {
     if (!user) return
     
     try {
-      const response = await fetch(`/api/transfers?userId=${user.uid}&limit=20`)
-      const result = await response.json()
-      
-      if (result.success) {
-        setTransfers(result.data)
-      }
+      const data = await getBranchTransfers(user.uid, undefined, 'requestedAt', 'desc', 20)
+      setTransfers(data as any)
     } catch (error) {
       console.error('Error loading transfers:', error)
     }
@@ -196,27 +189,19 @@ function BranchesContent() {
   // Create branch
   const createBranch = async (branchData: any) => {
     if (!user) return false
+
+    if (!isSubscribed && branches.length >= 1) {
+      alert('Your free plan includes one main branch. Upgrade to Pro to add more branches.')
+      router.push('/dashboard/subscription')
+      return false
+    }
     
     try {
-      const response = await fetch('/api/branches', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          ...branchData
-        })
-      })
-      
-      const result = await response.json()
-      if (result.success) {
-        await loadBranches()
-        await loadDashboard()
-        setShowAddModal(false)
-        return true
-      } else {
-        alert('Failed to create branch: ' + result.error)
-        return false
-      }
+      await createBranchRecord(user.uid, branchData)
+      await loadBranches()
+      await loadDashboard()
+      setShowAddModal(false)
+      return true
     } catch (error) {
       console.error('Error creating branch:', error)
       alert('Failed to create branch')
@@ -229,25 +214,11 @@ function BranchesContent() {
     if (!user) return false
     
     try {
-      const response = await fetch(`/api/branches/${branchId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          ...branchData
-        })
-      })
-      
-      const result = await response.json()
-      if (result.success) {
-        await loadBranches()
-        await loadDashboard()
-        setShowEditModal(null)
-        return true
-      } else {
-        alert('Failed to update branch: ' + result.error)
-        return false
-      }
+      await updateBranchRecord(branchId, { id: branchId, ...branchData } as any)
+      await loadBranches()
+      await loadDashboard()
+      setShowEditModal(null)
+      return true
     } catch (error) {
       console.error('Error updating branch:', error)
       alert('Failed to update branch')
@@ -362,7 +333,14 @@ function BranchesContent() {
             </Button>
                 
             <Button 
-              onClick={() => setShowAddModal(true)}
+              onClick={() => {
+                if (!subscriptionLoading && !isSubscribed && branches.length >= 1) {
+                  alert('Your free plan includes one main branch. Upgrade to Pro to add more branches.')
+                  router.push('/dashboard/subscription')
+                  return
+                }
+                setShowAddModal(true)
+              }}
               className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
             >
               <PlusIcon className="h-4 w-4 mr-2" />
@@ -1315,9 +1293,7 @@ export default function BranchesPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <PlanGate feature="branches">
-          <BranchesContent />
-        </PlanGate>
+        <BranchesContent />
       </DashboardLayout>
     </ProtectedRoute>
   )

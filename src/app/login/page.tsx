@@ -44,6 +44,8 @@ export default function LoginPage() {
     isSuperAdmin, 
     loading, 
     roleLoading,
+    backendSession,
+    backendSessionLoading,
     sendOtp,
     verifyOtp,
     sendLoginOtp,
@@ -61,16 +63,26 @@ export default function LoginPage() {
 
   // Smart redirect logic - wait for auth data to load
   React.useEffect(() => {
-    if (!loading && !roleLoading && user) {
-      if (isSuperAdmin) {
-        console.log('Redirecting super admin to /super-admin')
-        router.push('/super-admin')
-      } else {
-        // Check if user is a staff member by trying to fetch their staff data
-        checkStaffStatus()
-      }
+    if (loading || roleLoading || backendSessionLoading || !user) return
+
+    // During signup, let the registration handler route to onboarding after OTP verification.
+    if (!isLogin) return
+
+    if (isSuperAdmin) {
+      console.log('Redirecting super admin to /super-admin')
+      router.push('/super-admin')
+      return
     }
-  }, [user, isSuperAdmin, loading, roleLoading, router])
+
+    if (backendSession?.onboardingStatus && !backendSession.onboardingStatus.hasBusiness) {
+      console.log('Redirecting owner without business to /onboarding')
+      router.push('/onboarding')
+      return
+    }
+
+    // Check if user is a staff member by trying to fetch their staff data.
+    checkStaffStatus()
+  }, [user, isSuperAdmin, loading, roleLoading, backendSessionLoading, backendSession, isLogin, router])
 
   const checkStaffStatus = async () => {
     try {
@@ -83,13 +95,17 @@ export default function LoginPage() {
         router.push('/staff-dashboard')
       } else {
         // User is not a staff member, redirect to regular dashboard
-        console.log('Redirecting regular user to /dashboard')
-        router.push('/dashboard')
+        if (backendSession?.onboardingStatus && !backendSession.onboardingStatus.hasBusiness) {
+          console.log('Redirecting owner without business to /onboarding')
+          router.push('/onboarding')
+        } else {
+          console.log('Redirecting regular user to /dashboard')
+          router.push('/dashboard')
+        }
       }
     } catch (error) {
       console.error('Error checking staff status:', error)
-      // Fallback to regular dashboard
-      router.push('/dashboard')
+      router.push(backendSession?.onboardingStatus?.hasBusiness === false ? '/onboarding' : '/dashboard')
     }
   }
 
@@ -370,6 +386,8 @@ export default function LoginPage() {
           : 'No account found with this email address.'
       case 'auth/wrong-password':
         return 'Incorrect password. Please try again.'
+      case 'auth/invalid-credential':
+        return 'Invalid email or password. Please check your details and try again.'
       case 'auth/invalid-email':
         return 'Invalid email address format.'
       case 'auth/email-already-in-use':
@@ -404,6 +422,11 @@ export default function LoginPage() {
       case 'auth/network-request-failed':
         return 'Network error. Please check your internet connection and try again.'
       default:
+        if (errorMessage?.startsWith('Firebase: Error')) {
+          return isLogin
+            ? 'Login failed. Please check your credentials and try again.'
+            : 'Registration failed. Please check your details and try again.'
+        }
         if (errorMessage) return errorMessage
         if (isForgotPassword) {
           return 'Failed to send password reset email. Please try again.'

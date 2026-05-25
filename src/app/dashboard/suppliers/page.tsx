@@ -28,6 +28,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { UpgradeModal } from '@/components/UpgradeModal'
+import {
+  createSupplier as createSupplierRecord,
+  getSupplierDashboard,
+  getSuppliers
+} from '@/lib/suppliers-service'
 
 interface Supplier {
   id: string
@@ -105,12 +110,8 @@ function SuppliersContent() {
     if (!user) return
     
     try {
-      const response = await fetch(`/api/suppliers/dashboard?userId=${user.uid}`)
-      const result = await response.json()
-      
-      if (result.success) {
-        setDashboard(result.data)
-      }
+      const data = await getSupplierDashboard(user.uid)
+      setDashboard(data as any)
     } catch (error) {
       console.error('Error loading suppliers dashboard:', error)
     }
@@ -121,24 +122,11 @@ function SuppliersContent() {
     if (!user) return
     
     try {
-      const params = new URLSearchParams({
-        userId: user.uid
+      const data = await getSuppliers(user.uid, {
+        status: statusFilter && statusFilter !== 'ALL' ? [statusFilter as any] : undefined,
+        searchTerm: searchTerm.trim() || undefined
       })
-      
-      if (statusFilter && statusFilter !== 'ALL') {
-        params.append('status', statusFilter)
-      }
-      
-      if (searchTerm.trim()) {
-        params.append('searchTerm', searchTerm.trim())
-      }
-
-      const response = await fetch(`/api/suppliers?${params}`)
-      const result = await response.json()
-      
-      if (result.success) {
-        setSuppliers(result.data)
-      }
+      setSuppliers(data as any)
     } catch (error) {
       console.error('Error loading suppliers:', error)
     }
@@ -149,25 +137,11 @@ function SuppliersContent() {
     if (!user) return false
     
     try {
-      const response = await fetch('/api/suppliers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          ...supplierData
-        })
-      })
-      
-      const result = await response.json()
-      if (result.success) {
-        await loadSuppliers()
-        await loadDashboard()
-        setShowAddModal(false)
-        return true
-      } else {
-        alert('Failed to create supplier: ' + result.error)
-        return false
-      }
+      await createSupplierRecord(user.uid, supplierData)
+      await loadSuppliers()
+      await loadDashboard()
+      setShowAddModal(false)
+      return true
     } catch (error) {
       console.error('Error creating supplier:', error)
       alert('Failed to create supplier')

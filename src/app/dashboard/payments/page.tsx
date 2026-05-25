@@ -9,6 +9,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import {
+  getBackendBillingHistory,
+  getBackendSubscription,
+  isBackendAvailable,
+} from '@/lib/backend-business-api'
 
 interface SubscriptionHistory {
   id: string
@@ -31,6 +36,75 @@ function PaymentsPageContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentPlan, setCurrentPlan] = useState<'free' | 'monthly' | 'yearly'>('free')
 
+  const parseDate = (value: any): Date | null => {
+    if (!value) return null
+    if (typeof value === 'number') return new Date(value)
+    if (value?.toDate) return value.toDate()
+    if (value?.seconds) return new Date(value.seconds * 1000)
+    if (typeof value === 'string') return new Date(value)
+    return null
+  }
+
+  const rowsFrom = (value: any): any[] => {
+    if (Array.isArray(value)) return value
+    if (Array.isArray(value?.history)) return value.history
+    if (Array.isArray(value?.payments)) return value.payments
+    if (Array.isArray(value?.subscriptions)) return value.subscriptions
+    if (Array.isArray(value?.items)) return value.items
+    if (Array.isArray(value?.results)) return value.results
+    if (Array.isArray(value?.data)) return value.data
+    return []
+  }
+
+  const normalizeSubscription = (row: any): SubscriptionHistory => {
+    const planType = row.planType || row.plan || row.subscriptionPlan || 'monthly'
+    const status = String(row.status || row.subscriptionStatus || 'pending').toLowerCase()
+
+    return {
+      id: String(row.id || row._id || row.subscriptionId || row.paymentId || crypto.randomUUID()),
+      planName: row.planName || (planType === 'yearly' ? '1 Year Pro Plan' : '1 Month Pro Plan'),
+      planType: planType === 'yearly' ? 'yearly' : 'monthly',
+      amount: Number(row.amount || row.total || row.price || 0),
+      currency: row.currency || currency,
+      status: ['active', 'expired', 'failed', 'pending', 'cancelled'].includes(status)
+        ? status as SubscriptionHistory['status']
+        : 'pending',
+      startDate: parseDate(row.startDate || row.startedAt || row.paidAt),
+      endDate: parseDate(row.endDate || row.endsAt || row.subscriptionEndsAt || row.expiresAt),
+      createdAt: parseDate(row.createdAt || row.initiatedAt || row.paidAt) || new Date()
+    }
+  }
+
+  const fetchSubscriptionsFromFirestore = async () => {
+    const subscriptionsRef = collection(db, 'subscriptions')
+    // Simple query without orderBy to avoid index requirement
+    const q = query(
+      subscriptionsRef,
+      where('userId', '==', user!.uid)
+    )
+
+    const snapshot = await getDocs(q)
+    const subs: SubscriptionHistory[] = []
+
+    snapshot.forEach((doc) => {
+      const data = doc.data()
+
+      subs.push({
+        id: doc.id,
+        planName: data.planName || (data.planType === 'yearly' ? '1 Year Pro Plan' : '1 Month Pro Plan'),
+        planType: data.planType || 'monthly',
+        amount: data.amount || 0,
+        currency: data.currency || currency,
+        status: data.status || 'pending',
+        startDate: parseDate(data.startDate),
+        endDate: parseDate(data.endDate),
+        createdAt: parseDate(data.createdAt) || new Date()
+      })
+    })
+
+    return subs
+  }
+
   // Fetch user's subscription history
   useEffect(() => {
     const fetchSubscriptions = async () => {
@@ -40,41 +114,27 @@ function PaymentsPageContent() {
       }
 
       try {
-        const subscriptionsRef = collection(db, 'subscriptions')
-        // Simple query without orderBy to avoid index requirement
-        const q = query(
-          subscriptionsRef,
-          where('userId', '==', user.uid)
-        )
-        
-        const snapshot = await getDocs(q)
-        const subs: SubscriptionHistory[] = []
-        
-        snapshot.forEach((doc) => {
-          const data = doc.data()
-          
-          // Handle different date formats (timestamp number or Firestore Timestamp)
-          const parseDate = (value: any): Date | null => {
-            if (!value) return null
-            if (typeof value === 'number') return new Date(value)
-            if (value?.toDate) return value.toDate()
-            if (value?.seconds) return new Date(value.seconds * 1000)
-            if (typeof value === 'string') return new Date(value)
-            return null
+        let subs: SubscriptionHistory[] = []
+
+        if (isBackendAvailable()) {
+          try {
+            const [history, subscription] = await Promise.all([
+              getBackendBillingHistory(),
+              getBackendSubscription(),
+            ])
+            subs = rowsFrom(history).map(normalizeSubscription)
+
+            const current = normalizeSubscription(subscription?.subscription || subscription)
+            if (current.id && current.status === 'active' && !subs.some(sub => sub.id === current.id)) {
+              subs.push(current)
+            }
+          } catch (error) {
+            console.warn('Backend billing history unavailable, falling back to Firestore:', error)
+            subs = await fetchSubscriptionsFromFirestore()
           }
-          
-          subs.push({
-            id: doc.id,
-            planName: data.planName || (data.planType === 'yearly' ? '1 Year Pro Plan' : '1 Month Pro Plan'),
-            planType: data.planType || 'monthly',
-            amount: data.amount || 0,
-            currency: data.currency || currency,
-            status: data.status || 'pending',
-            startDate: parseDate(data.startDate),
-            endDate: parseDate(data.endDate),
-            createdAt: parseDate(data.createdAt) || new Date()
-          })
-        })
+        } else {
+          subs = await fetchSubscriptionsFromFirestore()
+        }
         
         // Sort by createdAt descending (newest first)
         subs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())

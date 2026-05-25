@@ -56,6 +56,32 @@ export interface MultiItemSale {
   lastSyncedAt: number
 }
 
+export type HeldSaleStatus = 'HELD' | 'COMPLETED' | 'CANCELLED'
+
+export interface HeldSale {
+  id: string
+  heldNumber: string
+  items: SaleItem[]
+  customerName?: string | null
+  customerPhone?: string | null
+  customerEmail?: string | null
+  paymentMethod: PaymentMethod
+  subtotal: number
+  discount?: number | null
+  discountType?: 'FIXED' | null
+  totalAmount: number
+  timestamp: number
+  lastModifiedAt: number
+  status: HeldSaleStatus
+  notes?: string | null
+  createdBy?: string | null
+  completedSaleId?: string | null
+  userId: string
+  branchId?: string | null
+  isSynced: boolean
+  lastSyncedAt: number
+}
+
 export interface PaymentMethod {
   id: string
   name: string

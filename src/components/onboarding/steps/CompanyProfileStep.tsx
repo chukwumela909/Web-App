@@ -26,7 +26,6 @@ export default function CompanyProfileStep({
   data,
   updateData,
   onNext,
-  onSkip,
   isLoading,
   isSaving
 }: CompanyProfileStepProps) {
@@ -187,17 +186,8 @@ export default function CompanyProfileStep({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
-          className="flex gap-4 pt-6"
+          className="flex pt-6"
         >
-          <Button
-            variant="outline"
-            onClick={onSkip}
-            disabled={isLoading}
-            className="flex-1"
-          >
-            Skip for Now
-          </Button>
-          
           <Button
             onClick={handleNext}
             disabled={isLoading || !isFormValid}

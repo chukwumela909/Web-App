@@ -3,12 +3,29 @@ import Stripe from 'stripe'
 import { createPendingSubscriptionAdmin } from '@/lib/subscription-service-admin'
 import { PLAN_PRICING, PlanType } from '@/lib/subscription-types'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-05-28.basil',
-})
+function getStripeClient() {
+  const secretKey = process.env.STRIPE_SECRET_KEY
+
+  if (!secretKey) {
+    return null
+  }
+
+  return new Stripe(secretKey, {
+    apiVersion: '2025-05-28.basil',
+  })
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const stripe = getStripeClient()
+
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Stripe is not configured' },
+        { status: 503 }
+      )
+    }
+
     const body = await request.json()
     const { planType, userId, email } = body as {
       planType: PlanType

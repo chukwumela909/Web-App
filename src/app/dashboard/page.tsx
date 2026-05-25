@@ -11,11 +11,13 @@ import {
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
+import { useBranch } from '@/contexts/BranchContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useMemo } from 'react'
-import type { Product as FPProduct, Sale, Expense, Debtor, MultiItemSale } from '@/lib/firestore'
-import { getProducts, getSales, getExpenses, getDebtors, getMultiItemSales } from '@/lib/firestore'
+import { useState, useMemo } from 'react'
+import type { Product as FPProduct } from '@/lib/firestore'
+import type { SaleItem } from '@/lib/multi-item-sales-types'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
+import { useDashboardDataQuery } from '@/hooks/useBusinessQueries'
 
 // Dashboard asset paths
 const dashboardAssets = {
@@ -29,78 +31,86 @@ const dashboardAssets = {
   emptyBoxIcon: '/assets/dashboard/empty-box-icon.svg',
 }
 
+function getProductImageUrl(product: Pick<FPProduct, 'images' | 'imageUrl'>) {
+  return product.images?.find(image => image.isPrimary)?.url || product.images?.[0]?.url || product.imageUrl || null
+}
+
 type DateFilter = 'today' | 'week' | 'month'
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3">
+        <div className="dashboard-skeleton h-8 w-56 rounded-[10px]" />
+        <div className="dashboard-skeleton h-5 w-72 max-w-full rounded-[8px]" />
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="dashboard-skeleton h-12 w-36 rounded-[12px]" />
+        <div className="flex flex-wrap gap-3">
+          <div className="dashboard-skeleton h-12 w-32 rounded-[14px]" />
+          <div className="dashboard-skeleton h-12 w-32 rounded-[14px]" />
+          <div className="dashboard-skeleton h-12 w-32 rounded-[14px]" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((item) => (
+          <div key={item} className="dashboard-card flex min-h-[168px] flex-col justify-between gap-6 p-5">
+            <div className="dashboard-skeleton h-[52px] w-[100px] rounded-[12px]" />
+            <div className="space-y-2">
+              <div className="dashboard-skeleton h-7 w-32 rounded-[8px]" />
+              <div className="dashboard-skeleton h-4 w-28 rounded-[8px]" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <div className="dashboard-panel p-5 lg:col-span-3">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="dashboard-skeleton h-6 w-32 rounded-[8px]" />
+            <div className="dashboard-skeleton h-9 w-20 rounded-[8px]" />
+          </div>
+          <div className="space-y-3">
+            {[0, 1, 2].map((item) => (
+              <div key={item} className="dashboard-skeleton h-16 rounded-[12px]" />
+            ))}
+          </div>
+        </div>
+        <div className="dashboard-panel p-5 lg:col-span-2">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="dashboard-skeleton h-6 w-36 rounded-[8px]" />
+            <div className="dashboard-skeleton h-9 w-20 rounded-[8px]" />
+          </div>
+          <div className="space-y-3">
+            {[0, 1, 2].map((item) => (
+              <div key={item} className="dashboard-skeleton h-14 rounded-[12px]" />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function DashboardPage() {
   const { user } = useAuth()
   const { staff } = useStaff()
+  const { selectedBranchId } = useBranch()
   const router = useRouter()
   const { currency } = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
-  const [products, setProducts] = useState<FPProduct[]>([])
-  const [sales, setSales] = useState<Sale[]>([])
-  const [multiItemSales, setMultiItemSales] = useState<MultiItemSale[]>([])
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [debtors, setDebtors] = useState<Debtor[]>([])
-  const [loading, setLoading] = useState(true)
-  const [initialLoadDone, setInitialLoadDone] = useState(false)
   const [dateFilter, setDateFilter] = useState<DateFilter>('today')
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
 
   // Determine the effective user ID for data loading
   const effectiveUserId = staff ? staff.userId : user?.uid
-
-  const fetchData = async (showLoadingSpinner = true) => {
-    if (!effectiveUserId) return
-    if (showLoadingSpinner) setLoading(true)
-    try {
-      const [productList, salesList, multiItemSaleList, expensesList, debtorList] = await Promise.all([
-        getProducts(effectiveUserId),
-        getSales(effectiveUserId, 2000),
-        getMultiItemSales(effectiveUserId, 2000),
-        getExpenses(effectiveUserId, 500),
-        getDebtors(effectiveUserId)
-      ])
-      console.log('Dashboard fetch - Sales:', salesList.length, 'Multi-item Sales:', multiItemSaleList.length, 'Products:', productList.length)
-      setProducts(productList)
-      setSales(salesList)
-      setMultiItemSales(multiItemSaleList)
-      setExpenses(expensesList)
-      setDebtors(debtorList)
-    } catch (error) {
-      console.error('Error loading dashboard data:', error)
-    } finally {
-      setLoading(false)
-      setInitialLoadDone(true)
-    }
-  }
-
-  useEffect(() => {
-    fetchData(true)
-  }, [effectiveUserId])
-
-  // Refetch data when tab becomes visible or when navigating back to the page
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && effectiveUserId && initialLoadDone) {
-        fetchData(false)
-      }
-    }
-
-    const handleFocus = () => {
-      if (effectiveUserId && initialLoadDone) {
-        fetchData(false)
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('focus', handleFocus)
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('focus', handleFocus)
-    }
-  }, [effectiveUserId, initialLoadDone])
+  const { data: dashboardData, isLoading } = useDashboardDataQuery({ userId: effectiveUserId, branchId: selectedBranchId })
+  const products = dashboardData?.products || []
+  const sales = dashboardData?.sales || []
+  const multiItemSales = dashboardData?.multiItemSales || []
+  const expenses = dashboardData?.expenses || []
 
   // Combine single-item and multi-item sales like the sales page does
   const allSales = useMemo(() => {
@@ -117,7 +127,7 @@ export default function DashboardPage() {
       displayName: sale.items?.[0]?.productName || 'Multi-item Sale',
       itemCount: sale.items?.length || 0,
       productName: sale.items?.[0]?.productName || 'Multi-item Sale',
-      quantitySold: sale.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0
+      quantitySold: sale.items?.reduce((sum: number, item: SaleItem) => sum + (item.quantity || 0), 0) || 0
     }))
 
     return [...singleItemSales, ...multiItemSalesFormatted]
@@ -203,13 +213,11 @@ export default function DashboardPage() {
 
   const outOfStockProducts = products.filter(product => product.quantity === 0)
 
-  if (loading) {
+  if (isLoading && !dashboardData) {
     return (
       <ProtectedRoute>
         <DashboardLayout>
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          </div>
+          <DashboardSkeleton />
         </DashboardLayout>
       </ProtectedRoute>
     )
@@ -221,13 +229,13 @@ export default function DashboardPage() {
       <ProtectedRoute>
         <StaffProtectedRoute requiredPermission="dashboard:read">
           <DashboardLayout>
-            <div className="space-y-6">
+            <div className="space-y-6 font-dm-sans">
               {/* Title Section */}
               <div className="flex flex-col gap-2">
-                <h1 className="font-dm-sans font-black text-[28px] text-black">
+                <h1 className="font-dm-sans text-[28px] font-semibold tracking-[-0.02em] text-[#0f172a]">
                   Hello {userName},
                 </h1>
-                <p className="font-dm-sans font-normal text-[16px] text-[#717171]">
+                <p className="font-dm-sans text-[15px] font-medium text-[#64748b]">
                   Monitor your business performance
                 </p>
               </div>
@@ -238,10 +246,10 @@ export default function DashboardPage() {
                 <div className="relative">
                     <button
                       onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                      className="flex items-center gap-2 px-4 py-3.5 bg-white border border-[#ececf2] rounded-[10px] hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-2 px-4 py-3.5 bg-white border border-[#e6ebf2] rounded-[12px] text-[#64748b] shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-[#d7e0ec] hover:bg-[#f8fafc] hover:text-[#0f172a] transition-all"
                     >
                       <Image src={dashboardAssets.calendarIcon} alt="Calendar" width={20} height={20} />
-                      <span className="font-dm-sans font-semibold text-[14px] text-[#717171]">
+                      <span className="font-dm-sans font-semibold text-[14px]">
                         {dateFilter === 'today' ? 'Today' : dateFilter === 'week' ? 'This Week' : 'This Month'}
                       </span>
                       <Image 
@@ -282,16 +290,16 @@ export default function DashboardPage() {
                   {/* Record Sale Button */}
                   <button
                     onClick={() => router.push('/dashboard/sales?new=1')}
-                    className="flex items-center gap-1.5 px-2.5 py-3.5 bg-[#e9f2f8] rounded-[14px] hover:bg-[#004aad] transition-colors group"
+                    className="flex items-center gap-1.5 px-3.5 py-3.5 bg-[#e9f2f8] rounded-[14px] hover:bg-[#004aad] active:scale-[0.98] transition-all group"
                   >
                     <PlusIcon className="w-5 h-5 text-[#004aad] group-hover:text-white transition-colors" />
-                    <span className="font-dm-sans font-semibold text-[14px] text-[#004aad] group-hover:text-white transition-colors">Record Sale</span>
+                    <span className="font-dm-sans font-semibold text-[14px] text-[#004aad] group-hover:text-white transition-colors">Fahampesa POS</span>
                   </button>
 
                   {/* Add Product Button */}
                   <button
                     onClick={() => router.push('/dashboard/products?new=1')}
-                    className="flex items-center gap-1.5 px-2.5 py-3.5 bg-[#e9f2f8] rounded-[14px] hover:bg-[#004aad] transition-colors group"
+                    className="flex items-center gap-1.5 px-3.5 py-3.5 bg-[#e9f2f8] rounded-[14px] hover:bg-[#004aad] active:scale-[0.98] transition-all group"
                   >
                     <PlusIcon className="w-5 h-5 text-[#004aad] group-hover:text-white transition-colors" />
                     <span className="font-dm-sans font-medium text-[14px] text-[#004aad] group-hover:text-white transition-colors">Add Product</span>
@@ -300,7 +308,7 @@ export default function DashboardPage() {
                   {/* Add Expense Button */}
                   <button
                     onClick={() => router.push('/dashboard/expenses?new=1')}
-                    className="flex items-center gap-1.5 px-2.5 py-3.5 bg-[#e9f2f8] rounded-[14px] hover:bg-[#004aad] transition-colors group"
+                    className="flex items-center gap-1.5 px-3.5 py-3.5 bg-[#e9f2f8] rounded-[14px] hover:bg-[#004aad] active:scale-[0.98] transition-all group"
                   >
                     <PlusIcon className="w-5 h-5 text-[#004aad] group-hover:text-white transition-colors" />
                     <span className="font-dm-sans font-medium text-[14px] text-[#004aad] group-hover:text-white transition-colors">Add Expense</span>
@@ -309,7 +317,7 @@ export default function DashboardPage() {
                   {/* View Report Button */}
                   <button
                     onClick={() => router.push('/dashboard/reports')}
-                    className="flex items-center gap-1.5 px-2.5 py-3.5 bg-[#e9f2f8] rounded-[14px] hover:bg-[#004aad] transition-colors group"
+                    className="flex items-center gap-1.5 px-3.5 py-3.5 bg-[#e9f2f8] rounded-[14px] hover:bg-[#004aad] active:scale-[0.98] transition-all group"
                   >
                     <ChartBarIcon className="w-5 h-5 text-[#004aad] group-hover:text-white transition-colors" />
                     <span className="font-dm-sans font-medium text-[14px] text-[#004aad] group-hover:text-white transition-colors">View Report</span>
@@ -322,16 +330,16 @@ export default function DashboardPage() {
                 {/* Sales Card */}
                 <div 
                   onClick={() => router.push('/dashboard/sales')}
-                  className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
+                  className="dashboard-card flex min-h-[168px] cursor-pointer flex-col justify-between gap-6 p-5"
                 >
                   <div className="bg-[#155dfc] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
                     <Image src={dashboardAssets.cartIcon} alt="Cart" width={24} height={24} />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <p className="font-inter font-bold text-[18px] text-[#09090b]">
+                    <p className="dashboard-metric-value font-dm-sans text-[22px] font-semibold tracking-[-0.01em] text-[#0f172a]">
                       {currencySymbol} {totalSalesAmount.toLocaleString()}
                     </p>
-                    <p className="font-inter font-medium text-[14px] text-[#71717a]">
+                    <p className="font-dm-sans text-[13px] font-medium text-[#64748b]">
                       {dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : "This Month's"} Sales
                     </p>
                   </div>
@@ -340,31 +348,31 @@ export default function DashboardPage() {
                 {/* Expenses Card */}
                 <div 
                   onClick={() => router.push('/dashboard/expenses')}
-                  className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
+                  className="dashboard-card flex min-h-[168px] cursor-pointer flex-col justify-between gap-6 p-5"
                 >
                   <div className="bg-[#e7000b] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
                     <Image src={dashboardAssets.receiptIcon} alt="Receipt" width={24} height={24} />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <p className="font-inter font-bold text-[18px] text-[#09090b]">
+                    <p className="dashboard-metric-value font-dm-sans text-[22px] font-semibold tracking-[-0.01em] text-[#0f172a]">
                       {currencySymbol} {totalExpenses.toLocaleString()}
                     </p>
-                    <p className="font-inter font-medium text-[14px] text-[#71717a]">
+                    <p className="font-dm-sans text-[13px] font-medium text-[#64748b]">
                       {dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : "This Month's"} Expenses
                     </p>
                   </div>
                 </div>
 
                 {/* Profit Card */}
-                <div className="bg-white border border-[#ececf2] rounded-[12px] p-5 flex flex-col gap-6">
+                <div className="dashboard-card flex min-h-[168px] flex-col justify-between gap-6 p-5">
                   <div className="bg-[#82cd7e] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
                     <Image src={dashboardAssets.growthIcon} alt="Growth" width={24} height={24} />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <p className="font-inter font-bold text-[18px] text-[#09090b]">
+                    <p className="dashboard-metric-value font-dm-sans text-[22px] font-semibold tracking-[-0.01em] text-[#0f172a]">
                       {currencySymbol} {totalProfit.toLocaleString()}
                     </p>
-                    <p className="font-inter font-medium text-[14px] text-[#71717a]">
+                    <p className="font-dm-sans text-[13px] font-medium text-[#64748b]">
                       {dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : "This Month's"} Profit
                     </p>
                   </div>
@@ -373,16 +381,16 @@ export default function DashboardPage() {
                 {/* Total Products Card */}
                 <div 
                   onClick={() => router.push('/dashboard/inventory')}
-                  className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
+                  className="dashboard-card flex min-h-[168px] cursor-pointer flex-col justify-between gap-6 p-5"
                 >
                   <div className="bg-[#71717a] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
                     <Image src={dashboardAssets.emptyBoxIcon} alt="Products" width={24} height={24} className="brightness-0 invert" />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <p className="font-inter font-bold text-[18px] text-[#09090b]">
+                    <p className="dashboard-metric-value font-dm-sans text-[22px] font-semibold tracking-[-0.01em] text-[#0f172a]">
                       0
                     </p>
-                    <p className="font-inter font-medium text-[14px] text-[#71717a]">
+                    <p className="font-dm-sans text-[13px] font-medium text-[#64748b]">
                       Total Products
                     </p>
                   </div>
@@ -392,21 +400,21 @@ export default function DashboardPage() {
               {/* Recent Sales and Latest Products Row */}
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 {/* Recent Sales */}
-                <div className="lg:col-span-3 bg-white border border-[#ececf2] rounded-[12px] p-5 flex flex-col gap-10">
+                <div className="dashboard-panel lg:col-span-3 p-5 flex flex-col gap-7">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-dm-sans font-semibold text-[18px] text-black">
+                    <h3 className="font-dm-sans font-semibold text-[18px] tracking-[-0.01em] text-[#0f172a]">
                       Recent Sales
                     </h3>
                     <button 
                       onClick={() => router.push('/dashboard/sales')}
-                      className="px-4 py-2 bg-white border border-[#ececf2] rounded-[8px] hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2 bg-white border border-[#e6ebf2] rounded-[10px] text-[#334155] hover:bg-[#f8fafc] hover:text-[#004aad] transition-colors"
                     >
-                      <span className="font-dm-sans font-bold text-[14px] text-[#1c1d21]">View all</span>
+                      <span className="font-dm-sans font-semibold text-[14px]">View all</span>
                     </button>
                   </div>
                   
                   {/* Empty State */}
-                  <div className="flex-1 border border-[#ececf2] rounded-lg flex flex-col items-center justify-center py-20 gap-4">
+                  <div className="flex-1 border border-dashed border-[#dbe3ee] rounded-[14px] bg-[#f8fafc] flex flex-col items-center justify-center py-20 gap-4">
                     <div className="w-[50px] h-[50px] flex items-center justify-center">
                       <Image src={dashboardAssets.emptyBoxIcon} alt="No Sales" width={50} height={50} className="opacity-50" />
                     </div>
@@ -417,21 +425,21 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Latest Products */}
-                <div className="lg:col-span-2 bg-white border border-[#ececf2] rounded-[12px] p-5 flex flex-col gap-10">
+                <div className="dashboard-panel lg:col-span-2 p-5 flex flex-col gap-7">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-dm-sans font-semibold text-[18px] text-black">
+                    <h3 className="font-dm-sans font-semibold text-[18px] tracking-[-0.01em] text-[#0f172a]">
                       Latest Products
                     </h3>
                     <button 
                       onClick={() => router.push('/dashboard/products')}
-                      className="px-4 py-2 bg-white border border-[#ececf2] rounded-[8px] hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2 bg-white border border-[#e6ebf2] rounded-[10px] text-[#334155] hover:bg-[#f8fafc] hover:text-[#004aad] transition-colors"
                     >
-                      <span className="font-dm-sans font-bold text-[14px] text-[#1c1d21]">View all</span>
+                      <span className="font-dm-sans font-semibold text-[14px]">View all</span>
                     </button>
                   </div>
                   
                   {/* Empty State */}
-                  <div className="flex-1 border border-[#ececf2] rounded-lg flex flex-col items-center justify-center py-20 gap-4">
+                  <div className="flex-1 border border-dashed border-[#dbe3ee] rounded-[14px] bg-[#f8fafc] flex flex-col items-center justify-center py-20 gap-4">
                     <div className="w-[50px] h-[50px] flex items-center justify-center">
                       <Image src={dashboardAssets.emptyBoxIcon} alt="No Products" width={50} height={50} className="opacity-50" />
                     </div>
@@ -452,20 +460,20 @@ export default function DashboardPage() {
     <ProtectedRoute>
       <StaffProtectedRoute requiredPermission="dashboard:read">
         <DashboardLayout>
-          <div className="space-y-6">
+          <div className="space-y-6 font-dm-sans">
             {/* Low Stock Alert Banner */}
             {(lowStockProducts.length > 0 || outOfStockProducts.length > 0) && (
-              <div className="bg-[#fff8f0] border border-[#ffecd9] rounded-[12px] p-4">
-                <div className="flex items-start justify-between">
+              <div className="border border-[#fed7aa] bg-[#fff7ed] rounded-[16px] p-4 shadow-[0_1px_2px_rgba(154,52,18,0.05)]">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-0.5">
                       <ExclamationTriangleIcon className="w-6 h-6 text-[#f97316]" />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <h3 className="font-dm-sans font-semibold text-[16px] text-[#c2410c]">
+                      <h3 className="font-dm-sans font-semibold text-[16px] text-[#9a3412]">
                         Attention Required
                       </h3>
-                      <p className="font-dm-sans font-normal text-[14px] text-[#ea580c]">
+                      <p className="font-dm-sans text-[14px] font-medium text-[#c2410c]">
                         {lowStockProducts.length + outOfStockProducts.length} alert{(lowStockProducts.length + outOfStockProducts.length) !== 1 ? 's' : ''} need your attention
                       </p>
                       <div className="flex flex-col gap-2 mt-3">
@@ -492,7 +500,7 @@ export default function DashboardPage() {
                   </div>
                   <button
                     onClick={() => router.push('/dashboard/inventory')}
-                    className="flex-shrink-0 px-4 py-2 bg-[#2175c7] text-white font-dm-sans font-semibold text-[14px] rounded-[8px] hover:bg-[#1a5fa3] transition-colors"
+                    className="flex-shrink-0 px-4 py-2 bg-[#2175c7] text-white font-dm-sans font-semibold text-[14px] rounded-[10px] hover:bg-[#1a5fa3] active:scale-[0.98] transition-all"
                   >
                     View All
                   </button>
@@ -502,10 +510,10 @@ export default function DashboardPage() {
 
             {/* Title Section */}
             <div className="flex flex-col gap-2">
-              <h1 className="font-dm-sans font-black text-[28px] text-black">
+              <h1 className="font-dm-sans text-[28px] font-semibold tracking-[-0.02em] text-[#0f172a]">
                 Hello {userName},
               </h1>
-              <p className="font-dm-sans font-normal text-[16px] text-[#717171]">
+              <p className="font-dm-sans text-[15px] font-medium text-[#64748b]">
                 Monitor your business performance
               </p>
             </div>
@@ -516,10 +524,10 @@ export default function DashboardPage() {
               <div className="relative">
                 <button
                   onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                  className="flex items-center gap-2 px-4 py-3.5 bg-white border border-[#ececf2] rounded-[10px] hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-2 px-4 py-3.5 bg-white border border-[#e6ebf2] rounded-[12px] text-[#64748b] shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-[#d7e0ec] hover:bg-[#f8fafc] hover:text-[#0f172a] transition-all"
                 >
                   <Image src={dashboardAssets.calendarIcon} alt="Calendar" width={20} height={20} />
-                  <span className="font-dm-sans font-semibold text-[14px] text-[#717171]">
+                  <span className="font-dm-sans font-semibold text-[14px]">
                     {dateFilter === 'today' ? 'Today' : dateFilter === 'week' ? 'This Week' : 'This Month'}
                   </span>
                   <Image 
@@ -560,16 +568,16 @@ export default function DashboardPage() {
                 {/* Record Sale Button - Blue Filled */}
                 <button
                   onClick={() => router.push('/dashboard/sales?new=1')}
-                  className="flex items-center gap-1.5 px-4 py-3.5 bg-[#004aad] rounded-[14px] hover:bg-[#003d8f] transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-3.5 bg-[#004aad] rounded-[14px] hover:bg-[#003d8f] active:scale-[0.98] transition-all shadow-[0_10px_22px_rgba(0,74,173,0.18)]"
                 >
                   <PlusIcon className="w-5 h-5 text-white" />
-                  <span className="font-dm-sans font-semibold text-[14px] text-white">Record Sale</span>
+                  <span className="font-dm-sans font-semibold text-[14px] text-white">Fahampesa POS</span>
                 </button>
 
                 {/* Add Product Button - Outlined */}
                 <button
                   onClick={() => router.push('/dashboard/products?new=1')}
-                  className="flex items-center gap-1.5 px-4 py-3.5 bg-white border border-[#ececf2] rounded-[14px] hover:bg-[#e9f2f8] transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-3.5 bg-white border border-[#e6ebf2] rounded-[14px] hover:bg-[#e9f2f8] active:scale-[0.98] transition-all"
                 >
                   <PlusIcon className="w-5 h-5 text-[#004aad]" />
                   <span className="font-dm-sans font-medium text-[14px] text-[#004aad]">Add Product</span>
@@ -578,7 +586,7 @@ export default function DashboardPage() {
                 {/* Add Expense Button - Outlined */}
                 <button
                   onClick={() => router.push('/dashboard/expenses?new=1')}
-                  className="flex items-center gap-1.5 px-4 py-3.5 bg-white border border-[#ececf2] rounded-[14px] hover:bg-[#e9f2f8] transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-3.5 bg-white border border-[#e6ebf2] rounded-[14px] hover:bg-[#e9f2f8] active:scale-[0.98] transition-all"
                 >
                   <PlusIcon className="w-5 h-5 text-[#004aad]" />
                   <span className="font-dm-sans font-medium text-[14px] text-[#004aad]">Add Expense</span>
@@ -587,7 +595,7 @@ export default function DashboardPage() {
                 {/* View Report Button - Outlined */}
                 <button
                   onClick={() => router.push('/dashboard/reports')}
-                  className="flex items-center gap-1.5 px-4 py-3.5 bg-white border border-[#ececf2] rounded-[14px] hover:bg-[#e9f2f8] transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-3.5 bg-white border border-[#e6ebf2] rounded-[14px] hover:bg-[#e9f2f8] active:scale-[0.98] transition-all"
                 >
                   <ChartBarIcon className="w-5 h-5 text-[#004aad]" />
                   <span className="font-dm-sans font-medium text-[14px] text-[#004aad]">View Report</span>
@@ -600,16 +608,16 @@ export default function DashboardPage() {
               {/* Sales Card */}
               <div 
                 onClick={() => router.push('/dashboard/sales')}
-                className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
+                className="dashboard-card flex min-h-[168px] cursor-pointer flex-col justify-between gap-6 p-5"
               >
                 <div className="bg-[#155dfc] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
                   <Image src={dashboardAssets.cartIcon} alt="Cart" width={24} height={24} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <p className="font-inter font-bold text-[18px] text-[#09090b]">
+                  <p className="dashboard-metric-value font-dm-sans text-[22px] font-semibold tracking-[-0.01em] text-[#0f172a]">
                     {currencySymbol} {totalSalesAmount.toLocaleString()}
                   </p>
-                  <p className="font-inter font-medium text-[14px] text-[#71717a]">
+                  <p className="font-dm-sans text-[13px] font-medium text-[#64748b]">
                     {dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : "This Month's"} Sales
                   </p>
                 </div>
@@ -618,31 +626,31 @@ export default function DashboardPage() {
               {/* Expenses Card */}
               <div 
                 onClick={() => router.push('/dashboard/expenses')}
-                className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
+                className="dashboard-card flex min-h-[168px] cursor-pointer flex-col justify-between gap-6 p-5"
               >
                 <div className="bg-[#e7000b] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
                   <Image src={dashboardAssets.receiptIcon} alt="Receipt" width={24} height={24} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <p className="font-inter font-bold text-[18px] text-[#09090b]">
+                  <p className="dashboard-metric-value font-dm-sans text-[22px] font-semibold tracking-[-0.01em] text-[#0f172a]">
                     {currencySymbol} {totalExpenses.toLocaleString()}
                   </p>
-                  <p className="font-inter font-medium text-[14px] text-[#71717a]">
+                  <p className="font-dm-sans text-[13px] font-medium text-[#64748b]">
                     {dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : "This Month's"} Expenses
                   </p>
                 </div>
               </div>
 
               {/* Profit Card */}
-              <div className="bg-white border border-[#ececf2] rounded-[12px] p-5 flex flex-col gap-6">
+              <div className="dashboard-card flex min-h-[168px] flex-col justify-between gap-6 p-5">
                 <div className="bg-[#82cd7e] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
                   <Image src={dashboardAssets.growthIcon} alt="Growth" width={24} height={24} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <p className="font-inter font-bold text-[18px] text-[#09090b]">
+                  <p className="dashboard-metric-value font-dm-sans text-[22px] font-semibold tracking-[-0.01em] text-[#0f172a]">
                     {currencySymbol} {totalProfit.toLocaleString()}
                   </p>
-                  <p className="font-inter font-medium text-[14px] text-[#71717a]">
+                  <p className="font-dm-sans text-[13px] font-medium text-[#64748b]">
                     {dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : "This Month's"} Profit
                   </p>
                 </div>
@@ -651,16 +659,16 @@ export default function DashboardPage() {
               {/* Total Products Card */}
               <div 
                 onClick={() => router.push('/dashboard/inventory')}
-                className="bg-white border border-[#ececf2] rounded-[12px] p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-6"
+                className="dashboard-card flex min-h-[168px] cursor-pointer flex-col justify-between gap-6 p-5"
               >
                 <div className="bg-[#71717a] w-[100px] h-[52px] rounded-[12px] flex items-center justify-center">
                   <Image src={dashboardAssets.emptyBoxIcon} alt="Products" width={24} height={24} className="brightness-0 invert" />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <p className="font-inter font-bold text-[18px] text-[#09090b]">
+                  <p className="dashboard-metric-value font-dm-sans text-[22px] font-semibold tracking-[-0.01em] text-[#0f172a]">
                     {products.length}
                   </p>
-                  <p className="font-inter font-medium text-[14px] text-[#71717a]">
+                  <p className="font-dm-sans text-[13px] font-medium text-[#64748b]">
                     Total Products
                   </p>
                 </div>
@@ -670,22 +678,22 @@ export default function DashboardPage() {
             {/* Recent Sales and Latest Products Row */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
               {/* Recent Sales */}
-              <div className="lg:col-span-3 bg-white border border-[#ececf2] rounded-[12px] p-5 flex flex-col gap-6">
+              <div className="dashboard-panel lg:col-span-3 p-5 flex flex-col gap-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-dm-sans font-semibold text-[18px] text-black">
+                  <h3 className="font-dm-sans font-semibold text-[18px] tracking-[-0.01em] text-[#0f172a]">
                     Recent Sales
                   </h3>
                   <button 
                     onClick={() => router.push('/dashboard/sales')}
-                    className="px-4 py-2 bg-white border border-[#ececf2] rounded-[8px] hover:bg-gray-50 transition-colors"
+                    className="px-4 py-2 bg-white border border-[#e6ebf2] rounded-[10px] text-[#334155] hover:bg-[#f8fafc] hover:text-[#004aad] transition-colors"
                   >
-                    <span className="font-dm-sans font-bold text-[14px] text-[#1c1d21]">View all</span>
+                    <span className="font-dm-sans font-semibold text-[14px]">View all</span>
                   </button>
                 </div>
                 
                 {/* Sales List */}
                 {allSales.length === 0 ? (
-                  <div className="flex-1 border border-[#ececf2] rounded-lg flex flex-col items-center justify-center py-20 gap-4">
+                  <div className="flex-1 border border-dashed border-[#dbe3ee] rounded-[14px] bg-[#f8fafc] flex flex-col items-center justify-center py-20 gap-4">
                     <div className="w-[50px] h-[50px] flex items-center justify-center">
                       <Image src={dashboardAssets.emptyBoxIcon} alt="No Sales" width={50} height={50} className="opacity-50" />
                     </div>
@@ -705,7 +713,7 @@ export default function DashboardPage() {
                         <div 
                           key={sale.id} 
                           onClick={() => router.push(`/dashboard/sales/${sale.id}`)}
-                          className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 border border-[#ececf2] rounded-[12px] transition-all"
+                          className="flex items-center justify-between gap-4 p-4 cursor-pointer hover:bg-[#f8fafc] border border-[#e6ebf2] rounded-[14px] transition-all"
                         >
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
@@ -719,15 +727,15 @@ export default function DashboardPage() {
                                 {itemCount} item{itemCount > 1 ? 's' : ''}
                               </span>
                             </div>
-                            <span className="font-dm-sans font-normal text-[12px] text-[#717171]">
+                            <span className="font-dm-sans text-[12px] font-medium text-[#64748b]">
                               {saleDate.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })} • {saleDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}
                             </span>
                           </div>
                           <div className="flex flex-col items-end gap-1">
-                            <span className="font-dm-sans font-semibold text-[14px] text-[#22c55e]">
+                            <span className="dashboard-tabular font-dm-sans font-semibold text-[14px] text-[#16a34a]">
                               {currencySymbol} {(sale.totalAmount || 0).toLocaleString()}
                             </span>
-                            <span className="font-dm-sans font-normal text-[12px] text-[#717171]">
+                            <span className="font-dm-sans text-[12px] font-medium text-[#64748b]">
                               {typeof sale.paymentMethod === 'object' 
                                 ? (sale.paymentMethod as any)?.name || (sale.paymentMethod as any)?.displayName || 'Cash'
                                 : sale.paymentMethod || 'Cash'}
@@ -741,22 +749,22 @@ export default function DashboardPage() {
               </div>
 
               {/* Latest Products */}
-              <div className="lg:col-span-2 bg-white border border-[#ececf2] rounded-[12px] p-5 flex flex-col gap-6">
+              <div className="dashboard-panel lg:col-span-2 p-5 flex flex-col gap-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-dm-sans font-semibold text-[18px] text-black">
+                  <h3 className="font-dm-sans font-semibold text-[18px] tracking-[-0.01em] text-[#0f172a]">
                     Latest Products
                   </h3>
                   <button 
                     onClick={() => router.push('/dashboard/products')}
-                    className="px-4 py-2 bg-white border border-[#ececf2] rounded-[8px] hover:bg-gray-50 transition-colors"
+                    className="px-4 py-2 bg-white border border-[#e6ebf2] rounded-[10px] text-[#334155] hover:bg-[#f8fafc] hover:text-[#004aad] transition-colors"
                   >
-                    <span className="font-dm-sans font-bold text-[14px] text-[#1c1d21]">View all</span>
+                    <span className="font-dm-sans font-semibold text-[14px]">View all</span>
                   </button>
                 </div>
                 
                 {/* Products List */}
                 {products.length === 0 ? (
-                  <div className="flex-1 border border-[#ececf2] rounded-lg flex flex-col items-center justify-center py-20 gap-4">
+                  <div className="flex-1 border border-dashed border-[#dbe3ee] rounded-[14px] bg-[#f8fafc] flex flex-col items-center justify-center py-20 gap-4">
                     <div className="w-[50px] h-[50px] flex items-center justify-center">
                       <Image src={dashboardAssets.emptyBoxIcon} alt="No Products" width={50} height={50} className="opacity-50" />
                     </div>
@@ -769,24 +777,42 @@ export default function DashboardPage() {
                     {products.slice(0, 5).map((product) => {
                       const shortSku = product.sku || product.id?.slice(0, 8).toUpperCase() || 'N/A'
                       const stockColor = product.quantity <= (product.minStockLevel || 5) ? 'text-[#e7000b]' : 'text-[#22c55e]'
+                      const primaryImageUrl = getProductImageUrl(product)
                       
                       return (
                         <div 
                           key={product.id} 
                           onClick={() => router.push(`/dashboard/products/${product.id}`)}
-                          className="flex items-center justify-between py-4 cursor-pointer hover:bg-gray-50 px-2 -mx-2 rounded-lg transition-colors"
+                          className="flex items-center justify-between gap-3 py-4 cursor-pointer hover:bg-gray-50 px-2 -mx-2 rounded-lg transition-colors"
                         >
-                          <div className="flex flex-col gap-1">
-                            <span className="font-dm-sans font-semibold text-[14px] text-black">
-                              {product.name}
-                            </span>
-                            <span className="font-dm-sans font-normal text-[12px] text-[#717171]">
-                              {product.category || 'Uncategorized'}
-                            </span>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="relative flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-[#e6ebf2] bg-[#f8fafc]">
+                              {primaryImageUrl ? (
+                                <Image
+                                  src={primaryImageUrl}
+                                  alt={product.name}
+                                  fill
+                                  sizes="56px"
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <span className="font-dm-sans text-[18px] font-semibold text-[#94a3b8]">
+                                  {product.name.charAt(0).toUpperCase()}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <span className="truncate font-dm-sans font-semibold text-[14px] text-black">
+                                {product.name}
+                              </span>
+                              <span className="truncate font-dm-sans font-normal text-[12px] text-[#717171]">
+                                {product.category || 'Uncategorized'}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex flex-col items-end gap-1">
+                          <div className="flex flex-shrink-0 flex-col items-end gap-1">
                             <span className={`font-dm-sans font-semibold text-[12px] ${stockColor}`}>
-                              Stock: {product.quantity} pcs
+                              Stock: {product.quantity} {product.unitOfMeasure || 'pcs'}
                             </span>
                             <span className="font-dm-sans font-normal text-[12px] text-[#717171]">
                               SKU: {shortSku}

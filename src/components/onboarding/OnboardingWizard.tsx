@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,13 +15,16 @@ import {
   MapPin,
   Users,
   Sparkles,
-  Skip,
   X
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { doc, setDoc, serverTimestamp, updateDoc, getDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
 import { useOnboarding } from './OnboardingProvider'
+import {
+  completeBusinessOnboarding,
+  CompleteBusinessOnboardingPayload,
+  isBackendApiError,
+  saveOnboardingProgress
+} from '@/lib/backend-api'
 
 // Step Components
 import WelcomeStep from './steps/WelcomeStep'
@@ -49,6 +52,7 @@ export interface OnboardingData {
   businessProfile: {
     businessName: string
     businessType: string
+    country: string
     currency: string
   }
   
@@ -90,7 +94,8 @@ const steps = [
 export default function OnboardingWizard() {
   const { user } = useAuth()
   const router = useRouter()
-  const { refreshOnboardingStatus, setCompletingOnboarding } = useOnboarding()
+  const { onboardingStatus, refreshOnboardingStatus, setCompletingOnboarding } = useOnboarding()
+  const hasLoadedDraft = useRef(false)
   
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
     personalProfile: { fullName: '', phoneNumber: '' },
@@ -98,6 +103,7 @@ export default function OnboardingWizard() {
     businessProfile: { 
       businessName: user?.displayName || '', 
       businessType: '', 
+      country: 'Kenya',
       currency: 'KES' 
     },
     branchSetup: { branchName: '', location: '', defaultCurrency: 'KES', addMoreLater: false },
@@ -109,44 +115,92 @@ export default function OnboardingWizard() {
   
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState('')
 
-  // Load existing onboarding data from Firebase
+  // Load existing onboarding data from the backend draft state.
   useEffect(() => {
-    const loadOnboardingData = async () => {
-      if (!user) return
-      
-      try {
-        // Check if onboarding data exists in userProfiles
-        const userProfileRef = doc(db, 'userProfiles', user.uid)
-        // Implementation would check for existing data
-        // For now, we'll start fresh each time
-      } catch (error) {
-        console.error('Error loading onboarding data:', error)
-      }
-    }
+    if (!user || !onboardingStatus || hasLoadedDraft.current) return
 
-    loadOnboardingData()
-  }, [user])
+    const storedBusinessName = typeof window !== 'undefined'
+      ? window.localStorage.getItem('fahampesa:onboardingBusinessName')
+      : null
+    const storedPhoneNumber = typeof window !== 'undefined'
+      ? window.localStorage.getItem('fahampesa:onboardingPhoneNumber')
+      : null
+    const storedCountry = typeof window !== 'undefined'
+      ? window.localStorage.getItem('fahampesa:onboardingCountry')
+      : null
 
-  // Save onboarding data to Firebase (incremental saves)
-  const saveOnboardingData = async (data: Partial<OnboardingData>) => {
+    const draft = isRecord(onboardingStatus.data) ? onboardingStatus.data : {}
+
+    setOnboardingData((current) => ({
+      ...current,
+      ...draft,
+      personalProfile: {
+        ...current.personalProfile,
+        ...(isRecord(draft.personalProfile) ? draft.personalProfile : {}),
+        phoneNumber: String(
+          (isRecord(draft.personalProfile) ? draft.personalProfile.phoneNumber : '') ||
+          storedPhoneNumber ||
+          user.phoneNumber ||
+          current.personalProfile.phoneNumber
+        )
+      },
+      companyProfile: {
+        ...current.companyProfile,
+        ...(isRecord(draft.companyProfile) ? draft.companyProfile : {})
+      },
+      businessProfile: {
+        ...current.businessProfile,
+        ...(isRecord(draft.businessProfile) ? draft.businessProfile : {}),
+        businessName: String(
+          (isRecord(draft.businessProfile) ? draft.businessProfile.businessName : '') ||
+          storedBusinessName ||
+          user.displayName ||
+          current.businessProfile.businessName
+        ),
+        country: String(
+          (isRecord(draft.businessProfile) ? draft.businessProfile.country : '') ||
+          storedCountry ||
+          current.businessProfile.country ||
+          'Kenya'
+        )
+      },
+      branchSetup: {
+        ...current.branchSetup,
+        ...(isRecord(draft.branchSetup) ? draft.branchSetup : {})
+      },
+      staffSetup: {
+        ...current.staffSetup,
+        ...(isRecord(draft.staffSetup) ? draft.staffSetup : {})
+      },
+      currentStep: onboardingStatus.currentStep || current.currentStep,
+      completedSteps: onboardingStatus.completedSteps || current.completedSteps,
+      skippedSteps: onboardingStatus.skippedSteps || current.skippedSteps
+    }) as OnboardingData)
+
+    hasLoadedDraft.current = true
+  }, [user, onboardingStatus])
+
+  const saveOnboardingData = async (data: OnboardingData) => {
     if (!user) return
 
     setIsSaving(true)
     try {
-      const userProfileRef = doc(db, 'userProfiles', user.uid)
-      const onboardingRef = doc(db, 'onboardingData', user.uid)
-      
-      // Update onboarding progress
-      await setDoc(onboardingRef, {
-        ...data,
-        userId: user.uid,
-        lastUpdated: serverTimestamp()
-      }, { merge: true })
-
-      console.log('Onboarding data saved successfully')
+      await saveOnboardingProgress(user, {
+        currentStep: data.currentStep,
+        completedSteps: data.completedSteps,
+        skippedSteps: data.skippedSteps,
+        data: toProgressData(data)
+      })
+      setError('')
     } catch (error) {
       console.error('Error saving onboarding data:', error)
+      if (isBackendApiError(error) && (error.code === 'missing_auth_token' || error.code === 'invalid_auth_token')) {
+        router.push('/login')
+        return
+      }
+      setError(error instanceof Error ? error.message : 'Unable to save onboarding progress.')
     } finally {
       setIsSaving(false)
     }
@@ -155,9 +209,7 @@ export default function OnboardingWizard() {
   const updateOnboardingData = (updates: Partial<OnboardingData>) => {
     const newData = { ...onboardingData, ...updates }
     setOnboardingData(newData)
-    
-    // Auto-save to Firebase
-    saveOnboardingData(updates)
+    saveOnboardingData(newData)
   }
 
   const nextStep = () => {
@@ -182,179 +234,51 @@ export default function OnboardingWizard() {
   }
 
   const skipStep = () => {
-    const currentStepNumber = onboardingData.currentStep
-    const skippedSteps = [...onboardingData.skippedSteps]
-    
-    if (!skippedSteps.includes(currentStepNumber)) {
-      skippedSteps.push(currentStepNumber)
-    }
-    
-    const nextStepNumber = Math.min(currentStepNumber + 1, TOTAL_STEPS)
-    
-    updateOnboardingData({
-      currentStep: nextStepNumber,
-      skippedSteps
-    })
-  }
-
-  const skipToEnd = async () => {
-    setIsLoading(true)
-    setCompletingOnboarding(true) // Disable auto-redirect during completion
-    
-    try {
-      // Mark all remaining steps as skipped
-      const allSteps = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1)
-      const remainingSteps = allSteps.filter(
-        step => 
-          step > onboardingData.currentStep && 
-          !onboardingData.completedSteps.includes(step)
-      )
-      
-      await updateOnboardingData({
-        currentStep: TOTAL_STEPS,
-        skippedSteps: [...onboardingData.skippedSteps, ...remainingSteps]
-      })
-      
-      // Mark onboarding as completed (can be resumed later)
-      const userProfileRef = doc(db, 'userProfiles', user!.uid)
-      
-      // Check if user profile exists, create it if it doesn't
-      const userProfileSnap = await getDoc(userProfileRef)
-      if (!userProfileSnap.exists()) {
-        // Create the user profile document
-        await setDoc(userProfileRef, {
-          businessName: user.displayName || '',
-          email: user.email || '',
-          onboardingCompleted: true,
-          onboardingSkipped: true,
-          onboardingCompletedAt: serverTimestamp(),
-          createdAt: serverTimestamp(),
-          lastLogin: serverTimestamp()
-        })
-      } else {
-        // Update existing document
-        await updateDoc(userProfileRef, {
-          onboardingCompleted: true,
-          onboardingCompletedAt: serverTimestamp(),
-          onboardingSkipped: true
-        })
-      }
-      
-      // Refresh onboarding status
-      await refreshOnboardingStatus()
-      
-      // Navigate to dashboard
-      router.push('/dashboard')
-    } catch (error) {
-      console.error('Error skipping onboarding:', error)
-    } finally {
-      setIsLoading(false)
-      setCompletingOnboarding(false) // Re-enable auto-redirect
-    }
+    setError('Business setup is required before opening the dashboard.')
   }
 
   const completeOnboarding = async () => {
+    const validationError = getCompletionValidationError(onboardingData)
+    if (validationError) {
+      setError(validationError.message)
+      updateOnboardingData({ currentStep: validationError.step })
+      return
+    }
+
     setIsLoading(true)
-    setCompletingOnboarding(true) // Disable auto-redirect during completion
+    setCompletingOnboarding(true)
     
     try {
-      // Save final onboarding data
       await saveOnboardingData(onboardingData)
-      
-      // Mark onboarding as completed
-      const userProfileRef = doc(db, 'userProfiles', user!.uid)
-      
-      // Check if user profile exists, create it if it doesn't
-      const userProfileSnap = await getDoc(userProfileRef)
-      if (!userProfileSnap.exists()) {
-        // Create the user profile document with onboarding data
-        await setDoc(userProfileRef, {
-          businessName: onboardingData.businessProfile.businessName || user.displayName || '',
-          email: user.email || '',
-          fullName: onboardingData.personalProfile.fullName,
-          phoneNumber: onboardingData.personalProfile.phoneNumber,
-          onboardingCompleted: true,
-          onboardingSkipped: false,
-          onboardingCompletedAt: serverTimestamp(),
-          createdAt: serverTimestamp(),
-          lastLogin: serverTimestamp()
-        })
-      } else {
-        // Update existing document
-        await updateDoc(userProfileRef, {
-          onboardingCompleted: true,
-          onboardingCompletedAt: serverTimestamp(),
-          onboardingSkipped: false
-        })
+
+      await completeBusinessOnboarding(user!, buildCompletionPayload(onboardingData, user!))
+
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('fahampesa:onboardingBusinessName')
+        window.localStorage.removeItem('fahampesa:onboardingPhoneNumber')
+        window.localStorage.removeItem('fahampesa:onboardingCountry')
       }
-      
-      // Create initial business data based on onboarding
-      await createInitialBusinessData()
-      
-      // Refresh onboarding status
+
       await refreshOnboardingStatus()
-      
-      // Navigate to dashboard
       router.push('/dashboard')
     } catch (error) {
       console.error('Error completing onboarding:', error)
-    } finally {
-      setIsLoading(false)
-      setCompletingOnboarding(false) // Re-enable auto-redirect
-    }
-  }
-
-  const createInitialBusinessData = async () => {
-    if (!user) return
-
-    try {
-      // Create initial branch if provided
-      if (onboardingData.branchSetup.branchName) {
-        const branchId = crypto.randomUUID()
-        const branchRef = doc(db, 'branches', branchId)
-        
-        await setDoc(branchRef, {
-          id: branchId,
-          name: onboardingData.branchSetup.branchName,
-          location: { 
-            address: onboardingData.branchSetup.location,
-            city: '',
-            region: ''
-          },
-          contact: {
-            phone: onboardingData.personalProfile.phoneNumber,
-            email: user.email
-          },
-          branchType: 'MAIN',
-          status: 'ACTIVE',
-          currency: onboardingData.branchSetup.defaultCurrency,
-          openingHours: [],
-          userId: user.uid,
-          createdBy: user.uid,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        })
-      }
-
-      // Create staff invitations if provided
-      if (onboardingData.staffSetup.teamMembers.length > 0) {
-        for (const member of onboardingData.staffSetup.teamMembers) {
-          const invitationId = crypto.randomUUID()
-          const invitationRef = doc(db, 'staffInvitations', invitationId)
-          
-          await setDoc(invitationRef, {
-            id: invitationId,
-            email: member.email,
-            role: member.role,
-            status: 'PENDING',
-            invitedBy: user.uid,
-            invitedAt: serverTimestamp(),
-            userId: user.uid
-          })
+      if (isBackendApiError(error)) {
+        if (error.code === 'business_already_exists') {
+          setError('This account already has a business. Refreshing your dashboard access...')
+          await refreshOnboardingStatus()
+          router.push('/dashboard')
+          return
+        }
+        if (error.code === 'missing_auth_token' || error.code === 'invalid_auth_token') {
+          router.push('/login')
+          return
         }
       }
-    } catch (error) {
-      console.error('Error creating initial business data:', error)
+      setError(getCompletionErrorMessage(error))
+    } finally {
+      setIsLoading(false)
+      setCompletingOnboarding(false)
     }
   }
 
@@ -370,7 +294,7 @@ export default function OnboardingWizard() {
 
     switch (onboardingData.currentStep) {
       case 1:
-        return <WelcomeStep {...stepProps} onSkipToEnd={skipToEnd} />
+        return <WelcomeStep {...stepProps} onSkipToEnd={skipStep} />
       case 2:
         return <PersonalProfileStep {...stepProps} />
       case 3:
@@ -384,7 +308,7 @@ export default function OnboardingWizard() {
       case 7:
         return <CompletionStep {...stepProps} onComplete={completeOnboarding} />
       default:
-        return <WelcomeStep {...stepProps} onSkipToEnd={skipToEnd} />
+        return <WelcomeStep {...stepProps} onSkipToEnd={skipStep} />
     }
   }
 
@@ -460,6 +384,12 @@ export default function OnboardingWizard() {
         {/* Main Content */}
         <Card className="bg-white shadow-2xl border-0 overflow-hidden">
           <div className="relative">
+            {error && (
+              <div className="mx-6 mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
             {/* Saving Indicator */}
             {isSaving && (
               <motion.div
@@ -499,14 +429,9 @@ export default function OnboardingWizard() {
                     Back
                   </Button>
                   
-                  <Button
-                    variant="ghost"
-                    onClick={skipToEnd}
-                    disabled={isLoading}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    Skip Setup & Go to Dashboard
-                  </Button>
+                  <div className="text-sm text-gray-500">
+                    Business setup is required before opening the dashboard.
+                  </div>
                 </div>
               </div>
             )}
@@ -515,4 +440,151 @@ export default function OnboardingWizard() {
       </div>
     </div>
   )
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isPhoneVerifiedByFirebase(user: import('firebase/auth').User, phoneNumber: string) {
+  if (!user.phoneNumber || !phoneNumber) return false
+  return normalizePhone(user.phoneNumber) === normalizePhone(phoneNumber)
+}
+
+function normalizePhone(phoneNumber: string) {
+  return phoneNumber.replace(/[^\d+]/g, '')
+}
+
+function getCompletionValidationError(data: OnboardingData): { step: number; message: string } | null {
+  const branchName = getEffectiveBranchName(data)
+
+  if (!data.businessProfile.businessName.trim() || !data.businessProfile.businessType.trim()) {
+    return {
+      step: 4,
+      message: 'Complete your business name and business type before opening the dashboard.'
+    }
+  }
+
+  if (!data.businessProfile.country.trim() || !data.businessProfile.currency.trim()) {
+    return {
+      step: 4,
+      message: 'Choose your business country and currency before opening the dashboard.'
+    }
+  }
+
+  if (!branchName.trim() || !data.branchSetup.location.trim()) {
+    return {
+      step: 5,
+      message: 'Add your first branch name and address before opening the dashboard.'
+    }
+  }
+
+  const invalidInvitation = data.staffSetup.teamMembers.find((member) => !isValidEmail(member.email))
+  if (invalidInvitation) {
+    return {
+      step: 6,
+      message: 'Review team invitations and remove or fix invalid email addresses.'
+    }
+  }
+
+  return null
+}
+
+function buildCompletionPayload(data: OnboardingData, user: import('firebase/auth').User): CompleteBusinessOnboardingPayload {
+  const payload: CompleteBusinessOnboardingPayload = {
+    business: {
+      businessName: data.businessProfile.businessName.trim(),
+      businessType: data.businessProfile.businessType.trim(),
+      country: data.businessProfile.country.trim() || 'Kenya',
+      currency: data.businessProfile.currency.trim()
+    },
+    branch: {
+      name: getEffectiveBranchName(data).trim(),
+      location: {
+        address: data.branchSetup.location.trim(),
+        country: data.businessProfile.country.trim() || 'Kenya'
+      },
+      branchCode: 'MAIN',
+      branchType: 'MAIN',
+      currency: data.branchSetup.defaultCurrency.trim() || data.businessProfile.currency.trim()
+    }
+  }
+
+  const personalProfile: NonNullable<CompleteBusinessOnboardingPayload['personalProfile']> = {}
+  if (data.personalProfile.fullName.trim()) {
+    personalProfile.fullName = data.personalProfile.fullName.trim()
+  }
+  if (data.personalProfile.phoneNumber.trim()) {
+    personalProfile.phoneNumber = data.personalProfile.phoneNumber.trim()
+    if (isPhoneVerifiedByFirebase(user, data.personalProfile.phoneNumber)) {
+      personalProfile.phoneVerified = true
+    }
+  }
+  if (Object.keys(personalProfile).length > 0) {
+    payload.personalProfile = personalProfile
+  }
+
+  const companyProfile: NonNullable<CompleteBusinessOnboardingPayload['companyProfile']> = {}
+  if (data.companyProfile.legalCompanyName.trim()) {
+    companyProfile.legalCompanyName = data.companyProfile.legalCompanyName.trim()
+  }
+  if (data.companyProfile.registrationNumber.trim()) {
+    companyProfile.registrationNumber = data.companyProfile.registrationNumber.trim()
+  }
+  if (Object.keys(companyProfile).length > 0) {
+    payload.companyProfile = companyProfile
+  }
+
+  const contact: NonNullable<CompleteBusinessOnboardingPayload['branch']['contact']> = {}
+  if (data.personalProfile.phoneNumber.trim()) {
+    contact.phone = data.personalProfile.phoneNumber.trim()
+    contact.whatsapp = data.personalProfile.phoneNumber.trim()
+  }
+  if (user.email) {
+    contact.email = user.email
+  }
+  if (Object.keys(contact).length > 0) {
+    payload.branch.contact = contact
+  }
+
+  const staffInvitations = data.staffSetup.teamMembers
+    .filter((member) => member.email.trim())
+    .map((member) => ({
+      email: member.email.trim(),
+      role: member.role
+    }))
+  if (staffInvitations.length > 0) {
+    payload.staffInvitations = staffInvitations
+  }
+
+  return payload
+}
+
+function getEffectiveBranchName(data: OnboardingData) {
+  return data.branchSetup.branchName.trim() || `${data.businessProfile.businessName.trim()} - Main`
+}
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+}
+
+function getCompletionErrorMessage(error: unknown) {
+  if (isBackendApiError(error) && error.code === 'validation_error') {
+    return 'Some setup details are incomplete. Please review your business and branch details.'
+  }
+
+  return error instanceof Error ? error.message : 'Unable to complete onboarding.'
+}
+
+function toProgressData(data: OnboardingData): Record<string, unknown> {
+  return {
+    personalProfile: data.personalProfile,
+    companyProfile: data.companyProfile,
+    businessProfile: data.businessProfile,
+    branchSetup: data.branchSetup,
+    staffSetup: data.staffSetup,
+    currentStep: data.currentStep,
+    completedSteps: data.completedSteps,
+    skippedSteps: data.skippedSteps
+  }
 }

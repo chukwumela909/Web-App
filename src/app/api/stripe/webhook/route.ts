@@ -2,14 +2,31 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { activateSubscriptionAdmin, updateSubscriptionStatusAdmin } from '@/lib/subscription-service-admin'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-05-28.basil',
-})
+function getStripeClient() {
+  const secretKey = process.env.STRIPE_SECRET_KEY
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+  if (!secretKey) {
+    return null
+  }
+
+  return new Stripe(secretKey, {
+    apiVersion: '2025-05-28.basil',
+  })
+}
+
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
 export async function POST(request: NextRequest) {
   try {
+    const stripe = getStripeClient()
+
+    if (!stripe || !webhookSecret) {
+      return NextResponse.json(
+        { error: 'Stripe webhook is not configured' },
+        { status: 503 }
+      )
+    }
+
     const body = await request.text()
     const signature = request.headers.get('stripe-signature')
 

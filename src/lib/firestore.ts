@@ -13,17 +13,92 @@ import {
   where
 } from 'firebase/firestore'
 import { 
+  HeldSale,
   MultiItemSale, 
   SaleItem, 
   SaleCalculations,
   PAYMENT_METHODS 
 } from './multi-item-sales-types'
+import {
+  createBackendDebtor,
+  createBackendExpense,
+  createBackendProduct,
+  createBackendSale,
+  deleteBackendExpense,
+  deleteBackendProduct,
+  deleteBackendSale,
+  getBackendDebtors,
+  getBackendExpenses,
+  getBackendMultiItemSales,
+  getBackendProduct,
+  getBackendProducts,
+  getBackendSingleItemSales,
+  isBackendAvailable,
+  recordBackendDebtorPayment,
+  shouldUseFirebaseFallback,
+  updateBackendExpense,
+  updateBackendProduct,
+  updateBackendSale
+} from '@/lib/backend-business-api'
 
 export interface ProductImage {
   url: string
   fileId: string
   name: string
+  id?: string
   isPrimary?: boolean
+  storagePath?: string
+  contentType?: string
+  size?: number
+}
+
+function normalizeProductImages(images: unknown, legacyImageUrl?: string | null): ProductImage[] {
+  const rows = Array.isArray(images) ? images : []
+  const normalized = rows
+    .map((image, index): ProductImage | null => {
+      if (typeof image === 'string') {
+        return {
+          url: image,
+          fileId: image,
+          name: `product-image-${index + 1}`,
+          isPrimary: index === 0
+        }
+      }
+
+      if (image && typeof image === 'object') {
+        const value = image as Partial<ProductImage> & { storage_path?: string }
+        if (!value.url) return null
+
+        return {
+          url: value.url,
+          fileId: value.fileId || value.storagePath || value.storage_path || value.url,
+          name: value.name || `product-image-${index + 1}`,
+          id: value.id,
+          isPrimary: value.isPrimary,
+          storagePath: value.storagePath || value.storage_path,
+          contentType: value.contentType,
+          size: value.size
+        }
+      }
+
+      return null
+    })
+    .filter((image): image is ProductImage => Boolean(image))
+
+  if (!normalized.some(image => image.isPrimary) && normalized[0]) {
+    normalized[0] = { ...normalized[0], isPrimary: true }
+  }
+
+  if (normalized.length === 0 && legacyImageUrl) {
+    return [{
+      url: legacyImageUrl,
+      fileId: legacyImageUrl,
+      name: 'legacy-image',
+      isPrimary: true
+    }]
+  }
+
+  return normalized
 }
 
 // Enhanced supplier relationship for products
@@ -105,16 +180,16 @@ export interface Product {
   
   // NEW ENHANCED FIELDS - Supplier Integration
   supplierLinks?: ProductSupplierLink[] // Multiple suppliers with relationships
-  preferredSupplierId?: string // Quick reference to primary supplier
-  lastSupplierId?: string // Last supplier used for purchase
+  preferredSupplierId?: string | null // Quick reference to primary supplier
+  lastSupplierId?: string | null // Last supplier used for purchase
   
   // NEW ENHANCED FIELDS - Inventory Integration (computed/cached fields)
   realTimeInventory?: ProductInventoryData // Real-time inventory data from inventory module
   
   // NEW ENHANCED FIELDS - Purchase History
-  lastPurchasePrice?: number // Cache of last purchase price
-  averagePurchasePrice?: number // Cache of average purchase price
-  lastPurchaseDate?: Date // Cache of last purchase date
+  lastPurchasePrice?: number | null // Cache of last purchase price
+  averagePurchasePrice?: number | null // Cache of average purchase price
+  lastPurchaseDate?: Date | null // Cache of last purchase date
 }
 
 export type PaymentMethod = 'CASH' | 'MPESA' | 'BANK_TRANSFER' | 'CARD' | 'CREDIT' | 'CHEQUE' | 'OTHER'
@@ -451,12 +526,28 @@ export interface StaffActivityLog {
 }
 
 export async function getProducts(userId: string): Promise<Product[]> {
+  if (isBackendAvailable()) {
+    try {
+      return await getBackendProducts()
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend products unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const q = query(
     collection(db, 'products'),
     where('userId', '==', userId)
   )
   const snap = await getDocs(q)
-  const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Product))
+  const items = snap.docs.map(d => {
+    const data = d.data()
+    return {
+      id: d.id,
+      ...data,
+      images: normalizeProductImages(data.images, data.imageUrl || null)
+    } as Product
+  })
   // Backward compatibility: include docs with either isActive or active not set to false
   return items.filter(p => {
     const isActive = p.isActive
@@ -468,12 +559,23 @@ export async function getProducts(userId: string): Promise<Product[]> {
 }
 
 export async function createProduct(userId: string, data: Partial<Product>): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await createBackendProduct(data)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend product create unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const id = data.id || crypto.randomUUID()
   const product: Product = {
     id,
     name: data.name || '',
     description: data.description || '',
     imageUrl: data.imageUrl ?? null,
+    images: normalizeProductImages(data.images, data.imageUrl ?? null),
     costPrice: Number(data.costPrice || 0),
     sellingPrice: Number(data.sellingPrice || 0),
     quantity: Number(data.quantity || 0),
@@ -518,9 +620,20 @@ function cleanFirestoreData<T extends Record<string, any>>(obj: T): T {
 }
 
 export async function updateProduct(productId: string, data: Partial<Product>): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await updateBackendProduct(productId, data)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend product update unavailable, falling back to Firestore:', error)
+    }
+  }
+
   // Clean the data to remove undefined values (Firestore doesn't allow undefined)
   const cleanedData = cleanFirestoreData({
     ...data,
+    ...(data.images ? { images: normalizeProductImages(data.images, data.imageUrl ?? null) } : {}),
     updatedAt: serverTimestamp()
   })
   
@@ -531,19 +644,52 @@ export async function updateProduct(productId: string, data: Partial<Product>): 
 }
 
 export async function getProduct(productId: string): Promise<Product | null> {
+  if (isBackendAvailable()) {
+    try {
+      return await getBackendProduct(productId)
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend product detail unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const snap = await getDoc(doc(db, 'products', productId))
   if (snap.exists()) {
-    return { id: snap.id, ...snap.data() } as Product
+    const data = snap.data()
+    return {
+      id: snap.id,
+      ...data,
+      images: normalizeProductImages(data.images, data.imageUrl || null)
+    } as Product
   }
   return null
 }
 
 export async function softDeleteProduct(productId: string): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await deleteBackendProduct(productId)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend product delete unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const updateData = cleanFirestoreData({ isActive: false, active: false, updatedAt: serverTimestamp() })
   await updateDoc(doc(db, 'products', productId), updateData)
 }
 
 export async function getSales(userId: string, max: number = 2000): Promise<Sale[]> {
+  if (isBackendAvailable()) {
+    try {
+      return (await getBackendSingleItemSales()).slice(0, max)
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend sales unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const q = query(
     collection(db, 'sales'),
     where('userId', '==', userId),
@@ -559,6 +705,16 @@ export async function getSales(userId: string, max: number = 2000): Promise<Sale
 }
 
 export async function createSale(userId: string, data: Partial<Sale>): Promise<void> {
+  if (isBackendAvailable() && data.productId) {
+    try {
+      await createBackendSale(data)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend sale create unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const id = data.id || crypto.randomUUID()
   const sale: Sale = {
     id,
@@ -605,6 +761,16 @@ export async function getSale(saleId: string): Promise<Sale | null> {
 }
 
 export async function updateSale(saleId: string, data: Partial<Sale>): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await updateBackendSale(saleId, data)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend sale update unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const updateData = {
     ...data,
     lastModifiedAt: Date.now(),
@@ -616,6 +782,16 @@ export async function updateSale(saleId: string, data: Partial<Sale>): Promise<v
 }
 
 export async function deleteSale(saleId: string): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await deleteBackendSale(saleId)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend sale delete unavailable, falling back to Firestore:', error)
+    }
+  }
+
   // For sales, we might want to soft delete to preserve business records
   await updateDoc(doc(db, 'sales', saleId), { 
     isDeleted: true, 
@@ -625,6 +801,15 @@ export async function deleteSale(saleId: string): Promise<void> {
 }
 
 export async function getDebtors(userId: string): Promise<Debtor[]> {
+  if (isBackendAvailable()) {
+    try {
+      return await getBackendDebtors()
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend debtors unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const q = query(
     collection(db, 'debtors'),
     where('userId', '==', userId)
@@ -646,6 +831,16 @@ export async function deleteDebtor(debtorId: string): Promise<void> {
 }
 
 export async function createDebtor(userId: string, data: Partial<Debtor>): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await createBackendDebtor(data)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend debtor create unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const id = data.id || crypto.randomUUID()
   const debtor: Debtor = {
     id,
@@ -680,6 +875,16 @@ export async function createDebtor(userId: string, data: Partial<Debtor>): Promi
 }
 
 export async function recordDebtorPayment(userId: string, data: Partial<DebtorPayment>): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await recordBackendDebtorPayment(data)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend debtor payment unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const id = data.id || crypto.randomUUID()
   const payment: DebtorPayment = {
     id,
@@ -715,6 +920,15 @@ export async function recordDebtorPayment(userId: string, data: Partial<DebtorPa
 }
 
 export async function getExpenses(userId: string, max: number = 200): Promise<Expense[]> {
+  if (isBackendAvailable()) {
+    try {
+      return (await getBackendExpenses()).slice(0, max)
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend expenses unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const q = query(
     collection(db, 'expenses'),
     where('userId', '==', userId),
@@ -726,6 +940,16 @@ export async function getExpenses(userId: string, max: number = 200): Promise<Ex
 }
 
 export async function createExpense(userId: string, data: Partial<Expense>): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await createBackendExpense(data)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend expense create unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const id = data.id || crypto.randomUUID()
   const expense: Expense = {
     id,
@@ -760,6 +984,16 @@ export async function getExpense(expenseId: string): Promise<Expense | null> {
 }
 
 export async function updateExpense(expenseId: string, data: Partial<Expense>): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await updateBackendExpense(expenseId, data)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend expense update unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const updateData = {
     ...data,
     updatedAt: serverTimestamp()
@@ -770,6 +1004,16 @@ export async function updateExpense(expenseId: string, data: Partial<Expense>): 
 }
 
 export async function deleteExpense(expenseId: string): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await deleteBackendExpense(expenseId)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend expense delete unavailable, falling back to Firestore:', error)
+    }
+  }
+
   await deleteDoc(doc(db, 'expenses', expenseId))
 }
 
@@ -1200,25 +1444,13 @@ function generateSaleNumber(): string {
   return `SALE-${year}${month}${day}-${timestamp}`
 }
 
-// Create a new multi-item sale
-export async function createMultiItemSale(userId: string, data: {
-  items: Partial<SaleItem>[]
-  customerName?: string
-  customerPhone?: string
-  customerEmail?: string
-  paymentMethod: string
-  tax?: number
-  taxRate?: number
-  discount?: number
-  discountType?: 'PERCENTAGE' | 'FIXED'
-  notes?: string
-  branchId?: string
-}): Promise<string> {
-  const saleId = crypto.randomUUID()
-  const timestamp = Date.now()
-  
-  // Process items and calculate totals
-  const items: SaleItem[] = data.items.map((item, index) => {
+function generateHeldSaleNumber(): string {
+  const timestamp = Date.now().toString().slice(-6)
+  return `HELD-${timestamp}`
+}
+
+function buildSaleItems(transactionId: string, dataItems: Partial<SaleItem>[]): SaleItem[] {
+  return dataItems.map((item, index) => {
     const quantity = Number(item.quantity || 1)
     const unitPrice = Number(item.unitPrice || 0)
     const costPrice = Number(item.costPrice || 0)
@@ -1226,7 +1458,7 @@ export async function createMultiItemSale(userId: string, data: {
     const profit = SaleCalculations.calculateProfit(quantity, unitPrice, costPrice)
     
     return {
-      id: `item_${saleId}_${index + 1}`,
+      id: item.id || `item_${transactionId}_${index + 1}`,
       productId: item.productId || null,
       productName: item.productName || '',
       saleType: item.saleType || 'PRODUCT',
@@ -1241,6 +1473,36 @@ export async function createMultiItemSale(userId: string, data: {
       notes: item.notes || null
     }
   })
+}
+
+// Create a new multi-item sale
+export async function createMultiItemSale(userId: string, data: {
+  items: Partial<SaleItem>[]
+  customerName?: string
+  customerPhone?: string
+  customerEmail?: string
+  paymentMethod: string
+  tax?: number
+  taxRate?: number
+  discount?: number
+  discountType?: 'PERCENTAGE' | 'FIXED'
+  notes?: string
+  branchId?: string
+}): Promise<string> {
+  if (isBackendAvailable()) {
+    try {
+      return await createBackendSale(data)
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend multi-item sale create unavailable, falling back to Firestore:', error)
+    }
+  }
+
+  const saleId = crypto.randomUUID()
+  const timestamp = Date.now()
+  
+  // Process items and calculate totals
+  const items: SaleItem[] = buildSaleItems(saleId, data.items)
   
   // Calculate totals
   const subtotal = SaleCalculations.calculateSubtotal(items)
@@ -1301,6 +1563,15 @@ export async function createMultiItemSale(userId: string, data: {
 
 // Get multi-item sales
 export async function getMultiItemSales(userId: string, max: number = 2000): Promise<MultiItemSale[]> {
+  if (isBackendAvailable()) {
+    try {
+      return (await getBackendMultiItemSales()).slice(0, max)
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend multi-item sales unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const q = query(
     collection(db, 'multi_item_sales'),
     where('userId', '==', userId),
@@ -1331,6 +1602,132 @@ export async function deleteMultiItemSale(saleId: string): Promise<void> {
     isDeleted: true,
     deletedAt: Date.now()
   })
+}
+
+// Create or update a database-backed sale draft that can be resumed later.
+export async function createHeldSale(userId: string, data: {
+  id?: string
+  items: Partial<SaleItem>[]
+  customerName?: string
+  customerPhone?: string
+  customerEmail?: string
+  paymentMethod: string
+  discount?: number
+  notes?: string
+  branchId?: string
+  createdBy?: string | null
+}): Promise<string> {
+  const heldSaleId = data.id || crypto.randomUUID()
+  const timestamp = Date.now()
+  const items = buildSaleItems(heldSaleId, data.items)
+  const subtotal = SaleCalculations.calculateSubtotal(items)
+  const discountAmount = Math.min(subtotal, Math.max(0, Number(data.discount || 0)))
+  const totalAmount = Math.max(0, SaleCalculations.calculateTotal(subtotal, 0, discountAmount))
+
+  const heldSale: HeldSale = {
+    id: heldSaleId,
+    heldNumber: generateHeldSaleNumber(),
+    items,
+    customerName: data.customerName || null,
+    customerPhone: data.customerPhone || null,
+    customerEmail: data.customerEmail || null,
+    paymentMethod: PAYMENT_METHODS.find(pm => pm.name === data.paymentMethod) || PAYMENT_METHODS[0],
+    subtotal,
+    discount: discountAmount > 0 ? discountAmount : null,
+    discountType: discountAmount > 0 ? 'FIXED' : null,
+    totalAmount,
+    timestamp,
+    lastModifiedAt: timestamp,
+    status: 'HELD',
+    notes: data.notes || null,
+    createdBy: data.createdBy || null,
+    completedSaleId: null,
+    userId,
+    branchId: data.branchId || null,
+    isSynced: false,
+    lastSyncedAt: 0
+  }
+
+  await setDoc(doc(db, 'held_sales', heldSaleId), {
+    ...heldSale,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  })
+
+  return heldSaleId
+}
+
+export async function getHeldSales(userId: string, max: number = 50): Promise<HeldSale[]> {
+  const q = query(
+    collection(db, 'held_sales'),
+    where('userId', '==', userId),
+    limit(max)
+  )
+  const snap = await getDocs(q)
+  const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as HeldSale))
+
+  return list
+    .filter(sale => sale.status === 'HELD')
+    .sort((a, b) => (b.lastModifiedAt || b.timestamp || 0) - (a.lastModifiedAt || a.timestamp || 0))
+}
+
+export async function updateHeldSale(heldSaleId: string, data: Partial<HeldSale>): Promise<void> {
+  const updateData = cleanFirestoreData({
+    ...data,
+    lastModifiedAt: Date.now(),
+    updatedAt: serverTimestamp()
+  })
+  delete (updateData as { id?: string }).id
+  await updateDoc(doc(db, 'held_sales', heldSaleId), updateData)
+}
+
+export async function deleteHeldSale(heldSaleId: string): Promise<void> {
+  await updateHeldSale(heldSaleId, {
+    status: 'CANCELLED'
+  })
+}
+
+export async function completeHeldSale(
+  userId: string,
+  heldSaleId: string,
+  overrides: {
+    items?: Partial<SaleItem>[]
+    customerName?: string
+    customerPhone?: string
+    customerEmail?: string
+    paymentMethod?: string
+    discount?: number
+    notes?: string
+    branchId?: string
+  } = {}
+): Promise<string> {
+  const heldSaleSnap = await getDoc(doc(db, 'held_sales', heldSaleId))
+  if (!heldSaleSnap.exists()) {
+    throw new Error('Held sale not found')
+  }
+
+  const heldSale = { id: heldSaleSnap.id, ...heldSaleSnap.data() } as HeldSale
+  const paymentMethod = typeof heldSale.paymentMethod === 'string'
+    ? heldSale.paymentMethod
+    : heldSale.paymentMethod.name
+  const saleId = await createMultiItemSale(userId, {
+    items: overrides.items || heldSale.items,
+    customerName: overrides.customerName ?? heldSale.customerName ?? undefined,
+    customerPhone: overrides.customerPhone ?? heldSale.customerPhone ?? undefined,
+    customerEmail: overrides.customerEmail ?? heldSale.customerEmail ?? undefined,
+    paymentMethod: overrides.paymentMethod || paymentMethod || 'CASH',
+    discount: overrides.discount ?? heldSale.discount ?? undefined,
+    discountType: 'FIXED',
+    notes: overrides.notes ?? heldSale.notes ?? undefined,
+    branchId: overrides.branchId || heldSale.branchId || undefined
+  })
+
+  await updateHeldSale(heldSaleId, {
+    status: 'COMPLETED',
+    completedSaleId: saleId
+  })
+
+  return saleId
 }
 
 

@@ -8,6 +8,11 @@ import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { Branch, BranchStatus } from '@/lib/branches-types'
+import {
+  deactivateBranch,
+  getBranch,
+  updateBranch,
+} from '@/lib/branches-service'
 import { Staff } from '@/lib/firestore'
 import {
   ArrowLeft,
@@ -148,9 +153,8 @@ export default function BranchDetailsPage({}: BranchDetailsPageProps) {
   const loadBranchDetails = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/branches/${params.id}?userId=${user?.uid}`)
-      if (response.ok) {
-        const { data } = await response.json()
+      const data = await getBranch(String(params.id))
+      if (data) {
         setBranch(data)
         
         // Initialize edit form
@@ -227,25 +231,15 @@ export default function BranchDetailsPage({}: BranchDetailsPageProps) {
     if (!branch) return
     
     try {
-      const response = await fetch(`/api/branches/${branch.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId: branch.userId,
-          ...editForm
-        })
-      })
+      await updateBranch(branch.id, {
+        userId: branch.userId,
+        ...editForm
+      } as any)
 
-      if (response.ok) {
-        setEditingDetails(false)
-        setEditingOpeningHours(false)
-        await loadBranchDetails() // Refresh data
-        alert('Branch details updated successfully!')
-      } else {
-        const errorData = await response.json()
-        console.error('Error response:', errorData)
-        alert(`Failed to update details: ${errorData.error || 'Unknown error'}`)
-      }
+      setEditingDetails(false)
+      setEditingOpeningHours(false)
+      await loadBranchDetails() // Refresh data
+      alert('Branch details updated successfully!')
     } catch (error) {
       console.error('Error updating details:', error)
       alert('Failed to update details')
@@ -256,18 +250,9 @@ export default function BranchDetailsPage({}: BranchDetailsPageProps) {
     if (!branch) return
     
     try {
-      const response = await fetch(`/api/branches/${branch.id}?userId=${branch.userId}&reason=Deleted by user`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        alert('Branch deactivated successfully!')
-        router.push('/dashboard/branches')
-      } else {
-        const errorData = await response.json()
-        console.error('Error response:', errorData)
-        alert(`Failed to deactivate branch: ${errorData.error || 'Unknown error'}`)
-      }
+      await deactivateBranch(branch.id, 'Deleted by user')
+      alert('Branch deactivated successfully!')
+      router.push('/dashboard/branches')
     } catch (error) {
       console.error('Error deactivating branch:', error)
       alert('Failed to deactivate branch')
@@ -279,25 +264,15 @@ export default function BranchDetailsPage({}: BranchDetailsPageProps) {
     
     try {
       const selectedStaff = allStaff.find(s => s.id === managerId)
-      const response = await fetch(`/api/branches/${branch.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId: branch.userId,
-          managerId: managerId,
-          managerName: selectedStaff?.fullName || ''
-        })
-      })
+      await updateBranch(branch.id, {
+        userId: branch.userId,
+        managerId: managerId,
+        managerName: selectedStaff?.fullName || ''
+      } as any)
 
-      if (response.ok) {
-        setShowManagerModal(false)
-        await loadBranchDetails() // Refresh data
-        alert('Manager assigned successfully!')
-      } else {
-        const errorData = await response.json()
-        console.error('Error response:', errorData)
-        alert(`Failed to assign manager: ${errorData.error || 'Unknown error'}`)
-      }
+      setShowManagerModal(false)
+      await loadBranchDetails() // Refresh data
+      alert('Manager assigned successfully!')
     } catch (error) {
       console.error('Error assigning manager:', error)
       alert('Failed to assign manager')

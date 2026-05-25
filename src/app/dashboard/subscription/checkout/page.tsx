@@ -5,6 +5,11 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/contexts/AuthContext'
 import { getCurrencySymbol, useCurrency } from '@/hooks/useCurrency'
+import {
+    getBackendSubscription,
+    startBackendMpesaCheckout,
+    startBackendStripeCheckout,
+} from '@/lib/backend-business-api'
 
 // Loading component for Suspense fallback
 function LoadingState() {
@@ -117,37 +122,16 @@ function CheckoutContent() {
         setError('')
 
         try {
-            const response = await fetch('/api/mpesa/stk-push', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    phoneNumber,
-                    amount,
-                    accountReference: `FahamPesa-${planName}`,
-                    transactionDesc: `FahamPesa Pro ${planName} Subscription`,
-                    // Subscription fields for tracking
-                    userId: user.uid,
-                    email: user.email,
-                    planType: plan, // 'monthly' or 'yearly'
-                    currency: currency, // 'KSH' or 'USD'
-                }),
-            })
+            const data = await startBackendMpesaCheckout(plan as 'monthly' | 'yearly', phoneNumber)
+            const initiated =
+                data.ResponseCode === '0' ||
+                data.success === true ||
+                Boolean(data.checkoutRequestId || data.subscriptionId || data.paymentId)
 
-            const data = await response.json()
-
-            if (data.ResponseCode === '0') {
+            if (initiated) {
                 // STK push sent successfully - now poll for payment confirmation
-                const subscriptionId = data.subscriptionId
+                const subscriptionId = data.subscriptionId || data.paymentId || data.checkoutRequestId || 'pending'
 
-                if (!subscriptionId) {
-                    setError('Payment initiated but could not track status. Please check your M-Pesa messages.')
-                    setIsProcessing(false)
-                    return
-                }
-
-                // Start polling for payment status
                 setIsWaitingConfirmation(true)
                 setPollCount(0)
                 pollPaymentStatus(subscriptionId)
@@ -167,20 +151,20 @@ function CheckoutContent() {
 
         const poll = async () => {
             try {
-                const response = await fetch(`/api/mpesa/status?subscriptionId=${subscriptionId}`)
-                const data = await response.json()
+                const data = await getBackendSubscription()
+                const status = String(data.status || data.subscriptionStatus || data.subscription?.status || '').toLowerCase()
 
-                if (data.status === 'active') {
+                if (status === 'active' || status === 'paid') {
                     // Payment successful - redirect to success page
                     router.push(`/dashboard/subscription/success?plan=${plan}&amount=${amount}&currency=${currency}&subscriptionId=${subscriptionId}`)
                     return
-                } else if (data.status === 'failed') {
+                } else if (status === 'failed' || status === 'cancelled' || status === 'expired') {
                     // Payment failed
                     setError('Payment failed. Please check you have sufficient funds and try again.')
                     setIsProcessing(false)
                     setIsWaitingConfirmation(false)
                     return
-                } else if (data.status === 'pending') {
+                } else {
                     // Still pending - continue polling
                     attempts++
                     setPollCount(attempts)
@@ -227,23 +211,17 @@ function CheckoutContent() {
         setError('')
 
         try {
-            const response = await fetch('/api/stripe/checkout-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    planType: plan, // 'monthly' or 'yearly'
-                    userId: user.uid,
-                    email: user.email,
-                }),
-            })
+            const origin = window.location.origin
+            const data = await startBackendStripeCheckout(
+                plan as 'monthly' | 'yearly',
+                `${origin}/dashboard/subscription/success?plan=${plan}&amount=${amount}&currency=USD`,
+                window.location.href
+            )
+            const checkoutUrl = data.url || data.sessionUrl || data.checkoutUrl
 
-            const data = await response.json()
-
-            if (data.sessionUrl) {
+            if (checkoutUrl) {
                 // Redirect to Stripe Checkout
-                window.location.href = data.sessionUrl
+                window.location.href = checkoutUrl
             } else {
                 setError(data.error || 'Failed to create checkout session. Please try again.')
                 setIsProcessing(false)

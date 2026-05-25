@@ -240,3 +240,48 @@ textarea {
   opacity: 1;
   visibility: visible;
 }
+
+/* Dashboard polish */
+.dashboard-card,
+.dashboard-panel {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #e6ebf2;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.dashboard-card {
+  border-radius: 16px;
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.dashboard-card:hover {
+  border-color: #d7e0ec;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+  transform: translateY(-2px);
+}
+
+.dashboard-panel {
+  border-radius: 18px;
+}
+
+.dashboard-metric-value,
+.dashboard-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, #eef2f7 0%, #f8fafc 45%, #eef2f7 100%);
+  background-size: 220% 100%;
+  animation: dashboardShimmer 1.35s ease-in-out infinite;
+}
+
+@keyframes dashboardShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}

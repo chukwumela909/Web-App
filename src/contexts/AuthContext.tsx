@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useState, useRef } from 'react'
 import { 
   User, 
   signInWithEmailAndPassword, 
@@ -8,18 +8,22 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
-  sendPasswordResetEmail,
-  ApplicationVerifier
+  sendPasswordResetEmail
 } from 'firebase/auth'
-import { doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { auth, db, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, signInWithCredential, ConfirmationResult } from '@/lib/firebase'
+import { doc, updateDoc } from 'firebase/firestore'
+import { auth, db, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, signInWithCredential } from '@/lib/firebase'
 import { getUserRole, UserRole } from '@/lib/adminUtils'
+import { BackendSession, getMe, isBackendApiError, phoneExists } from '@/lib/backend-api'
 
 interface AuthContextType {
   user: User | null
   userRole: UserRole | null
+  backendSession: BackendSession | null
+  backendSessionLoading: boolean
+  backendSessionError: string | null
   loading: boolean
   roleLoading: boolean
+  refreshBackendSession: () => Promise<BackendSession | null>
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, businessName?: string, phoneNumber?: string, country?: string) => Promise<void>
   logout: () => Promise<void>
@@ -49,6 +53,9 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userRole, setUserRole] = useState<UserRole | null>(null)
+  const [backendSession, setBackendSession] = useState<BackendSession | null>(null)
+  const [backendSessionLoading, setBackendSessionLoading] = useState(false)
+  const [backendSessionError, setBackendSessionError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [roleLoading, setRoleLoading] = useState(false)
   const [verificationId, setVerificationId] = useState<string>('')
@@ -68,10 +75,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (user) {
         setRoleLoading(true)
-        // Fetch user role from Firestore
-        const role = await getUserRole(user.uid)
+        setBackendSessionLoading(true)
+        setBackendSessionError(null)
+
+        const [role, session] = await Promise.all([
+          getUserRole(user.uid),
+          getMe(user).catch(async (error) => {
+            if (isBackendApiError(error) && (error.code === 'missing_auth_token' || error.code === 'invalid_auth_token')) {
+              await signOut(auth)
+              return null
+            }
+
+            console.error('Error bootstrapping backend session:', error)
+            setBackendSessionError(error instanceof Error ? error.message : 'Unable to load account session.')
+            return null
+          })
+        ])
+
         setUserRole(role)
+        setBackendSession(session)
         setRoleLoading(false)
+        setBackendSessionLoading(false)
         
         // Update last login time
         if (role) {
@@ -85,7 +109,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         setUserRole(null)
+        setBackendSession(null)
+        setBackendSessionError(null)
         setRoleLoading(false)
+        setBackendSessionLoading(false)
       }
       
       setLoading(false)
@@ -102,41 +129,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password)
     const user = userCredential.user
     
-    // Update user profile with business name
     if (businessName && user) {
       await updateProfile(user, {
         displayName: businessName
       })
-      
-      // Create user profile document in Firestore
-      await setDoc(doc(db, 'userProfiles', user.uid), {
-        businessName: businessName,
-        email: email,
-        phoneNumber: phoneNumber || '',
-        country: country || '',
-        phoneVerified: !!phoneNumber,
-        onboardingCompleted: false,
-        onboardingSkipped: false,
-        createdAt: serverTimestamp(),
-        lastLogin: serverTimestamp()
-      })
-      
-      // Set default role as 'user' (not admin)
-      await setDoc(doc(db, 'userRoles', user.uid), {
-        role: 'user',
-        email: email,
-        businessName: businessName,
-        phoneNumber: phoneNumber || '',
-        createdAt: serverTimestamp(),
-        lastLogin: serverTimestamp()
-      })
+    }
+
+    if (typeof window !== 'undefined') {
+      if (businessName) window.localStorage.setItem('fahampesa:onboardingBusinessName', businessName)
+      if (phoneNumber) window.localStorage.setItem('fahampesa:onboardingPhoneNumber', phoneNumber)
+      if (country) window.localStorage.setItem('fahampesa:onboardingCountry', country)
     }
   }
 
   const logout = async () => {
     await signOut(auth)
     setUserRole(null)
-    setConfirmationResult(null)
+    setBackendSession(null)
+    setBackendSessionError(null)
   }
 
   const resetPassword = async (email: string) => {
@@ -217,31 +227,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Continue anyway - the user is created with email/password
     }
     
-    // Update profile and create Firestore documents
     await updateProfile(newUser, {
       displayName: businessName
     })
-    
-    await setDoc(doc(db, 'userProfiles', newUser.uid), {
-      businessName: businessName,
-      email: email,
-      phoneNumber: phoneNumber,
-      country: country,
-      phoneVerified: true,
-      onboardingCompleted: false,
-      onboardingSkipped: false,
-      createdAt: serverTimestamp(),
-      lastLogin: serverTimestamp()
-    })
-    
-    await setDoc(doc(db, 'userRoles', newUser.uid), {
-      role: 'user',
-      email: email,
-      businessName: businessName,
-      phoneNumber: phoneNumber,
-      createdAt: serverTimestamp(),
-      lastLogin: serverTimestamp()
-    })
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('fahampesa:onboardingBusinessName', businessName)
+      window.localStorage.setItem('fahampesa:onboardingPhoneNumber', phoneNumber)
+      window.localStorage.setItem('fahampesa:onboardingCountry', country)
+    }
     
     // Clear pending registration data
     pendingRegistrationRef.current = null
@@ -251,20 +245,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Send OTP for login
   const sendLoginOtp = async (phoneNumber: string) => {
-    // Check if phone number exists using server-side Admin SDK
-    try {
-      const response = await fetch(`/api/auth/phone-exists?phone=${encodeURIComponent(phoneNumber)}`)
-      if (!response.ok) {
-        const data = await response.json().catch(() => null)
-        const message = data?.error || 'Unable to verify phone number. Please try again.'
-        throw new Error(message)
-      }
-      const data = await response.json()
-      if (!data?.exists) {
-        throw new Error('No account found with this phone number. Please register first.')
-      }
-    } catch (error) {
-      throw error
+    const exists = await phoneExists(phoneNumber)
+    if (!exists) {
+      throw new Error('No account found with this phone number. Please register first.')
     }
     
     const windowWithRecaptcha = window as unknown as { recaptchaVerifier?: RecaptchaVerifier }
@@ -309,14 +292,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     pendingRegistrationRef.current = data
   }
 
+  const refreshBackendSession = useCallback(async () => {
+    const currentUser = auth.currentUser
+    if (!currentUser) {
+      setBackendSession(null)
+      return null
+    }
+
+    setBackendSessionLoading(true)
+    setBackendSessionError(null)
+    try {
+      const session = await getMe(currentUser)
+      setBackendSession(session)
+      return session
+    } catch (error) {
+      if (isBackendApiError(error) && (error.code === 'missing_auth_token' || error.code === 'invalid_auth_token')) {
+        await signOut(auth)
+      }
+      setBackendSession(null)
+      setBackendSessionError(error instanceof Error ? error.message : 'Unable to load account session.')
+      throw error
+    } finally {
+      setBackendSessionLoading(false)
+    }
+  }, [])
+
   const isSuperAdmin = userRole?.role === 'super_admin'
   const isAdmin = userRole?.role === 'admin' || userRole?.role === 'super_admin'
 
   const value = {
     user,
     userRole,
+    backendSession,
+    backendSessionLoading,
+    backendSessionError,
     loading,
     roleLoading,
+    refreshBackendSession,
     login,
     register,
     logout,

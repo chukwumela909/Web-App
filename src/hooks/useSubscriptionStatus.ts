@@ -1,8 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useStaff } from '@/contexts/StaffContext'
-import { doc, getDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
 
 interface SubscriptionStatus {
   isSubscribed: boolean
@@ -18,10 +15,14 @@ interface SubscriptionStatus {
  * For staff members, this checks the owner's subscription (inherited)
  */
 export function useSubscriptionStatus(): SubscriptionStatus {
-  const { user } = useAuth()
-  const { staff } = useStaff()
-  // Use owner's ID for staff members to inherit subscription
-  const effectiveUserId = staff ? staff.userId : user?.uid
+  const {
+    user,
+    backendSession,
+    backendSessionError,
+    backendSessionLoading,
+    refreshBackendSession
+  } = useAuth()
+  const refreshAttemptedForUid = useRef<string | null>(null)
   
   const [status, setStatus] = useState<SubscriptionStatus>({
     isSubscribed: false,
@@ -33,7 +34,8 @@ export function useSubscriptionStatus(): SubscriptionStatus {
 
   useEffect(() => {
     async function checkSubscription() {
-      if (!effectiveUserId) {
+      if (!user) {
+        refreshAttemptedForUid.current = null
         setStatus({
           isSubscribed: false,
           subscriptionId: null,
@@ -45,38 +47,29 @@ export function useSubscriptionStatus(): SubscriptionStatus {
       }
 
       try {
-        // Check user profile for subscription status
-        // Uses effectiveUserId so staff inherits owner's subscription
-        const userProfileRef = doc(db, 'userProfiles', effectiveUserId)
-        const userProfileSnap = await getDoc(userProfileRef)
-
-        if (userProfileSnap.exists()) {
-          const data = userProfileSnap.data()
-          const isSubscribed = data.isSubscribed === true
-          const subscriptionEndDate = data.subscriptionEndDate 
-            ? new Date(data.subscriptionEndDate.seconds ? data.subscriptionEndDate.seconds * 1000 : data.subscriptionEndDate)
-            : null
-
-          // Check if subscription is still valid (not expired)
-          const isActive = Boolean(isSubscribed && subscriptionEndDate !== null && subscriptionEndDate > new Date())
-
-          setStatus({
-            isSubscribed: isActive,
-            subscriptionId: data.subscriptionId || null,
-            subscriptionEndDate,
-            isLoading: false,
-            error: null,
-          })
-        } else {
-          // No profile found, not subscribed
-          setStatus({
-            isSubscribed: false,
-            subscriptionId: null,
-            subscriptionEndDate: null,
-            isLoading: false,
-            error: null,
-          })
+        let session = backendSession
+        if (!session && refreshAttemptedForUid.current !== user.uid) {
+          refreshAttemptedForUid.current = user.uid
+          session = await refreshBackendSession()
         }
+
+        const subscriptionEndDate = session?.subscriptionEndsAt
+          ? new Date(session.subscriptionEndsAt)
+          : null
+        const statusValue = String(session?.subscriptionStatus || '').toLowerCase()
+        const isActive = Boolean(
+          statusValue === 'active' ||
+          statusValue === 'trialing' ||
+          (subscriptionEndDate && subscriptionEndDate > new Date())
+        )
+
+        setStatus({
+          isSubscribed: isActive,
+          subscriptionId: null,
+          subscriptionEndDate,
+          isLoading: backendSessionLoading,
+          error: session ? null : backendSessionError,
+        })
       } catch (error) {
         console.error('Error checking subscription status:', error)
         setStatus({
@@ -89,8 +82,10 @@ export function useSubscriptionStatus(): SubscriptionStatus {
       }
     }
 
-    checkSubscription()
-  }, [effectiveUserId])
+    if (!backendSessionLoading) {
+      checkSubscription()
+    }
+  }, [user, backendSession, backendSessionError, backendSessionLoading, refreshBackendSession])
 
   return status
 }

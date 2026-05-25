@@ -3,6 +3,7 @@
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCurrency, formatCurrency } from '@/hooks/useCurrency'
 import { useEffect, useState } from 'react'
@@ -20,6 +21,8 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { getBranches as getBranchRecords, createBranch as createBranchRecord } from '@/lib/branches-service'
+import { adjustStock as adjustStockRecord, getInventoryItems } from '@/lib/inventory-service'
 
 interface StockLevel {
   productId: string
@@ -76,8 +79,17 @@ interface Product {
   sellingPrice: number
   costPrice: number
   category: string
-  sku?: string
-  barcode?: string
+  sku?: string | null
+  barcode?: string | null
+  imageUrl?: string | null
+  images?: Array<{
+    url: string
+    isPrimary?: boolean
+  }>
+}
+
+function getProductImageUrl(product?: Product | null) {
+  return product?.images?.find(image => image.isPrimary)?.url || product?.images?.[0]?.url || product?.imageUrl || null
 }
 
 const fadeInUp = {
@@ -112,38 +124,14 @@ function InventoryContent() {
     if (!user) return
     
     try {
-      const response = await fetch('/api/branches', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          name: 'Main Branch',
-          branchType: 'MAIN',
-          location: {
-            address: 'Primary Location',
-            city: '',
-            region: ''
-          },
-          contact: {
-            phone: '',
-            email: ''
-          },
-          openingHours: [
-            { dayOfWeek: 'MONDAY', isOpen: true, openTime: '09:00', closeTime: '17:00' },
-            { dayOfWeek: 'TUESDAY', isOpen: true, openTime: '09:00', closeTime: '17:00' },
-            { dayOfWeek: 'WEDNESDAY', isOpen: true, openTime: '09:00', closeTime: '17:00' },
-            { dayOfWeek: 'THURSDAY', isOpen: true, openTime: '09:00', closeTime: '17:00' },
-            { dayOfWeek: 'FRIDAY', isOpen: true, openTime: '09:00', closeTime: '17:00' },
-            { dayOfWeek: 'SATURDAY', isOpen: true, openTime: '09:00', closeTime: '17:00' },
-            { dayOfWeek: 'SUNDAY', isOpen: false }
-          ]
-        })
-      })
-      
-      const result = await response.json()
-      if (result.success) {
-        await loadBranches()
-      }
+      await createBranchRecord(user.uid, {
+        name: 'Main Branch',
+        branchType: 'MAIN',
+        location: { address: 'Primary Location', city: '', region: '' },
+        contact: { phone: '', email: '' },
+        openingHours: []
+      } as any)
+      await loadBranches()
     } catch (error) {
       console.error('Error creating default branch:', error)
     }
@@ -154,17 +142,12 @@ function InventoryContent() {
     if (!user) return
     
     try {
-      const response = await fetch(`/api/inventory/branches?userId=${user.uid}`)
-      const result = await response.json()
-      
-      if (result.success) {
-        setBranches(result.data)
-        if (result.data.length > 0 && !selectedBranch) {
-          setSelectedBranch(result.data[0].id)
-        } else if (result.data.length === 0) {
-          // No branches exist, create default
-          await createDefaultBranch()
-        }
+      const data = await getBranchRecords(user.uid)
+      setBranches(data as any)
+      if (data.length > 0 && !selectedBranch) {
+        setSelectedBranch(data[0].id)
+      } else if (data.length === 0) {
+        await createDefaultBranch()
       }
     } catch (error) {
       console.error('Error loading branches:', error)
@@ -189,12 +172,17 @@ function InventoryContent() {
     if (!user || !selectedBranch) return
     
     try {
-      const response = await fetch(`/api/inventory/dashboard?userId=${user.uid}&branchId=${selectedBranch}`)
-      const result = await response.json()
-      
-      if (result.success) {
-        setDashboard(result.data)
-      }
+      const inventory = await getInventoryItems(user.uid, selectedBranch)
+      setDashboard({
+        branchId: selectedBranch,
+        totalProducts: inventory.length,
+        lowStockItems: inventory.filter((item) => item.currentStock > 0 && item.currentStock <= item.minStockLevel).length,
+        outOfStockItems: inventory.filter((item) => item.currentStock === 0).length,
+        expiringItems: 0,
+        totalInventoryValue: inventory.reduce((sum, item) => sum + Number(item.currentStock || 0) * Number(item.averageCostPrice || 0), 0),
+        recentMovements: [],
+        alerts: { lowStock: [], expiring: [] }
+      })
     } catch (error) {
       console.error('Error loading dashboard:', error)
     }
@@ -205,12 +193,16 @@ function InventoryContent() {
     if (!user || !selectedBranch) return
     
     try {
-      const response = await fetch(`/api/inventory/stock?userId=${user.uid}&branchId=${selectedBranch}`)
-      const result = await response.json()
-      
-      if (result.success) {
-        setStockLevels(result.data)
-      }
+      const inventory = await getInventoryItems(user.uid, selectedBranch)
+      setStockLevels(inventory.map((item) => ({
+        productId: item.productId,
+        branchId: item.branchId,
+        currentStock: item.currentStock,
+        reservedStock: item.reservedStock,
+        availableStock: item.availableStock,
+        minStockLevel: item.minStockLevel,
+        isLowStock: item.currentStock <= item.minStockLevel
+      })))
     } catch (error) {
       console.error('Error loading stock levels:', error)
     }
@@ -221,12 +213,7 @@ function InventoryContent() {
     if (!user || !selectedBranch) return
     
     try {
-      const response = await fetch(`/api/inventory/movements?userId=${user.uid}&branchId=${selectedBranch}&limit=20`)
-      const result = await response.json()
-      
-      if (result.success) {
-        setMovements(result.data.movements || [])
-      }
+      setMovements([])
     } catch (error) {
       console.error('Error loading movements:', error)
     }
@@ -245,24 +232,9 @@ function InventoryContent() {
     
     try {
       setLoading(true)
-      const response = await fetch('/api/inventory/initialize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          branchId: selectedBranch,
-          defaultStock: 0
-        })
-      })
-      
-      const result = await response.json()
-      if (result.success) {
-        alert(result.message)
-        await loadStockLevels()
-        await loadDashboard()
-      } else {
-        alert('Failed to initialize inventory: ' + result.error)
-      }
+      alert('Inventory is initialized automatically from backend branch products.')
+      await loadStockLevels()
+      await loadDashboard()
     } catch (error) {
       console.error('Error initializing inventory:', error)
       alert('Failed to initialize inventory')
@@ -276,28 +248,17 @@ function InventoryContent() {
     if (!user || !selectedBranch) return
     
     try {
-      const response = await fetch('/api/inventory/stock/adjust', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          productId,
-          branchId: selectedBranch,
-          quantity,
-          reason,
-          notes
-        })
+      await adjustStockRecord(user.uid, {
+        productId,
+        branchId: selectedBranch,
+        quantity,
+        reason,
+        notes
       })
-      
-      const result = await response.json()
-      if (result.success) {
-        await loadStockLevels()
-        await loadDashboard()
-        await loadMovements()
-        setShowAdjustModal(null)
-      } else {
-        alert('Failed to adjust stock: ' + result.error)
-      }
+      await loadStockLevels()
+      await loadDashboard()
+      await loadMovements()
+      setShowAdjustModal(null)
     } catch (error) {
       console.error('Error adjusting stock:', error)
       alert('Failed to adjust stock')
@@ -626,20 +587,37 @@ function InventoryContent() {
               <div className="space-y-4">
                 {stockLevels.map((stock) => {
                   const product = products.find(p => p.id === stock.productId)
+                  const primaryImageUrl = getProductImageUrl(product)
                   return (
                     <div key={`${stock.productId}-${stock.branchId}`} 
-                         className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <h3 className="font-medium">{product?.name || stock.productId}</h3>
+                         className="flex flex-col gap-4 py-3 border-b border-gray-100 last:border-0 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 items-center gap-4">
+                        <div className="relative flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                          {primaryImageUrl ? (
+                            <Image
+                              src={primaryImageUrl}
+                              alt={product?.name || 'Product image'}
+                              fill
+                              sizes="64px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <CubeIcon className="h-7 w-7 text-gray-400" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="truncate font-medium">{product?.name || stock.productId}</h3>
+                          {product?.category && (
+                            <p className="mb-0.5 text-xs font-medium text-gray-500">{product.category}</p>
+                          )}
                           <p className="text-sm text-gray-600">
                             SKU: {product?.sku || 'N/A'} • Min: {stock.minStockLevel}
                           </p>
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
+                      <div className="flex items-center justify-between gap-4 sm:justify-end">
+                        <div className="text-left sm:text-right">
                           <p className="font-medium">{stock.currentStock} units</p>
                           <p className="text-sm text-gray-600">
                             Available: {stock.availableStock}
@@ -647,7 +625,7 @@ function InventoryContent() {
                           </p>
                         </div>
                         
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                           {stock.isLowStock && (
                             <Badge variant="destructive">Low Stock</Badge>
                           )}

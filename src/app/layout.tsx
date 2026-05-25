@@ -5,7 +5,9 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { StaffProvider } from "@/contexts/StaffContext";
 import { AdminAccessProvider } from "@/contexts/AdminAccessContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
+import { BranchProvider } from "@/contexts/BranchContext";
 import { OnboardingProvider } from "@/components/onboarding/OnboardingProvider";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 import ErrorHandler from "@/components/ErrorHandler";
 import ChatwootWidget from "@/components/ChatwootWidget";
 
@@ -74,17 +76,21 @@ export default function RootLayout({
       >
         <ErrorHandler />
         <ChatwootWidget />
-        <AuthProvider>
-          <StaffProvider>
-            <AdminAccessProvider>
-              <NotificationsProvider>
-                <OnboardingProvider>
-                  {children}
-                </OnboardingProvider>
-              </NotificationsProvider>
-            </AdminAccessProvider>
-          </StaffProvider>
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <StaffProvider>
+              <AdminAccessProvider>
+                <NotificationsProvider>
+                  <OnboardingProvider>
+                    <BranchProvider>
+                      {children}
+                    </BranchProvider>
+                  </OnboardingProvider>
+                </NotificationsProvider>
+              </AdminAccessProvider>
+            </StaffProvider>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

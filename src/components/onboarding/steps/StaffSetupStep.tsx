@@ -59,7 +59,6 @@ export default function StaffSetupStep({
   data,
   updateData,
   onNext,
-  onSkip,
   isLoading,
   isSaving
 }: StaffSetupStepProps) {
@@ -336,17 +335,8 @@ export default function StaffSetupStep({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
-          className="flex gap-4 pt-6"
+          className="flex pt-6"
         >
-          <Button
-            variant="outline"
-            onClick={onSkip}
-            disabled={isLoading}
-            className="flex-1"
-          >
-            Skip This Step
-          </Button>
-          
           <Button
             onClick={handleNext}
             disabled={isLoading}

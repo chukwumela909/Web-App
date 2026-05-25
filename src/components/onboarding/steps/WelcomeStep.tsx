@@ -50,7 +50,6 @@ export default function WelcomeStep({
   data,
   updateData,
   onNext,
-  onSkipToEnd,
   isLoading,
   isSaving
 }: WelcomeStepProps) {
@@ -72,7 +71,7 @@ export default function WelcomeStep({
         
         <p className="text-lg text-gray-600 max-w-2xl mx-auto mb-8">
           Let's set up your account so you can start managing your business like a pro. 
-          This will only take a few minutes, and you can always complete it later.
+          This will only take a few minutes.
         </p>
       </motion.div>
 
@@ -127,20 +126,9 @@ export default function WelcomeStep({
           )}
         </Button>
 
-        <div className="text-center">
-          <Button
-            variant="ghost"
-            onClick={onSkipToEnd}
-            disabled={isLoading}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            Skip setup and go to dashboard
-          </Button>
-        </div>
-
         <div className="text-xs text-gray-500 max-w-md mx-auto">
           <p>
-            ✨ <strong>Pro tip:</strong> Completing the setup now will help you get the most out of FahamPesa. 
+            <strong>Pro tip:</strong> Completing setup now gives your account the business workspace it needs. 
             You can always update your information later in Settings.
           </p>
         </div>

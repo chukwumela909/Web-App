@@ -19,7 +19,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
   free: {
     products: 10,
     dailySales: 5,
-    branches: 0, // No access
+    branches: 1, // One included main branch; additional branches require Pro
     staff: 0, // No access
     suppliers: 5,
     debtors: 5,

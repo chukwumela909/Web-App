@@ -43,6 +43,13 @@ import {
 // Import Branch from the proper branches system
 import { Branch } from '@/lib/branches-types'
 import { getBranches as getBranchesFromService, getBranch as getBranchFromService } from '@/lib/branches-service'
+import {
+  adjustBackendStock,
+  getBackendProducts,
+  getSelectedBackendBranchId,
+  isBackendAvailable,
+  shouldUseFirebaseFallback
+} from '@/lib/backend-business-api'
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -93,6 +100,32 @@ export async function getBranch(branchId: string): Promise<Branch | null> {
 // ============================================================================
 
 export async function getInventoryItems(userId: string, branchId?: string): Promise<InventoryItem[]> {
+  if (isBackendAvailable()) {
+    try {
+      const targetBranch = branchId || await getSelectedBackendBranchId()
+      const products = await getBackendProducts(targetBranch)
+      return products.map((product) => ({
+        id: product.id,
+        productId: product.id,
+        branchId: targetBranch,
+        currentStock: product.quantity || 0,
+        reservedStock: 0,
+        availableStock: product.quantity || 0,
+        minStockLevel: product.minStockLevel || 0,
+        reorderPoint: product.minStockLevel || 0,
+        averageCostPrice: product.costPrice || 0,
+        lastCostPrice: product.costPrice || 0,
+        binLocation: product.location || undefined,
+        userId: product.userId,
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt
+      }))
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend inventory unavailable, falling back to Firestore:', error)
+    }
+  }
+
   try {
     // Get products from the products collection (where they're actually stored)
     let q = query(
@@ -423,6 +456,16 @@ export async function adjustStock(
   userId: string,
   request: StockAdjustmentRequest
 ): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await adjustBackendStock(request)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend stock adjustment unavailable, falling back to Firestore:', error)
+    }
+  }
+
   await runTransaction(db, async (transaction) => {
     // Get current inventory item
     const inventoryRef = await getInventoryItem(request.productId, request.branchId)

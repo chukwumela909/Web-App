@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter, usePathname } from 'next/navigation'
-import { checkOnboardingStatus, OnboardingStatus, getOnboardingRedirectPath } from '@/lib/onboarding-utils'
+import { checkOnboardingStatus, OnboardingStatus } from '@/lib/onboarding-utils'
 
 interface OnboardingContextType {
   onboardingStatus: OnboardingStatus | null
@@ -23,12 +23,16 @@ export function useOnboarding() {
 }
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, backendSession, backendSessionLoading, isSuperAdmin } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isCompletingOnboarding, setIsCompletingOnboarding] = useState(false)
+  const isStaffRoute = pathname.startsWith('/staff-dashboard')
+  const isAuthRoute = pathname === '/login' || pathname === '/signup'
+  const isOnboardingRoute = pathname.startsWith('/onboarding')
+  const isSuperAdminRoute = pathname.startsWith('/super-admin')
 
   const refreshOnboardingStatus = async () => {
     if (!user) {
@@ -39,7 +43,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
     try {
       setIsLoading(true)
-      const status = await checkOnboardingStatus(user.uid)
+      const status = await checkOnboardingStatus(user)
       setOnboardingStatus(status)
     } catch (error) {
       console.error('Error refreshing onboarding status:', error)
@@ -49,36 +53,51 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && !backendSessionLoading) {
+      if (backendSession?.onboardingStatus) {
+        setOnboardingStatus(backendSession.onboardingStatus)
+        setIsLoading(false)
+        return
+      }
       refreshOnboardingStatus()
     }
-  }, [user, authLoading])
+  }, [user, authLoading, backendSessionLoading, backendSession])
 
   // Redirect logic based on onboarding status
   useEffect(() => {
-    if (authLoading || isLoading || !user || !onboardingStatus || isCompletingOnboarding) return
+    if (authLoading || backendSessionLoading || isLoading || !user || !onboardingStatus || isCompletingOnboarding) return
 
     // Don't redirect if on auth pages (login, signup)
-    if (pathname === '/login' || pathname === '/signup') return
+    if (isAuthRoute) return
     
     // Don't redirect if user is super admin
     // (Super admins might not need onboarding)
-    if (pathname.startsWith('/super-admin')) return
+    if (isSuperAdmin || isSuperAdminRoute || isStaffRoute) return
 
-    // Only redirect if onboarding is NOT completed and NOT skipped
-    if (!onboardingStatus.completed && !onboardingStatus.skipped) {
-      // User needs to complete onboarding
-      if (!pathname.startsWith('/onboarding')) {
+    if (!onboardingStatus.hasBusiness) {
+      if (!isOnboardingRoute) {
         router.push('/onboarding')
       }
     } else {
-      // User has completed onboarding - let them navigate freely
-      // Only redirect from onboarding page to dashboard if they're done
       if (pathname === '/onboarding') {
         router.push('/dashboard')
       }
     }
-  }, [user, onboardingStatus, authLoading, isLoading, pathname, router, isCompletingOnboarding])
+  }, [
+    user,
+    onboardingStatus,
+    authLoading,
+    backendSessionLoading,
+    isLoading,
+    pathname,
+    router,
+    isCompletingOnboarding,
+    isSuperAdmin,
+    isAuthRoute,
+    isSuperAdminRoute,
+    isStaffRoute,
+    isOnboardingRoute
+  ])
 
   const setCompletingOnboarding = (completing: boolean) => {
     setIsCompletingOnboarding(completing)
@@ -86,14 +105,22 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const value = {
     onboardingStatus,
-    isLoading: authLoading || isLoading,
+    isLoading: authLoading || backendSessionLoading || isLoading,
     refreshOnboardingStatus,
     setCompletingOnboarding
   }
 
   return (
     <OnboardingContext.Provider value={value}>
-      {children}
+      {user &&
+      onboardingStatus &&
+      !onboardingStatus.hasBusiness &&
+      !isCompletingOnboarding &&
+      !isAuthRoute &&
+      !isOnboardingRoute &&
+      !isSuperAdmin &&
+      !isSuperAdminRoute &&
+      !isStaffRoute ? null : children}
     </OnboardingContext.Provider>
   )
 }

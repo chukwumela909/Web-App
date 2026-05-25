@@ -48,6 +48,19 @@ import {
 
 // Integration with inventory system
 import { processPurchaseInventoryUpdate } from '@/lib/inventory-hooks'
+import {
+  approveBackendPurchaseOrder,
+  createBackendPurchaseOrder,
+  createBackendSupplier,
+  deleteBackendSupplier,
+  getBackendPurchaseOrders,
+  getBackendSupplierDashboard,
+  getBackendSuppliers,
+  isBackendAvailable,
+  receiveBackendPurchaseOrder,
+  shouldUseFirebaseFallback,
+  updateBackendSupplier
+} from '@/lib/backend-business-api'
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -87,6 +100,24 @@ export async function getSuppliers(
   sortDirection: SortDirection = 'asc',
   limitCount?: number
 ): Promise<Supplier[]> {
+  if (isBackendAvailable()) {
+    try {
+      let suppliers = await getBackendSuppliers()
+      if (filters?.searchTerm) {
+        const term = filters.searchTerm.toLowerCase()
+        suppliers = suppliers.filter((supplier) =>
+          supplier.name.toLowerCase().includes(term) ||
+          supplier.phone.includes(term) ||
+          supplier.email?.toLowerCase().includes(term)
+        )
+      }
+      return limitCount ? suppliers.slice(0, limitCount) : suppliers
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend suppliers unavailable, falling back to Firestore:', error)
+    }
+  }
+
   let q = query(collection(db, 'suppliers'), where('userId', '==', userId))
   
   // Apply filters
@@ -148,6 +179,16 @@ export async function getSuppliers(
 }
 
 export async function getSupplier(supplierId: string): Promise<Supplier | null> {
+  if (isBackendAvailable()) {
+    try {
+      const suppliers = await getBackendSuppliers()
+      return suppliers.find((supplier) => supplier.id === supplierId) || null
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend supplier detail unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const docSnap = await getDoc(doc(db, 'suppliers', supplierId))
   if (docSnap.exists()) {
     return { id: docSnap.id, ...docSnap.data() } as Supplier
@@ -159,6 +200,15 @@ export async function createSupplier(
   userId: string,
   data: CreateSupplierRequest
 ): Promise<string> {
+  if (isBackendAvailable()) {
+    try {
+      return await createBackendSupplier(data as Partial<Supplier>)
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend supplier create unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const supplierId = crypto.randomUUID()
   
   const supplier: Supplier = {
@@ -202,6 +252,16 @@ export async function updateSupplier(
   supplierId: string,
   data: UpdateSupplierRequest
 ): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await updateBackendSupplier(supplierId, data as Partial<Supplier>)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend supplier update unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const updateData: any = { ...data }
   delete updateData.id // Remove ID from update data
   updateData.updatedAt = serverTimestamp()
@@ -217,6 +277,16 @@ export async function archiveSupplier(supplierId: string): Promise<void> {
 }
 
 export async function deleteSupplier(supplierId: string): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await deleteBackendSupplier(supplierId)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend supplier delete unavailable, falling back to Firestore:', error)
+    }
+  }
+
   // Check if supplier has any purchase orders
   const poQuery = query(
     collection(db, 'purchase_orders'),
@@ -243,6 +313,22 @@ export async function getPurchaseOrders(
   sortDirection: SortDirection = 'desc',
   limitCount?: number
 ): Promise<PurchaseOrder[]> {
+  if (isBackendAvailable()) {
+    try {
+      let orders = await getBackendPurchaseOrders(filters?.branchId)
+      if (filters?.status?.length) {
+        orders = orders.filter((order) => filters.status!.includes(order.status))
+      }
+      if (filters?.supplierId) {
+        orders = orders.filter((order) => order.supplierId === filters.supplierId)
+      }
+      return limitCount ? orders.slice(0, limitCount) : orders
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend purchase orders unavailable, falling back to Firestore:', error)
+    }
+  }
+
   let q = query(collection(db, 'purchase_orders'), where('userId', '==', userId))
   
   // Apply filters
@@ -311,6 +397,16 @@ export async function getPurchaseOrders(
 }
 
 export async function getPurchaseOrder(purchaseOrderId: string): Promise<PurchaseOrder | null> {
+  if (isBackendAvailable()) {
+    try {
+      const orders = await getBackendPurchaseOrders()
+      return orders.find((order) => order.id === purchaseOrderId) || null
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend purchase order detail unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const docSnap = await getDoc(doc(db, 'purchase_orders', purchaseOrderId))
   if (docSnap.exists()) {
     return { id: docSnap.id, ...docSnap.data() } as PurchaseOrder
@@ -350,6 +446,15 @@ export async function createPurchaseOrder(
   userId: string,
   data: CreatePurchaseOrderRequest
 ): Promise<string> {
+  if (isBackendAvailable()) {
+    try {
+      return await createBackendPurchaseOrder(data)
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend purchase order create unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const purchaseOrderId = crypto.randomUUID()
   const poNumber = await generatePONumber(userId)
   
@@ -420,6 +525,16 @@ export async function approvePurchaseOrder(
   userId: string,
   data: ApprovePurchaseOrderRequest
 ): Promise<void> {
+  if (isBackendAvailable() && data.approved) {
+    try {
+      await approveBackendPurchaseOrder(purchaseOrderId)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend purchase order approve unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const updateData: any = {
     updatedAt: serverTimestamp()
   }
@@ -471,6 +586,16 @@ export async function receivePurchaseOrder(
   userId: string,
   data: ReceivePurchaseOrderRequest
 ): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await receiveBackendPurchaseOrder(data.purchaseOrderId, data.items)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend purchase order receive unavailable, falling back to Firestore:', error)
+    }
+  }
+
   await runTransaction(db, async (transaction) => {
     // Get the current PO
     const poRef = doc(db, 'purchase_orders', data.purchaseOrderId)
@@ -726,6 +851,15 @@ export async function getPriceHistory(
 // ============================================================================
 
 export async function getSupplierDashboard(userId: string): Promise<SupplierDashboard> {
+  if (isBackendAvailable()) {
+    try {
+      return await getBackendSupplierDashboard()
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend supplier dashboard unavailable, falling back to Firestore:', error)
+    }
+  }
+
   // Get supplier counts
   const suppliersSnap = await getDocs(
     query(collection(db, 'suppliers'), where('userId', '==', userId))

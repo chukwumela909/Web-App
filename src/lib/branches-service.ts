@@ -57,6 +57,19 @@ import {
   checkStockLevels, 
   validateStockAvailability 
 } from '@/lib/inventory-hooks'
+import {
+  createBackendBranch,
+  createBackendTransfer,
+  disableBackendBranch,
+  getBackendBranch,
+  getBackendBranchDashboard,
+  getBackendBranches,
+  getBackendTransfers,
+  isBackendAvailable,
+  shouldUseFirebaseFallback,
+  transitionBackendTransfer,
+  updateBackendBranch
+} from '@/lib/backend-business-api'
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -96,6 +109,26 @@ export async function getBranches(
   sortDirection: SortDirection = 'asc',
   limitCount?: number
 ): Promise<Branch[]> {
+  if (isBackendAvailable()) {
+    try {
+      let branches = await getBackendBranches()
+      if (filters?.searchTerm) {
+        const term = filters.searchTerm.toLowerCase()
+        branches = branches.filter((branch) =>
+          branch.name.toLowerCase().includes(term) ||
+          branch.branchCode?.toLowerCase().includes(term)
+        )
+      }
+      if (filters?.status?.length) {
+        branches = branches.filter((branch) => filters.status!.includes(branch.status))
+      }
+      return limitCount ? branches.slice(0, limitCount) : branches
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend branches unavailable, falling back to Firestore:', error)
+    }
+  }
+
   try {
     console.log('getBranches called with:', { userId, filters, sortField, sortDirection, limitCount })
     
@@ -251,6 +284,15 @@ export async function getBranches(
 }
 
 export async function getBranch(branchId: string): Promise<Branch | null> {
+  if (isBackendAvailable()) {
+    try {
+      return await getBackendBranch(branchId)
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend branch detail unavailable, falling back to Firestore:', error)
+    }
+  }
+
   try {
     const docSnap = await getDoc(doc(db, 'branches', branchId))
     if (docSnap.exists()) {
@@ -279,6 +321,15 @@ export async function createBranch(
   userId: string,
   data: CreateBranchRequest
 ): Promise<string> {
+  if (isBackendAvailable()) {
+    try {
+      return await createBackendBranch(data as Partial<Branch>)
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend branch create unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const branchId = crypto.randomUUID()
   
   // Generate branch code if not provided
@@ -330,6 +381,16 @@ export async function updateBranch(
   branchId: string,
   data: UpdateBranchRequest
 ): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await updateBackendBranch(branchId, data as Partial<Branch>)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend branch update unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const updateData: any = { ...data }
   delete updateData.id
   updateData.updatedAt = serverTimestamp()
@@ -344,6 +405,16 @@ export async function deactivateBranch(
   branchId: string,
   reason?: string
 ): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await disableBackendBranch(branchId)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend branch disable unavailable, falling back to Firestore:', error)
+    }
+  }
+
   // Check for pending transfers
   const pendingTransfersQuery = query(
     collection(db, 'branch_transfers'),
@@ -433,6 +504,25 @@ export async function getBranchTransfers(
   sortDirection: SortDirection = 'desc',
   limitCount?: number
 ): Promise<BranchTransfer[]> {
+  if (isBackendAvailable()) {
+    try {
+      let transfers = await getBackendTransfers()
+      if (filters?.fromBranchId) {
+        transfers = transfers.filter((transfer) => transfer.fromBranchId === filters.fromBranchId)
+      }
+      if (filters?.toBranchId) {
+        transfers = transfers.filter((transfer) => transfer.toBranchId === filters.toBranchId)
+      }
+      if (filters?.status?.length) {
+        transfers = transfers.filter((transfer) => filters.status!.includes(transfer.status))
+      }
+      return limitCount ? transfers.slice(0, limitCount) : transfers
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend transfers unavailable, falling back to Firestore:', error)
+    }
+  }
+
   try {
     let q = query(collection(db, 'branch_transfers'), where('userId', '==', userId))
   
@@ -510,6 +600,16 @@ export async function getBranchTransfers(
 }
 
 export async function getBranchTransfer(transferId: string): Promise<BranchTransfer | null> {
+  if (isBackendAvailable()) {
+    try {
+      const transfers = await getBackendTransfers()
+      return transfers.find((transfer) => transfer.id === transferId) || null
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend transfer detail unavailable, falling back to Firestore:', error)
+    }
+  }
+
   try {
     const docSnap = await getDoc(doc(db, 'branch_transfers', transferId))
     if (docSnap.exists()) {
@@ -553,6 +653,15 @@ export async function createBranchTransfer(
   userId: string,
   data: CreateTransferRequest
 ): Promise<string> {
+  if (isBackendAvailable()) {
+    try {
+      return await createBackendTransfer(data)
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend transfer create unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const transferId = crypto.randomUUID()
   const transferNumber = await generateTransferNumber(userId)
   
@@ -624,7 +733,7 @@ export async function createBranchTransfer(
     requestedAt: new Date(),
     requestReason: data.requestReason || '',
     transferType: data.transferType,
-    transportMethod: data.transportMethod,
+    transportMethod: data.transportMethod as BranchTransfer['transportMethod'],
     estimatedArrival: data.estimatedArrival,
     internalNotes: data.internalNotes || '',
     userId
@@ -648,6 +757,16 @@ export async function approveBranchTransfer(
   userId: string,
   data: ApproveTransferRequest
 ): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await transitionBackendTransfer(transferId, data.approved ? 'approve' : 'reject', data.approved ? undefined : { reason: data.rejectionReason })
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend transfer approve/reject unavailable, falling back to Firestore:', error)
+    }
+  }
+
   await runTransaction(db, async (transaction) => {
     const transferRef = doc(db, 'branch_transfers', transferId)
     const transferSnap = await transaction.get(transferRef)
@@ -703,6 +822,20 @@ export async function shipBranchTransfer(
   transferId: string,
   data: ShipTransferRequest
 ): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await transitionBackendTransfer(transferId, 'ship', {
+        trackingNumber: data.trackingNumber,
+        estimatedArrival: data.estimatedArrival,
+        notes: data.shippingNotes
+      })
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend transfer ship unavailable, falling back to Firestore:', error)
+    }
+  }
+
   await updateDoc(doc(db, 'branch_transfers', transferId), {
     status: 'IN_TRANSIT',
     shippedBy: data.shippedBy,
@@ -718,6 +851,22 @@ export async function receiveBranchTransfer(
   userId: string,
   data: ReceiveTransferRequest
 ): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await transitionBackendTransfer(data.transferId, 'receive', {
+        items: data.items.map((item) => ({
+          productId: item.productId,
+          quantityReceived: item.receivedQuantity
+        })),
+        notes: data.receivingNotes
+      })
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend transfer receive unavailable, falling back to Firestore:', error)
+    }
+  }
+
   await runTransaction(db, async (transaction) => {
     const transferRef = doc(db, 'branch_transfers', data.transferId)
     const transferSnap = await transaction.get(transferRef)
@@ -819,6 +968,16 @@ export async function cancelBranchTransfer(
   transferId: string,
   reason: string
 ): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await transitionBackendTransfer(transferId, 'cancel', { reason })
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend transfer cancel unavailable, falling back to Firestore:', error)
+    }
+  }
+
   await updateDoc(doc(db, 'branch_transfers', transferId), {
     status: 'CANCELLED',
     rejectionReason: reason,
@@ -962,7 +1121,84 @@ export async function getMultibranchStockSummary(
 // DASHBOARD AND ANALYTICS
 // ============================================================================
 
+function buildBranchDashboard(branches: Branch[], transfers: BranchTransfer[] = []): BranchDashboard {
+  const activeBranches = branches.filter(b => b.status === 'ACTIVE')
+
+  let totalProducts = 0
+  let totalInventoryValue = 0
+  let lowStockAlerts = 0
+
+  for (const branch of activeBranches) {
+    totalProducts += branch.totalProducts || 0
+    totalInventoryValue += branch.totalInventoryValue || 0
+    lowStockAlerts += branch.lowStockItemsCount || 0
+  }
+
+  return {
+    totalBranches: branches.length,
+    activeBranches: activeBranches.length,
+    totalProducts,
+    totalInventoryValue,
+    lowStockAlerts,
+    pendingTransfers: transfers.filter(t => t.status === 'REQUESTED').length,
+    inTransitTransfers: transfers.filter(t => t.status === 'IN_TRANSIT').length,
+    recentTransfers: transfers,
+    topPerformingBranches: activeBranches
+      .sort((a, b) => (b.totalInventoryValue || 0) - (a.totalInventoryValue || 0))
+      .slice(0, 5)
+      .map(branch => ({
+        branchId: branch.id,
+        branchName: branch.name,
+        inventoryValue: branch.totalInventoryValue || 0,
+        productsCount: branch.totalProducts || 0,
+        transfersIn: 0,
+        transfersOut: 0
+      }))
+  }
+}
+
 export async function getBranchDashboard(userId: string): Promise<BranchDashboard> {
+  if (isBackendAvailable()) {
+    try {
+      const branches = await getBackendBranches()
+      const branch = branches.find((item) => item.status === 'ACTIVE') || branches[0]
+      const transfers = await getBackendTransfers().catch((error) => {
+        console.warn('Backend transfers unavailable while building branch dashboard:', error)
+        return []
+      })
+      const aggregateDashboard = buildBranchDashboard(branches, transfers)
+
+      if (branch) {
+        const branchDashboard = await getBackendBranchDashboard(branch.id).catch((error) => {
+          console.warn('Backend branch dashboard unavailable, using branch list summary:', error)
+          return null
+        })
+
+        if (branchDashboard) {
+          return {
+            ...aggregateDashboard,
+            totalProducts: aggregateDashboard.totalProducts || branchDashboard.totalProducts,
+            totalInventoryValue: aggregateDashboard.totalInventoryValue || branchDashboard.totalInventoryValue,
+            lowStockAlerts: aggregateDashboard.lowStockAlerts || branchDashboard.lowStockAlerts,
+            pendingTransfers: aggregateDashboard.pendingTransfers || branchDashboard.pendingTransfers,
+            inTransitTransfers: aggregateDashboard.inTransitTransfers || branchDashboard.inTransitTransfers,
+            recentTransfers: aggregateDashboard.recentTransfers.length > 0
+              ? aggregateDashboard.recentTransfers
+              : branchDashboard.recentTransfers,
+            topPerformingBranches: aggregateDashboard.topPerformingBranches.length > 0
+              ? aggregateDashboard.topPerformingBranches
+              : branchDashboard.topPerformingBranches
+          }
+        }
+      }
+
+      return aggregateDashboard
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend branch dashboard unavailable, falling back to Firestore:', error)
+    }
+  }
+
   try {
     console.log('getBranchDashboard called for userId:', userId)
     
@@ -981,48 +1217,7 @@ export async function getBranchDashboard(userId: string): Promise<BranchDashboar
     console.log('Dashboard data - branches found:', branches.length)
     console.log('Dashboard data - transfers found:', transfers.length)
   
-  const activeBranches = branches.filter(b => b.status === 'ACTIVE')
-  const totalBranches = branches.length
-  
-  // Calculate inventory metrics
-  let totalProducts = 0
-  let totalInventoryValue = 0
-  let lowStockAlerts = 0
-  
-  for (const branch of activeBranches) {
-    totalProducts += branch.totalProducts || 0
-    totalInventoryValue += branch.totalInventoryValue || 0
-    lowStockAlerts += branch.lowStockItemsCount || 0
-  }
-  
-  // Transfer metrics
-  const pendingTransfers = transfers.filter(t => t.status === 'REQUESTED').length
-  const inTransitTransfers = transfers.filter(t => t.status === 'IN_TRANSIT').length
-  
-  // Top performing branches
-  const topPerformingBranches = activeBranches
-    .sort((a, b) => (b.totalInventoryValue || 0) - (a.totalInventoryValue || 0))
-    .slice(0, 5)
-    .map(branch => ({
-      branchId: branch.id,
-      branchName: branch.name,
-      inventoryValue: branch.totalInventoryValue || 0,
-      productsCount: branch.totalProducts || 0,
-      transfersIn: 0, // TODO: Calculate from transfers
-      transfersOut: 0 // TODO: Calculate from transfers
-    }))
-  
-    return {
-      totalBranches,
-      activeBranches: activeBranches.length,
-      totalProducts,
-      totalInventoryValue,
-      lowStockAlerts,
-      pendingTransfers,
-      inTransitTransfers,
-      recentTransfers: transfers,
-      topPerformingBranches
-    }
+    return buildBranchDashboard(branches, transfers)
   } catch (error) {
     console.error('Error in getBranchDashboard:', error)
     // Return default dashboard data on error

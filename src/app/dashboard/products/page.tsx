@@ -4,7 +4,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
-import { useCallback, useEffect, useMemo, useState, Suspense } from 'react'
+import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { 
@@ -23,7 +23,8 @@ import {
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
-import { Product as FPProduct, ProductImage, createProduct, getProducts, updateProduct } from '@/lib/firestore'
+import { useBranch } from '@/contexts/BranchContext'
+import { Product as FPProduct, ProductImage, createProduct, updateProduct } from '@/lib/firestore'
 import { uploadMultipleProductImages, UploadProgress } from '@/lib/firebase-storage'
 import { addSupplierLinkToProduct } from '@/lib/product-enhancements'
 import SupplierSelection from '@/components/products/SupplierSelection'
@@ -33,6 +34,7 @@ import { getBranches } from '@/lib/branches-service'
 import { Branch } from '@/lib/branches-types'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { UpgradeModal } from '@/components/UpgradeModal'
+import { useInvalidateBusinessData, useProductsQuery } from '@/hooks/useBusinessQueries'
 
 const categories = [
   "All Categories",
@@ -60,6 +62,8 @@ const units = [
   "pcs", "kg", "g", "litre", "ml", "box", "pack", "bottle", "can", "bag", "roll", "meter", "feet", "dozen",
   "inches", "yards", "square meter", "square feet", "cubic meter", "length", "coil", "bundle", "set", "pair"
 ]
+
+const allowedProductImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 // Helper function to remove undefined values from objects before saving to Firestore
 function cleanFirestoreData<T extends Record<string, any>>(obj: T): T {
@@ -136,7 +140,6 @@ function ProductsPageContent() {
   const [showEditProduct, setShowEditProduct] = useState(false)
   const [editingProduct, setEditingProduct] = useState<FPProduct | null>(null)
   const [currentStep, setCurrentStep] = useState<FormStep>('basic')
-  const [products, setProducts] = useState<FPProduct[]>([])
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [showSellingValue, setShowSellingValue] = useState(false)
@@ -154,12 +157,14 @@ function ProductsPageContent() {
   } | null>(null)
   const { user } = useAuth()
   const { staff } = useStaff()
+  const { selectedBranchId } = useBranch()
   const effectiveUserId = staff ? staff.userId : user?.uid
   const currency = useCurrency()
-  const currencySymbol = getCurrencySymbol(currency)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { canAddProduct } = usePlanLimits()
+  const { data: products = [], refetch: refetchProducts } = useProductsQuery({ userId: effectiveUserId, branchId: selectedBranchId })
+  const { invalidateAllBusinessData } = useInvalidateBusinessData()
 
   // Enhanced Product Form State
   const [productForm, setProductForm] = useState<ProductFormData>({
@@ -203,8 +208,8 @@ function ProductsPageContent() {
 
     // Validate file types
     const validFiles = files.filter(file => {
-      if (!file.type.startsWith('image/')) {
-        alert(`${file.name} is not a valid image file.`)
+      if (!allowedProductImageTypes.has(file.type)) {
+        alert(`${file.name} is not a supported image. Please upload a JPEG, PNG, or WebP file.`)
         return false
       }
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
@@ -221,37 +226,48 @@ function ProductsPageContent() {
       selectedFiles: [...prev.selectedFiles, ...validFiles]
     }))
 
-    // Start upload process
-    if (user) {
-      setIsUploading(true)
-      try {
-        const productId = editingProduct?.id || crypto.randomUUID()
-        const uploadedImages = await uploadMultipleProductImages(
-          validFiles,
-          productId,
-          setUploadProgress
-        )
+    if (!user) {
+      alert('You must be signed in to upload product images.')
+      setProductForm(prev => ({
+        ...prev,
+        selectedFiles: prev.selectedFiles.filter(file => !validFiles.includes(file))
+      }))
+      event.target.value = ''
+      return
+    }
 
-        setProductForm(prev => ({
-          ...prev,
-          images: [...prev.images, ...uploadedImages.map((img, index) => ({
-            ...img,
-            isPrimary: prev.images.length === 0 && index === 0 // First image is primary
-          }))],
-          selectedFiles: prev.selectedFiles.filter(file => !validFiles.includes(file))
-        }))
-      } catch (error) {
-        console.error('Image upload failed:', error)
-        alert('Failed to upload some images. Please try again.')
-        // Remove failed files from selectedFiles
-        setProductForm(prev => ({
-          ...prev,
-          selectedFiles: prev.selectedFiles.filter(file => !validFiles.includes(file))
-        }))
-      } finally {
-        setIsUploading(false)
-        setUploadProgress([])
+    setIsUploading(true)
+    try {
+      const productId = editingProduct?.id || crypto.randomUUID()
+      const uploadedImages = await uploadMultipleProductImages(
+        validFiles,
+        productId,
+        setUploadProgress
+      )
+
+      setProductForm(prev => ({
+        ...prev,
+        images: [...prev.images, ...uploadedImages.map((img, index) => ({
+          ...img,
+          isPrimary: prev.images.length === 0 && index === 0 // First image is primary
+        }))],
+        selectedFiles: prev.selectedFiles.filter(file => !validFiles.includes(file))
+      }))
+
+      if (uploadedImages.length < validFiles.length) {
+        alert(`${uploadedImages.length} of ${validFiles.length} images uploaded. Please retry the failed image.`)
       }
+    } catch (error) {
+      console.error('Image upload failed:', error)
+      alert(error instanceof Error ? error.message : 'Failed to upload product images. Please try again.')
+      // Remove failed files from selectedFiles
+      setProductForm(prev => ({
+        ...prev,
+        selectedFiles: prev.selectedFiles.filter(file => !validFiles.includes(file))
+      }))
+    } finally {
+      setIsUploading(false)
+      setUploadProgress([])
     }
 
     // Clear the input
@@ -296,6 +312,7 @@ function ProductsPageContent() {
       expiryDate: '',
       images: [],
       selectedFiles: [],
+      branchId: branches.find(b => b.status === 'ACTIVE')?.id || branches[0]?.id || '',
       
       // NEW ENHANCED FIELDS
       selectedSuppliers: [],
@@ -326,29 +343,14 @@ function ProductsPageContent() {
     
     try {
       await updateProduct(selectedProductForDetail.id, updates)
-      // Refresh products list
-      if (effectiveUserId) {
-        const updatedProducts = await getProducts(effectiveUserId)
-        setProducts(updatedProducts)
-      }
+      await invalidateAllBusinessData()
+      await refetchProducts()
       // Update the selected product for detail view
       setSelectedProductForDetail(prev => prev ? { ...prev, ...updates } : null)
     } catch (error) {
       console.error('Error updating product:', error)
     }
   }
-
-  const fetchData = useCallback(async () => {
-    if (!effectiveUserId) return
-    try {
-      const list = await getProducts(effectiveUserId)
-      setProducts(list)
-    } catch (error) {
-      console.error('Error loading products:', error)
-    }
-  }, [effectiveUserId])
-
-  useEffect(() => { fetchData() }, [effectiveUserId, fetchData])
 
   // Load branches for branch selector
   useEffect(() => {
@@ -489,7 +491,7 @@ function ProductsPageContent() {
       setShowAddProduct(false)
       setShowEditProduct(false)
       resetForm()
-      fetchData()
+      await invalidateAllBusinessData()
     } catch (error) {
       console.error('Failed to save product:', error)
       alert('Failed to save product. Please try again.')
@@ -557,6 +559,10 @@ function ProductsPageContent() {
   const totalProducts = products.length
   const totalCostValue = useMemo(() => products.reduce((sum, p) => sum + (p.costPrice * p.quantity), 0), [products])
   const totalSellingValue = useMemo(() => products.reduce((sum, p) => sum + (p.sellingPrice * p.quantity), 0), [products])
+  const selectedBranchCurrency = branches.find(branch => branch.id === productForm.branchId)?.currency
+    || branches.find(branch => branch.status === 'ACTIVE')?.currency
+    || branches[0]?.currency
+  const currencySymbol = getCurrencySymbol(selectedBranchCurrency || currency)
 
   const nextStep = () => {
     if (currentStep === 'basic') setCurrentStep('pricing')
@@ -919,7 +925,7 @@ function ProductsPageContent() {
                                   <div className="aspect-square">
                                     <input
                                       type="file"
-                                      accept="image/*"
+                                      accept="image/jpeg,image/png,image/webp"
                                       multiple
                                       onChange={handleImageUpload}
                                       className="hidden"
@@ -945,7 +951,7 @@ function ProductsPageContent() {
                               </div>
                               
                               <p className="text-xs text-gray-500">
-                                📸 Powered by ImageKit • First image will be used as primary display image
+                                Uploaded to Firebase Storage. First image will be used as the primary display image.
                               </p>
                             </div>
 
@@ -1336,7 +1342,7 @@ function ProductsPageContent() {
                 onClose={() => setShowBulkUpload(false)}
                 onSuccess={() => {
                   setShowBulkUpload(false)
-                  fetchData() // Refresh products list
+                  invalidateAllBusinessData()
                 }}
                 branchId={branches.length > 0 ? branches.find(b => b.status === 'ACTIVE')?.id || branches[0]?.id : undefined}
               />
