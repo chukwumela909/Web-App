@@ -35,7 +35,7 @@ interface BusinessQueryArgs {
 export function useProductsQuery({ userId, branchId }: BusinessQueryArgs) {
   return useQuery<Product[]>({
     queryKey: businessQueryKeys.products(userId, branchId),
-    queryFn: () => getProducts(userId!),
+    queryFn: () => getProducts(userId!, branchId),
     enabled: Boolean(userId),
     staleTime: 2 * 60 * 1000,
     placeholderData: previous => previous
@@ -97,7 +97,7 @@ export function useDashboardDataQuery({ userId, branchId }: BusinessQueryArgs) {
     queryKey: businessQueryKeys.dashboard(userId, branchId),
     queryFn: async () => {
       const [products, sales, multiItemSales, expenses, debtors] = await Promise.all([
-        getProducts(userId!),
+        getProducts(userId!, branchId),
         getSales(userId!, 2000),
         getMultiItemSales(userId!, 2000),
         getExpenses(userId!, 500),
@@ -117,7 +117,7 @@ export function usePOSDataQuery({ userId, branchId }: BusinessQueryArgs) {
     queryKey: businessQueryKeys.pos(userId, branchId),
     queryFn: async () => {
       const [products, singleSales, multiItemSales, heldSales] = await Promise.all([
-        getProducts(userId!),
+        getProducts(userId!, branchId),
         getSales(userId!, 2000),
         getMultiItemSales(userId!, 2000),
         getHeldSales(userId!, 50).catch((error) => {

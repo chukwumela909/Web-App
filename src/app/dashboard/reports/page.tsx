@@ -4,7 +4,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
-import { 
+import {
   CalendarDaysIcon,
   ChevronDownIcon,
   BuildingOffice2Icon,
@@ -13,14 +13,14 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
 import { useEffect, useMemo, useState } from 'react'
-import { 
-  DailySummary, 
-  getDailySummaries, 
-  getSales, 
-  Sale, 
-  getProducts, 
-  Product, 
-  getStaff, 
+import {
+  DailySummary,
+  getDailySummaries,
+  getSales,
+  Sale,
+  getProducts,
+  Product,
+  getStaff,
   Staff,
   getDebtors,
   Debtor,
@@ -35,7 +35,7 @@ import dynamic from 'next/dynamic'
 // Dynamically import chart components to avoid SSR issues
 const Line = dynamic(
   () => import('react-chartjs-2').then((mod) => mod.Line),
-  { 
+  {
     ssr: false,
     loading: () => <div className="h-[200px] flex items-center justify-center"><span className="text-gray-400">Loading chart...</span></div>
   }
@@ -104,10 +104,10 @@ function StatCard({ title, value, trend, trendColor = 'green' }: StatCardProps) 
   const { stroke, bg } = colors[trendColor]
 
   return (
-    <div className="bg-white border border-[#ececf2] rounded-xl px-4 py-5 flex flex-col gap-4">
-      <span className="text-[#525252] text-base font-normal">{title}</span>
+    <div className="dashboard-card flex min-h-[142px] flex-col gap-4 px-4 py-5">
+      <span className="text-[13px] font-medium text-[#64748b]">{title}</span>
       <div className="flex items-end justify-between">
-        <span className="text-[#171717] text-2xl font-bold">{value}</span>
+        <span className="dashboard-metric-value text-2xl font-semibold tracking-[-0.02em] text-[#0f172a]">{value}</span>
         {trend && (
           <svg width="50" height="36" viewBox="0 0 50 36" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="50" height="36" rx="10" fill={bg}/>
@@ -134,8 +134,8 @@ function PaymentMethodRow({ label, percentage }: PaymentMethodRowProps) {
     <div className="flex items-center justify-between w-full">
       <span className="text-[#525252] text-xs font-normal min-w-[80px]">{label}</span>
       <div className="bg-[#e9f2f8] h-1 w-[100px] rounded-sm">
-        <div 
-          className="bg-[#004aad] h-1 rounded-sm transition-all duration-300" 
+        <div
+          className="bg-[#004aad] h-1 rounded-sm transition-all duration-300"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -150,9 +150,9 @@ function PlaceBadge({ place }: { place: 1 | 2 | 3 }) {
     2: { from: '#7a8291', to: '#9098a6' },
     3: { from: '#da6a00', to: '#c25400' }
   }
-  
+
   return (
-    <div 
+    <div
       className="w-9 h-9 rounded-[18px] flex items-center justify-center text-white text-sm font-semibold shrink-0"
       style={{ background: `linear-gradient(to bottom, ${colors[place].from}, ${colors[place].to})` }}
     >
@@ -249,10 +249,10 @@ export default function ReportsPage() {
     const multiSales = multiItemSales.map(sale => {
       const totalCost = sale.items?.reduce((sum, item) => sum + ((item.costPrice || 0) * (item.quantity || 0)), 0) || 0
       const totalQty = sale.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0
-      const paymentMethodId = typeof sale.paymentMethod === 'string' 
-        ? sale.paymentMethod 
+      const paymentMethodId = typeof sale.paymentMethod === 'string'
+        ? sale.paymentMethod
         : sale.paymentMethod?.id || 'CASH'
-      
+
       return {
         id: sale.id,
         timestamp: sale.timestamp || 0,
@@ -288,16 +288,16 @@ export default function ReportsPage() {
   const metrics = useMemo(() => {
     // Filter sales based on selected period
     const now = Date.now()
-    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 : 
-                       selectedPeriod === 'Last 30 Days' ? 30 : 
+    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 :
+                       selectedPeriod === 'Last 30 Days' ? 30 :
                        selectedPeriod === 'Last 90 Days' ? 90 : 30
     const periodStart = now - (periodDays * 24 * 60 * 60 * 1000)
-    
+
     // Use combined sales data
     const filteredSales = allSalesData.filter(sale => (sale.timestamp || 0) >= periodStart)
-    
+
     console.log('Metrics calculation - Period:', selectedPeriod, 'Days:', periodDays, 'Filtered sales:', filteredSales.length, 'Total all sales:', allSalesData.length)
-    
+
     const totalSales = filteredSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
     const totalProfit = filteredSales.reduce((sum, sale) => {
       const cost = Number(sale.costPrice || 0)
@@ -305,7 +305,7 @@ export default function ReportsPage() {
       return sum + Math.max(0, revenue - cost)
     }, 0)
     const totalTransactions = filteredSales.length
-    
+
     // Calculate debt from debtors
     const totalDebt = debtors.reduce((sum, debtor) => sum + (debtor.currentDebt || 0), 0)
 
@@ -319,129 +319,129 @@ export default function ReportsPage() {
 
   // Generate trend data for Sales vs Profit chart from actual sales data
   const trendData = useMemo(() => {
-    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 : 
-                       selectedPeriod === 'Last 30 Days' ? 30 : 
+    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 :
+                       selectedPeriod === 'Last 30 Days' ? 30 :
                        selectedPeriod === 'Last 90 Days' ? 90 : 7
-    
+
     const now = Date.now()
     const periodStart = now - (periodDays * 24 * 60 * 60 * 1000)
-    
+
     // Filter sales data to selected period
     const filteredSales = allSalesData.filter(sale => (sale.timestamp || 0) >= periodStart)
-    
+
     if (filteredSales.length === 0 && summaries.length === 0) {
       return { labels: [], salesData: [], profitData: [] }
     }
-    
+
     // For 7 days: daily data points
     if (periodDays === 7) {
       const salesByDate: Record<string, { sales: number; profit: number }> = {}
-      
+
       // Initialize all 7 days with zeros
       for (let i = 6; i >= 0; i--) {
         const date = new Date(now - i * 24 * 60 * 60 * 1000)
         const dateKey = date.toISOString().split('T')[0]
         salesByDate[dateKey] = { sales: 0, profit: 0 }
       }
-      
+
       // Aggregate sales data
       filteredSales.forEach(sale => {
         const saleDate = new Date(sale.timestamp)
         const dateKey = saleDate.toISOString().split('T')[0]
-        
+
         if (salesByDate[dateKey]) {
           salesByDate[dateKey].sales += sale.totalAmount || 0
           salesByDate[dateKey].profit += Math.max(0, (sale.totalAmount || 0) - (sale.costPrice || 0))
         }
       })
-      
+
       const sortedDates = Object.keys(salesByDate).sort()
       const labels = sortedDates.map(dateStr => {
         const date = new Date(dateStr)
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       })
-      
+
       return {
         labels,
         salesData: sortedDates.map(d => salesByDate[d].sales),
         profitData: sortedDates.map(d => salesByDate[d].profit)
       }
     }
-    
+
     // For 30 days: weekly aggregation (~4-5 weeks)
     if (periodDays === 30) {
       const weeks: { label: string; sales: number; profit: number }[] = []
-      
+
       // Create 4-5 weekly buckets
       for (let i = 4; i >= 0; i--) {
         const weekEnd = new Date(now - i * 7 * 24 * 60 * 60 * 1000)
         const weekStart = new Date(weekEnd.getTime() - 6 * 24 * 60 * 60 * 1000)
-        
+
         if (weekStart.getTime() < periodStart) continue
-        
+
         const weekSales = filteredSales.filter(sale => {
           const saleTime = sale.timestamp || 0
           return saleTime >= weekStart.getTime() && saleTime <= weekEnd.getTime()
         })
-        
+
         const totalSales = weekSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
-        const totalProfit = weekSales.reduce((sum, sale) => 
+        const totalProfit = weekSales.reduce((sum, sale) =>
           sum + Math.max(0, (sale.totalAmount || 0) - (sale.costPrice || 0)), 0)
-        
+
         const label = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { day: 'numeric' })}`
         weeks.push({ label, sales: totalSales, profit: totalProfit })
       }
-      
+
       return {
         labels: weeks.map(w => w.label),
         salesData: weeks.map(w => w.sales),
         profitData: weeks.map(w => w.profit)
       }
     }
-    
+
     // For 90 days: monthly aggregation (3 months)
     if (periodDays === 90) {
       const months: { label: string; sales: number; profit: number }[] = []
-      
+
       for (let i = 2; i >= 0; i--) {
         const monthDate = new Date(now)
         monthDate.setMonth(monthDate.getMonth() - i)
         const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1)
         const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59, 999)
-        
+
         const monthSales = filteredSales.filter(sale => {
           const saleTime = sale.timestamp || 0
           return saleTime >= monthStart.getTime() && saleTime <= monthEnd.getTime()
         })
-        
+
         const totalSales = monthSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
-        const totalProfit = monthSales.reduce((sum, sale) => 
+        const totalProfit = monthSales.reduce((sum, sale) =>
           sum + Math.max(0, (sale.totalAmount || 0) - (sale.costPrice || 0)), 0)
-        
+
         const label = monthDate.toLocaleDateString('en-US', { month: 'long' })
         months.push({ label, sales: totalSales, profit: totalProfit })
       }
-      
+
       return {
         labels: months.map(m => m.label),
         salesData: months.map(m => m.sales),
         profitData: months.map(m => m.profit)
       }
     }
-    
+
     // Default fallback (Custom or unknown)
     return { labels: [], salesData: [], profitData: [] }
   }, [selectedPeriod, allSalesData])
 
   // Payment methods breakdown from real sales data (combined) - filtered by period
   const paymentMethods = useMemo(() => {
-    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 : 
-                       selectedPeriod === 'Last 30 Days' ? 30 : 
+    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 :
+                       selectedPeriod === 'Last 30 Days' ? 30 :
                        selectedPeriod === 'Last 90 Days' ? 90 : 30
     const periodStart = Date.now() - (periodDays * 24 * 60 * 60 * 1000)
-    
+
     const filteredSales = allSalesData.filter(sale => (sale.timestamp || 0) >= periodStart)
-    
+
     if (filteredSales.length === 0) {
       return [
         { label: 'Cash', percentage: 0 },
@@ -453,7 +453,7 @@ export default function ReportsPage() {
         { label: 'Other', percentage: 0 }
       ]
     }
-    
+
     const methodCounts: Record<string, number> = {
       CASH: 0,
       MPESA: 0,
@@ -463,14 +463,14 @@ export default function ReportsPage() {
       CHEQUE: 0,
       OTHER: 0
     }
-    
+
     filteredSales.forEach(sale => {
       const method = sale.paymentMethod || 'CASH'
       methodCounts[method] = (methodCounts[method] || 0) + 1
     })
-    
+
     const total = filteredSales.length
-    
+
     return [
       { label: 'Cash', percentage: Math.round((methodCounts.CASH / total) * 100) },
       { label: 'M-Pesa', percentage: Math.round((methodCounts.MPESA / total) * 100) },
@@ -485,24 +485,24 @@ export default function ReportsPage() {
   // Inventory stock data from real products
   const inventoryData = useMemo(() => {
     console.log('inventoryData - Products count:', products.length)
-    
+
     if (products.length === 0) {
       return []
     }
-    
+
     // Sort by quantity and take top items for display
     const sortedProducts = [...products]
       .filter(p => (p.quantity || 0) > 0) // Only show products with stock
       .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
       .slice(0, 11)
-    
+
     // If no products with stock, show first 11 products anyway
-    const displayProducts = sortedProducts.length > 0 
-      ? sortedProducts 
+    const displayProducts = sortedProducts.length > 0
+      ? sortedProducts
       : [...products].slice(0, 11)
-    
+
     console.log('inventoryData - Display products:', displayProducts.length, displayProducts.map(p => ({ name: p.name, qty: p.quantity })))
-    
+
     return displayProducts.map((product) => ({
       name: product.name.length > 8 ? product.name.substring(0, 6) + '...' : product.name,
       fullName: product.name,
@@ -515,25 +515,25 @@ export default function ReportsPage() {
     if ((recentSales.length === 0 && multiItemSales.length === 0) || products.length === 0) {
       return []
     }
-    
-    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 : 
-                       selectedPeriod === 'Last 30 Days' ? 30 : 
+
+    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 :
+                       selectedPeriod === 'Last 30 Days' ? 30 :
                        selectedPeriod === 'Last 90 Days' ? 90 : 30
     const periodStart = Date.now() - (periodDays * 24 * 60 * 60 * 1000)
-    
+
     // Filter sales by period
     const filteredRecentSales = recentSales.filter(sale => (sale.timestamp || 0) >= periodStart)
     const filteredMultiItemSales = multiItemSales.filter(sale => (sale.timestamp || 0) >= periodStart)
-    
+
     // Aggregate sales by product
-    const productSales: Record<string, { 
+    const productSales: Record<string, {
       productId: string
       productName: string
       totalSales: number
       unitsSold: number
       category: string
     }> = {}
-    
+
     // Process single-item sales
     filteredRecentSales.forEach(sale => {
       const key = sale.productId || sale.productName
@@ -550,7 +550,7 @@ export default function ReportsPage() {
       productSales[key].totalSales += sale.totalAmount || 0
       productSales[key].unitsSold += sale.quantitySold || 1
     })
-    
+
     // Process multi-item sales (each item separately)
     filteredMultiItemSales.forEach(sale => {
       (sale.items || []).forEach(item => {
@@ -569,12 +569,12 @@ export default function ReportsPage() {
         productSales[key].unitsSold += item.quantity || 1
       })
     })
-    
+
     // Sort by total sales and get top 3
     const topProducts = Object.values(productSales)
       .sort((a, b) => b.totalSales - a.totalSales)
       .slice(0, 3)
-    
+
     return topProducts.map((p, idx) => ({
       name: p.productName,
       category: p.category,
@@ -589,38 +589,38 @@ export default function ReportsPage() {
     if (branches.length === 0) {
       return []
     }
-    
+
     // Get all sales data combined
     const allSales = [...recentSales, ...multiItemSales.map(s => ({
       ...s,
       totalAmount: s.totalAmount || 0,
       costPrice: s.items?.reduce((sum, item) => sum + ((item.costPrice || 0) * (item.quantity || 0)), 0) || 0
     }))]
-    
+
     // Calculate total sales/profit across all data for distribution
     const totalAllSales = allSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
     const totalAllProfit = allSales.reduce((sum, sale) => {
-      const cost = 'items' in sale 
+      const cost = 'items' in sale
         ? (sale as any).items?.reduce((itemSum: number, item: any) => itemSum + ((item.costPrice || 0) * (item.quantity || 0)), 0) || 0
         : ((sale as any).costPrice || 0) * ((sale as any).quantitySold || 1)
       return sum + Math.max(0, (sale.totalAmount || 0) - cost)
     }, 0)
-    
+
     return branches.map((branch, idx) => {
       const branchStaff = staffList.filter(s => s.branchIds?.includes(branch.id))
       const branchProducts = branch.totalProducts || 0
       const costValue = branch.totalInventoryValue || 0
-      
+
       // Try to get branch-specific sales first
       const branchMultiSales = multiItemSales.filter(sale => sale.branchId === branch.id)
-      
+
       let branchSalesTotal = branchMultiSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
       let branchProfitTotal = branchMultiSales.reduce((sum, sale) => {
-        const saleCost = sale.items?.reduce((itemSum, item) => 
+        const saleCost = sale.items?.reduce((itemSum, item) =>
           itemSum + ((item.costPrice || 0) * (item.quantity || 0)), 0) || 0
         return sum + ((sale.totalAmount || 0) - saleCost)
       }, 0)
-      
+
       // If no branch-specific data, distribute total evenly among branches (for display purposes)
       if (branchSalesTotal === 0 && totalAllSales > 0 && branches.length > 0) {
         // Give first branch all sales if only one branch, otherwise distribute
@@ -629,7 +629,7 @@ export default function ReportsPage() {
           branchProfitTotal = totalAllProfit
         }
       }
-      
+
       return {
         id: branch.id,
         name: branch.name,
@@ -647,31 +647,31 @@ export default function ReportsPage() {
     if (staffList.length === 0) {
       return []
     }
-    
+
     // Combine all sales for staff calculation
     const allSalesCount = recentSales.length + multiItemSales.length
-    const allSalesTotal = recentSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0) + 
+    const allSalesTotal = recentSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0) +
                           multiItemSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0)
-    
+
     return staffList.slice(0, 10).map((staffMember, idx) => {
       // Find the branch name for this staff member
       const staffBranch = branches.find(b => staffMember.branchIds?.includes(b.id))
-      
+
       // Calculate actual transactions and sales from multi-item sales created by this staff
-      const staffMultiSales = multiItemSales.filter(sale => 
-        sale.createdBy === staffMember.id || 
+      const staffMultiSales = multiItemSales.filter(sale =>
+        sale.createdBy === staffMember.id ||
         sale.createdBy === staffMember.email ||
         sale.createdBy === staffMember.fullName
       )
       let totalTransactions = staffMultiSales.length
       let totalSalesAmount = staffMultiSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
-      
+
       // If no staff-specific data and this is the first staff, show all sales (likely owner)
       if (totalTransactions === 0 && idx === 0 && allSalesCount > 0) {
         totalTransactions = allSalesCount
         totalSalesAmount = allSalesTotal
       }
-      
+
       return {
         branchId: staffBranch?.id || '',
         branch: staffBranch?.name || 'Main Branch',
@@ -688,7 +688,7 @@ export default function ReportsPage() {
     const totalCostValue = products.reduce((sum, p) => sum + ((p.costPrice || 0) * (p.quantity || 0)), 0)
     const totalSellingValue = products.reduce((sum, p) => sum + ((p.sellingPrice || 0) * (p.quantity || 0)), 0)
     const topProduct = inventoryData.length > 0 ? inventoryData[0] : null
-    
+
     return {
       totalProducts: products.length,
       totalCostValue,
@@ -730,7 +730,7 @@ export default function ReportsPage() {
     const maxSales = Math.max(...(trendData.salesData.length > 0 ? trendData.salesData : [0]), 1000)
     const maxProfit = Math.max(...(trendData.profitData.length > 0 ? trendData.profitData : [0]), 1000)
     const chartMax = Math.ceil(Math.max(maxSales, maxProfit) * 1.2 / 1000) * 1000 || 15000
-    
+
     return {
       responsive: true,
       maintainAspectRatio: false,
@@ -777,7 +777,7 @@ export default function ReportsPage() {
     setIsExporting(true)
     try {
       await new Promise(resolve => setTimeout(resolve, 1500))
-      
+
       const csvContent = [
         ['FahamPesa Business Report'],
         ['Period:', selectedPeriod],
@@ -789,7 +789,7 @@ export default function ReportsPage() {
         ['Transactions', metrics.totalTransactions.toString()],
         ['Debt', `${currencySymbol} ${metrics.debt.toLocaleString()}`]
       ].map(row => row.join(',')).join('\n')
-      
+
       const blob = new Blob([csvContent], { type: 'text/csv' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -806,26 +806,26 @@ export default function ReportsPage() {
     <ProtectedRoute>
       <DashboardLayout>
         <PlanGate feature="reports">
-          <div className="space-y-6 pb-8">
+          <div className="space-y-6 pb-8 font-dm-sans">
             {/* Header Section */}
-            <motion.div 
-              initial="initial" 
-              animate="animate" 
+            <motion.div
+              initial="initial"
+              animate="animate"
               variants={fadeInUp}
               className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4"
             >
               <div>
-                <h1 className="text-[28px] font-black text-black font-dm-sans">
+                <h1 className="dashboard-page-title">
                   Reports &amp; Analytics
                 </h1>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 {/* Export Button */}
                 <button
                   onClick={handleExport}
                   disabled={isExporting}
-                  className="flex items-center gap-2 px-[18px] py-[14px] bg-[#004aad] hover:bg-[#003d91] text-white rounded-lg font-medium transition-colors"
+                  className="dashboard-action-primary px-[18px] py-[14px]"
                 >
                   <FileExportIcon />
                   <span>{isExporting ? 'Exporting...' : 'Export'}</span>
@@ -835,15 +835,15 @@ export default function ReportsPage() {
                 <div className="relative period-dropdown">
                   <button
                     onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
-                    className="flex items-center gap-2 px-3 py-[15px] bg-white border border-[#d9d9d9] rounded-[10px] min-w-[162px]"
+                    className="dashboard-action-muted min-w-[162px] px-3 py-[15px]"
                   >
                     <CalendarDaysIcon className="h-5 w-5 text-gray-500" />
                     <span className="text-[#717171] text-sm font-semibold">{selectedPeriod}</span>
                     <ChevronDownIcon className="h-5 w-5 text-gray-500 ml-auto" />
                   </button>
-                  
+
                   {showPeriodDropdown && (
-                    <div className="absolute top-full right-0 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-xl z-50">
+                    <div className="absolute right-0 top-full z-50 mt-2 w-full rounded-[14px] border border-[#e6ebf2] bg-white shadow-[0_18px_45px_rgba(15,23,42,0.12)]">
                       <div className="py-2">
                         {(['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'Custom'] as ReportPeriod[]).map((period) => (
                           <button
@@ -853,7 +853,7 @@ export default function ReportsPage() {
                               setShowPeriodDropdown(false)
                             }}
                             className={`w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm ${
-                              selectedPeriod === period ? 'text-[#004aad] font-semibold' : 'text-gray-700'
+                              selectedPeriod === period ? 'bg-[#eef5ff] text-[#004aad] font-semibold' : 'text-[#334155]'
                             }`}
                           >
                             {period}
@@ -867,48 +867,48 @@ export default function ReportsPage() {
             </motion.div>
 
             {/* Key Metrics Cards */}
-            <motion.div 
-              initial="initial" 
-              animate="animate" 
+            <motion.div
+              initial="initial"
+              animate="animate"
               variants={fadeInUp}
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
             >
-              <StatCard 
-                title="Total Sales" 
+              <StatCard
+                title="Total Sales"
                 value={`${currencySymbol} ${metrics.totalSales.toLocaleString()}`}
                 trend={metrics.totalSales > 0 ? "up" : null}
                 trendColor="blue"
               />
-              <StatCard 
-                title="Total Profit" 
+              <StatCard
+                title="Total Profit"
                 value={`${currencySymbol} ${metrics.totalProfit.toLocaleString()}`}
                 trend={metrics.totalProfit > 0 ? "up" : null}
                 trendColor="green"
               />
-              <StatCard 
-                title="Transactions" 
+              <StatCard
+                title="Transactions"
                 value={metrics.totalTransactions.toLocaleString()}
                 trend={metrics.totalTransactions > 0 ? "up" : null}
                 trendColor="red"
               />
-              <StatCard 
-                title="Debt" 
+              <StatCard
+                title="Debt"
                 value={`${currencySymbol} ${metrics.debt.toLocaleString()}`}
                 trend={null}
               />
             </motion.div>
 
             {/* Sales Trend + Payment Methods Row */}
-            <motion.div 
-              initial="initial" 
-              animate="animate" 
+            <motion.div
+              initial="initial"
+              animate="animate"
               variants={fadeInUp}
               className="grid grid-cols-1 lg:grid-cols-4 gap-4"
             >
               {/* Sales vs Profit Trend Chart */}
-              <div className="lg:col-span-3 bg-white border border-[#ececf2] rounded-xl p-5 overflow-hidden">
+              <div className="dashboard-panel overflow-hidden p-5 lg:col-span-3">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold text-black">Sales vs Profit Trend</h3>
+                  <h3 className="dashboard-section-title text-base">Sales vs Profit Trend</h3>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-[#004aad]" />
@@ -932,14 +932,14 @@ export default function ReportsPage() {
               </div>
 
               {/* Payment Method Card */}
-              <div className="bg-white border border-[#ececf2] rounded-xl p-5">
-                <h3 className="text-base font-semibold text-black mb-5">Payment method</h3>
+              <div className="dashboard-panel p-5">
+                <h3 className="dashboard-section-title mb-5 text-base">Payment method</h3>
                 <div className="flex flex-col gap-[14px]">
                   {paymentMethods.map((method) => (
-                    <PaymentMethodRow 
-                      key={method.label} 
-                      label={method.label} 
-                      percentage={method.percentage} 
+                    <PaymentMethodRow
+                      key={method.label}
+                      label={method.label}
+                      percentage={method.percentage}
                     />
                   ))}
                 </div>
@@ -947,18 +947,18 @@ export default function ReportsPage() {
             </motion.div>
 
             {/* Inventory Stock + Total Products Row */}
-            <motion.div 
-              initial="initial" 
-              animate="animate" 
+            <motion.div
+              initial="initial"
+              animate="animate"
               variants={fadeInUp}
               className="grid grid-cols-1 lg:grid-cols-4 gap-4"
             >
               {/* Inventory Stock Chart */}
-              <div className="lg:col-span-3 bg-white border border-[#ececf2] rounded-xl p-5">
+              <div className="dashboard-panel p-5 lg:col-span-3">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold text-black">Inventory Stock</h3>
+                  <h3 className="dashboard-section-title text-base">Inventory Stock</h3>
                 </div>
-                
+
                 {/* Bar Chart */}
                 {inventoryData.length > 0 ? (
                   <div className="relative h-[180px] mt-4 overflow-visible">
@@ -969,7 +969,7 @@ export default function ReportsPage() {
                       <span>{Math.round(Math.max(...inventoryData.map(i => i.stock)) * 0.33)}</span>
                       <span>0</span>
                     </div>
-                    
+
                     {/* Bars Container */}
                     <div className="absolute left-10 right-0 top-0 h-[120px] flex items-end justify-around gap-2 overflow-visible">
                       {inventoryData.map((item, idx) => {
@@ -977,7 +977,7 @@ export default function ReportsPage() {
                         const heightPx = Math.max((item.stock / maxStock) * 120, 2) // Min 2px height for visibility
                         return (
                           <div key={idx} className="relative flex-1 h-full flex items-end justify-center overflow-visible">
-                            <div 
+                            <div
                               className="inventory-bar w-full max-w-[30px] rounded-t-lg cursor-pointer"
                               style={{ height: `${heightPx}px` }}
                               title={`${item.fullName || item.name}: ${item.stock} units`}
@@ -991,12 +991,12 @@ export default function ReportsPage() {
                         )
                       })}
                     </div>
-                    
+
                     {/* X-axis labels */}
                     <div className="absolute left-10 right-0 top-[130px] flex justify-around">
                       {inventoryData.map((item, idx) => (
-                        <span 
-                          key={idx} 
+                        <span
+                          key={idx}
                           className="text-[10px] text-[#717171] transform -rotate-45 origin-top-left whitespace-nowrap"
                           title={item.fullName || item.name}
                         >
@@ -1013,12 +1013,12 @@ export default function ReportsPage() {
               </div>
 
               {/* Total Products Card */}
-              <div className="bg-white border border-[#ececf2] rounded-xl p-5 flex flex-col gap-6">
+              <div className="dashboard-panel flex flex-col gap-6 p-5">
                 <div className="flex flex-col gap-4">
-                  <h3 className="text-base font-semibold text-black">Total Products</h3>
-                  <span className="text-base text-black">{productStats.totalProducts}</span>
+                  <h3 className="dashboard-section-title text-base">Total Products</h3>
+                  <span className="dashboard-metric-value text-base text-[#0f172a]">{productStats.totalProducts}</span>
                 </div>
-                
+
                 <div className="flex flex-col gap-[10px]">
                   <div className="flex items-center gap-[5px]">
                     <TagIcon className="w-4 h-4 text-[#717171]" />
@@ -1035,24 +1035,24 @@ export default function ReportsPage() {
             </motion.div>
 
             {/* Best Performing Products */}
-            <motion.div 
-              initial="initial" 
-              animate="animate" 
+            <motion.div
+              initial="initial"
+              animate="animate"
               variants={fadeInUp}
-              className="bg-white border border-[#ececf2] rounded-xl p-5"
+              className="dashboard-panel p-5"
             >
-              <h3 className="text-base font-bold text-black mb-5">Best performing Products</h3>
-              
+              <h3 className="dashboard-section-title mb-5 text-base">Best performing Products</h3>
+
               {bestProducts.length > 0 ? (
                 <div className="flex flex-col gap-5">
                   {bestProducts.map((product) => (
-                    <div 
+                    <div
                       key={product.place}
                       className={`flex items-center justify-between px-5 py-4 rounded-xl border ${
-                        product.place === 1 
-                          ? 'bg-[#fff8ec] border-[#fff085]' 
-                          : product.place === 2 
-                          ? 'bg-[#f8fafb] border-[#e5e7eb]' 
+                        product.place === 1
+                          ? 'bg-[#fff8ec] border-[#fff085]'
+                          : product.place === 2
+                          ? 'bg-[#f8fafb] border-[#e5e7eb]'
                           : 'bg-[#fdffec] border-[#deff85]'
                       }`}
                     >
@@ -1066,7 +1066,7 @@ export default function ReportsPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-col items-end gap-[3px]">
                         <span className="text-[#004aad] text-base font-bold">
                           {currencySymbol} {product.sales.toLocaleString()}
@@ -1086,14 +1086,14 @@ export default function ReportsPage() {
             </motion.div>
 
             {/* Branch Performance */}
-            <motion.div 
-              initial="initial" 
-              animate="animate" 
+            <motion.div
+              initial="initial"
+              animate="animate"
               variants={fadeInUp}
-              className="bg-white border border-[#ececf2] rounded-xl p-5"
+              className="dashboard-panel p-5"
             >
-              <h3 className="text-base font-bold text-black mb-5">Branch Performance</h3>
-              
+              <h3 className="dashboard-section-title mb-5 text-base">Branch Performance</h3>
+
               {branchPerformance.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -1140,14 +1140,14 @@ export default function ReportsPage() {
             </motion.div>
 
             {/* Staff Performance */}
-            <motion.div 
-              initial="initial" 
-              animate="animate" 
+            <motion.div
+              initial="initial"
+              animate="animate"
               variants={fadeInUp}
-              className="bg-white border border-[#ececf2] rounded-xl p-5"
+              className="dashboard-panel p-5"
             >
-              <h3 className="text-base font-bold text-black mb-5">Staff Performance</h3>
-              
+              <h3 className="dashboard-section-title mb-5 text-base">Staff Performance</h3>
+
               {staffPerformance.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">

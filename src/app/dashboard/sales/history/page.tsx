@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
-import { 
+import {
   ArrowLeftIcon,
   MagnifyingGlassIcon,
   CalendarIcon,
@@ -40,10 +40,10 @@ const staggerChildren = {
 
 type DateFilter = 'ALL' | 'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'LAST_30_DAYS'
 
-type CombinedSale = (Sale & { saleType: 'single-item'; displayName: string; itemCount: number }) | 
-  (Omit<MultiItemSale, 'paymentMethod'> & { 
-    saleType: 'multi-item'; 
-    displayName: string; 
+type CombinedSale = (Sale & { saleType: 'single-item'; displayName: string; itemCount: number }) |
+  (Omit<MultiItemSale, 'paymentMethod'> & {
+    saleType: 'multi-item';
+    displayName: string;
     itemCount: number;
     paymentMethod: string;
     saleNumber?: string;
@@ -61,7 +61,7 @@ function SalesHistoryContent() {
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<PaymentMethod | null>(null)
   const [currentPage, setCurrentPage] = useState(0)
   const itemsPerPage = 10
-  
+
   const { user } = useAuth()
   const { staff } = useStaff()
   const router = useRouter()
@@ -93,13 +93,13 @@ function SalesHistoryContent() {
   // Helper function to generate sale display names
   const generateSaleDisplayName = (saleId: string, productName?: string, items?: any[]) => {
     const shortId = saleId.slice(-4)
-    
+
     if (items && items.length > 0) {
       // Multi-item sale
       const topItem = items[0]?.productName || 'Unknown'
       const additionalCount = items.length - 1
-      
-      return additionalCount > 0 
+
+      return additionalCount > 0
         ? `Sale #${shortId} – ${topItem} + ${additionalCount} more items`
         : `Sale #${shortId} – ${topItem}`
     } else {
@@ -116,7 +116,7 @@ function SalesHistoryContent() {
       displayName: generateSaleDisplayName(sale.id, sale.productName),
       itemCount: 1
     }))
-    
+
     const multiItemSalesFlattened = multiItemSales.map(multiSale => ({
       id: multiSale.id,
       timestamp: multiSale.timestamp,
@@ -133,7 +133,7 @@ function SalesHistoryContent() {
       items: multiSale.items,
       saleNumber: multiSale.saleNumber
     }))
-    
+
     return [...singleItemSales, ...multiItemSalesFlattened]
       .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
   }, [sales, multiItemSales])
@@ -161,11 +161,11 @@ function SalesHistoryContent() {
     if (dateFilter !== 'ALL') {
       const now = new Date()
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      
+
       filtered = filtered.filter(sale => {
         const saleDate = new Date(sale.timestamp)
         const saleDateOnly = new Date(saleDate.getFullYear(), saleDate.getMonth(), saleDate.getDate())
-        
+
         switch (dateFilter) {
           case 'TODAY':
             return saleDateOnly.getTime() === today.getTime()
@@ -235,9 +235,9 @@ function SalesHistoryContent() {
     <ProtectedRoute>
       <StaffProtectedRoute requiredPermission="sales:read">
         <DashboardLayout>
-        <motion.div 
-          initial="initial" 
-          animate="animate" 
+        <motion.div
+          initial="initial"
+          animate="animate"
           variants={staggerChildren}
           className="space-y-6"
         >
@@ -263,7 +263,7 @@ function SalesHistoryContent() {
           </motion.div>
 
           {/* Search and Filter Section */}
-          <motion.div variants={fadeInUp} className="bg-card rounded-xl p-6 shadow-sm border border-border">
+          <motion.div variants={fadeInUp} className="dashboard-panel p-6">
             <div className="space-y-4">
               {/* Search Bar */}
               <div className="relative">
@@ -338,7 +338,7 @@ function SalesHistoryContent() {
 
           {/* Statistics Section */}
           {filteredSales.length > 0 && (
-            <motion.div variants={fadeInUp} className="bg-card rounded-xl p-6 shadow-sm border border-border">
+            <motion.div variants={fadeInUp} className="dashboard-panel p-6">
               <h3 className="text-lg font-semibold text-card-foreground mb-4">Summary</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
@@ -369,8 +369,8 @@ function SalesHistoryContent() {
                 <div className="text-6xl mb-4">📊</div>
                 <h3 className="text-xl font-semibold text-card-foreground mb-2">No sales found</h3>
                 <p className="text-muted-foreground mb-6">
-                  {searchQuery || dateFilter !== 'ALL' || paymentMethodFilter 
-                    ? "Try adjusting your filters or search terms" 
+                  {searchQuery || dateFilter !== 'ALL' || paymentMethodFilter
+                    ? "Try adjusting your filters or search terms"
                     : "Start by recording your first sale"}
                 </p>
               </div>
@@ -382,34 +382,34 @@ function SalesHistoryContent() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className="bg-card rounded-xl p-4 shadow-sm border border-border hover:shadow-md transition-all"
+                    className="dashboard-panel p-4 hover:shadow-md transition-all"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="font-semibold text-card-foreground">{sale.displayName}</h3>
                         </div>
-                        
+
                         <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
                           <span>
-                            {sale.saleType === 'multi-item' 
-                              ? `${sale.itemCount} items` 
+                            {sale.saleType === 'multi-item'
+                              ? `${sale.itemCount} items`
                               : `${sale.quantitySold} units`
                             }
                           </span>
                           <span>•</span>
                           <span className="text-[#4CAF50] font-medium">{formatPaymentMethod(sale.paymentMethod)}</span>
                         </div>
-                        
+
                         <div className="text-sm text-muted-foreground">
                           {new Date(sale.timestamp).toLocaleDateString()} at {new Date(sale.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </div>
-                        
+
                         {sale.customerName && (
                           <div className="text-sm text-blue-600 mt-1">Customer: {sale.customerName}</div>
                         )}
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
                         <div className="text-right mr-4">
                           <p className="text-xl font-bold text-[#4CAF50]">{currencySymbol} {sale.totalAmount.toLocaleString()}</p>
@@ -417,7 +417,7 @@ function SalesHistoryContent() {
                             Profit: {currencySymbol} {(((sale.unitPrice || 0) - (sale.costPrice || 0)) * (sale.quantitySold || 0)).toLocaleString()}
                           </p>
                         </div>
-                        
+
                         {/* Action Buttons */}
                         <div className="flex items-center gap-1">
                           <button
@@ -458,7 +458,7 @@ function SalesHistoryContent() {
                 >
                   Previous
                 </button>
-                
+
                 <div className="flex items-center gap-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum = i
@@ -468,7 +468,7 @@ function SalesHistoryContent() {
                         pageNum = totalPages - 5 + i
                       }
                     }
-                    
+
                     return (
                       <button
                         key={pageNum}
@@ -484,7 +484,7 @@ function SalesHistoryContent() {
                     )
                   })}
                 </div>
-                
+
                 <button
                   onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
                   disabled={currentPage >= totalPages - 1}

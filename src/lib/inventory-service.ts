@@ -45,10 +45,13 @@ import { Branch } from '@/lib/branches-types'
 import { getBranches as getBranchesFromService, getBranch as getBranchFromService } from '@/lib/branches-service'
 import {
   adjustBackendStock,
+  createBackendTransfer,
+  getBackendTransfers,
   getBackendProducts,
   getSelectedBackendBranchId,
   isBackendAvailable,
-  shouldUseFirebaseFallback
+  shouldUseFirebaseFallback,
+  transitionBackendTransfer
 } from '@/lib/backend-business-api'
 
 // ============================================================================
@@ -99,6 +102,33 @@ export async function getBranch(branchId: string): Promise<Branch | null> {
 // INVENTORY ITEM OPERATIONS
 // ============================================================================
 
+async function getInventoryRecord(productId: string, branchId: string): Promise<InventoryItem | null> {
+  const q = query(
+    collection(db, 'inventory'),
+    where('productId', '==', productId),
+    where('branchId', '==', branchId),
+    limit(1)
+  )
+  const snap = await getDocs(q)
+  if (snap.empty) return null
+  return { id: snap.docs[0].id, ...snap.docs[0].data() } as InventoryItem
+}
+
+async function getInventoryRecordsForBranch(userId: string, branchId: string): Promise<Map<string, InventoryItem>> {
+  const q = query(
+    collection(db, 'inventory'),
+    where('userId', '==', userId),
+    where('branchId', '==', branchId)
+  )
+  const snap = await getDocs(q)
+  return new Map(
+    snap.docs.map((inventoryDoc) => {
+      const item = { id: inventoryDoc.id, ...inventoryDoc.data() } as InventoryItem
+      return [item.productId, item]
+    })
+  )
+}
+
 export async function getInventoryItems(userId: string, branchId?: string): Promise<InventoryItem[]> {
   if (isBackendAvailable()) {
     try {
@@ -144,45 +174,48 @@ export async function getInventoryItems(userId: string, branchId?: string): Prom
     
     const snap = await getDocs(q)
     const products = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any))
+    const inventoryByProduct = branchId
+      ? await getInventoryRecordsForBranch(userId, branchId)
+      : new Map<string, InventoryItem>()
     
     // Convert products to InventoryItem format for inventory dashboard
-    const inventoryItems: InventoryItem[] = products.map(product => ({
-      id: product.id,
-      productId: product.id,
-      branchId: branchId || 'main', // Use the requested branchId or default to 'main'
-      currentStock: product.quantity || 0,
-      reservedStock: 0, // TODO: Implement reserved stock tracking
-      availableStock: product.quantity || 0,
+    const inventoryItems: InventoryItem[] = products.map(product => {
+      const branchInventory = inventoryByProduct.get(product.id)
+      const currentStock = branchInventory?.currentStock ?? product.quantity ?? 0
+      const reservedStock = branchInventory?.reservedStock ?? 0
+
+      return {
+        id: branchInventory?.id || product.id,
+        productId: product.id,
+        branchId: branchId || branchInventory?.branchId || 'main',
+        currentStock,
+        reservedStock,
+        availableStock: branchInventory?.availableStock ?? Math.max(0, currentStock - reservedStock),
       
-      // Alert thresholds from product
-      minStockLevel: product.minStockLevel || 0,
-      maxStockLevel: undefined,
-      reorderPoint: product.minStockLevel || 0,
-      reorderQuantity: undefined,
+        // Alert thresholds from product
+        minStockLevel: branchInventory?.minStockLevel ?? product.minStockLevel ?? 0,
+        maxStockLevel: branchInventory?.maxStockLevel,
+        reorderPoint: branchInventory?.reorderPoint ?? product.minStockLevel ?? 0,
+        reorderQuantity: branchInventory?.reorderQuantity,
       
-      // Costing from product
-      averageCostPrice: product.averagePurchasePrice || product.costPrice || 0,
-      lastCostPrice: product.lastPurchasePrice || product.costPrice || 0,
+        // Costing from product
+        averageCostPrice: branchInventory?.averageCostPrice ?? product.averagePurchasePrice ?? product.costPrice ?? 0,
+        lastCostPrice: branchInventory?.lastCostPrice ?? product.lastPurchasePrice ?? product.costPrice ?? 0,
       
-      // Location
-      binLocation: product.location || undefined,
+        // Location
+        binLocation: branchInventory?.binLocation ?? product.location ?? undefined,
       
-      // Audit fields
-      lastCountDate: undefined,
-      lastCountStock: undefined,
-      lastCountUserId: undefined,
+        // Audit fields
+        lastCountDate: undefined,
+        lastCountStock: undefined,
+        lastCountUserId: undefined,
       
-      // Metadata
-      userId: product.userId,
-      createdAt: product.createdAt,
-      updatedAt: product.updatedAt,
-      
-      // Product reference for easy access
-      productName: product.name,
-      productSku: product.sku,
-      productBarcode: product.barcode,
-      unitOfMeasure: product.unitOfMeasure || 'pcs'
-    }))
+        // Metadata
+        userId: product.userId,
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt
+      }
+    })
     
     return inventoryItems
   } catch (error) {
@@ -193,6 +226,11 @@ export async function getInventoryItems(userId: string, branchId?: string): Prom
 
 export async function getInventoryItem(productId: string, branchId: string): Promise<InventoryItem | null> {
   try {
+    const inventoryRecord = await getInventoryRecord(productId, branchId)
+    if (inventoryRecord) {
+      return inventoryRecord
+    }
+
     // Get the product from the products collection
     const productDoc = await getDoc(doc(db, 'products', productId))
     
@@ -237,13 +275,7 @@ export async function getInventoryItem(productId: string, branchId: string): Pro
       // Metadata
       userId: product.userId,
       createdAt: product.createdAt,
-      updatedAt: product.updatedAt,
-      
-      // Product reference for easy access
-      productName: product.name,
-      productSku: product.sku,
-      productBarcode: product.barcode,
-      unitOfMeasure: product.unitOfMeasure || 'pcs'
+      updatedAt: product.updatedAt
     }
     
     return inventoryItem
@@ -259,7 +291,7 @@ export async function createOrUpdateInventoryItem(
   branchId: string,
   data: Partial<InventoryItem>
 ): Promise<void> {
-  const existingItem = await getInventoryItem(productId, branchId)
+  const existingItem = await getInventoryRecord(productId, branchId)
   
   if (existingItem) {
     // Update existing inventory item
@@ -372,11 +404,11 @@ export async function createStockMovement(
     userId
   }
   
-  await setDoc(doc(db, 'stock_movements', movementId), {
+  await setDoc(doc(db, 'stock_movements', movementId), removeUndefinedValues({
     ...stockMovement,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
-  })
+  }))
   
   return movementId
 }
@@ -521,6 +553,38 @@ export async function createStockTransfer(
   userId: string,
   request: StockTransferRequest
 ): Promise<string> {
+  if (isBackendAvailable()) {
+    try {
+      return await createBackendTransfer({
+        ...request,
+        priority: 'normal'
+      })
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend transfer create unavailable, falling back to Firestore:', error)
+    }
+  }
+
+  if (request.fromBranchId === request.toBranchId) {
+    throw new Error('Source and destination branches cannot be the same')
+  }
+
+  const sourceStock = await getInventoryItems(userId, request.fromBranchId)
+  const sourceStockByProduct = new Map(sourceStock.map(item => [item.productId, item]))
+
+  for (const item of request.items) {
+    const stock = sourceStockByProduct.get(item.productId)
+    if (!stock) {
+      throw new Error(`No stock record found for product ${item.productId}`)
+    }
+    if (item.quantity <= 0) {
+      throw new Error('Transfer quantity must be greater than zero')
+    }
+    if (stock.availableStock < item.quantity) {
+      throw new Error(`Insufficient stock for product ${item.productId}. Available: ${stock.availableStock}, requested: ${item.quantity}`)
+    }
+  }
+
   const transferId = crypto.randomUUID()
   
   const transfer: StockTransfer = {
@@ -528,9 +592,11 @@ export async function createStockTransfer(
     fromBranchId: request.fromBranchId,
     toBranchId: request.toBranchId,
     items: request.items.map(item => ({
-      ...item,
+      productId: item.productId,
+      requestedQuantity: item.quantity,
       approvedQuantity: item.quantity,
-      receivedQuantity: 0
+      receivedQuantity: 0,
+      batchNumber: item.batchNumber
     })),
     status: 'PENDING',
     requestedBy: userId,
@@ -540,12 +606,12 @@ export async function createStockTransfer(
     userId
   }
   
-  await setDoc(doc(db, 'stock_transfers', transferId), {
+  await setDoc(doc(db, 'stock_transfers', transferId), removeUndefinedValues({
     ...transfer,
     requestedAt: serverTimestamp(),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
-  })
+  }))
   
   return transferId
 }
@@ -555,74 +621,54 @@ export async function approveStockTransfer(
   userId: string,
   approvals: { productId: string; approvedQuantity: number }[]
 ): Promise<void> {
-  await runTransaction(db, async (transaction) => {
-    const transferRef = doc(db, 'stock_transfers', transferId)
-    const transferSnap = await transaction.get(transferRef)
-    
-    if (!transferSnap.exists()) {
-      throw new Error('Transfer not found')
+  if (isBackendAvailable()) {
+    try {
+      await transitionBackendTransfer(transferId, 'approve', {
+        items: approvals.map((approval) => ({
+          productId: approval.productId,
+          quantity: approval.approvedQuantity
+        }))
+      })
+      await transitionBackendTransfer(transferId, 'ship')
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend transfer approve/ship unavailable, falling back to Firestore:', error)
     }
-    
-    const transfer = transferSnap.data() as StockTransfer
-    
-    // Update transfer with approvals
-    const updatedItems = transfer.items.map(item => {
-      const approval = approvals.find(a => a.productId === item.productId)
-      return {
-        ...item,
-        approvedQuantity: approval?.approvedQuantity || item.requestedQuantity
-      }
-    })
-    
-    transaction.update(transferRef, {
-      items: updatedItems,
-      status: 'IN_TRANSIT',
-      approvedBy: userId,
-      approvedAt: serverTimestamp(),
-      shippedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    })
-    
-    // Create outbound stock movements
-    for (const item of updatedItems) {
-      if ((item.approvedQuantity || 0) > 0) {
-        const movementId = crypto.randomUUID()
-        const outMovement: StockMovement = {
-          id: movementId,
-          productId: item.productId,
-          branchId: transfer.fromBranchId,
-          movementType: 'TRANSFER_OUT',
-          quantity: item.approvedQuantity || 0,
-          previousStock: 0, // Will be updated in inventory adjustment
-          newStock: 0,
-          fromBranchId: transfer.fromBranchId,
-          toBranchId: transfer.toBranchId,
-          transferId,
-          referenceType: 'TRANSFER',
-          referenceId: transferId,
-          status: 'APPROVED',
-          batchNumber: item.batchNumber,
-          userId: transfer.userId
-        }
-        
-        transaction.set(doc(db, 'stock_movements', movementId), {
-          ...outMovement,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        })
-        
-        // Update source inventory
-        const sourceInventory = await getInventoryItem(item.productId, transfer.fromBranchId)
-        if (sourceInventory) {
-          const newStock = Math.max(0, sourceInventory.currentStock - (item.approvedQuantity || 0))
-          transaction.update(doc(db, 'inventory', sourceInventory.id), {
-            currentStock: newStock,
-            availableStock: newStock - sourceInventory.reservedStock,
-            updatedAt: serverTimestamp()
-          })
-        }
-      }
+  }
+
+  const transferRef = doc(db, 'stock_transfers', transferId)
+  const transferSnap = await getDoc(transferRef)
+
+  if (!transferSnap.exists()) {
+    throw new Error('Transfer not found')
+  }
+
+  const transfer = transferSnap.data() as StockTransfer
+
+  if (transfer.userId !== userId) {
+    throw new Error('You do not have access to this transfer')
+  }
+
+  if (transfer.status !== 'PENDING') {
+    throw new Error('Only pending transfers can be approved')
+  }
+
+  const updatedItems = transfer.items.map(item => {
+    const approval = approvals.find(a => a.productId === item.productId)
+    return {
+      ...item,
+      approvedQuantity: approval?.approvedQuantity ?? item.requestedQuantity
     }
+  })
+
+  await updateDoc(transferRef, {
+    items: updatedItems,
+    status: 'IN_TRANSIT',
+    approvedBy: userId,
+    approvedAt: serverTimestamp(),
+    shippedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
   })
 }
 
@@ -631,117 +677,166 @@ export async function receiveStockTransfer(
   userId: string,
   receipts: { productId: string; receivedQuantity: number }[]
 ): Promise<void> {
-  await runTransaction(db, async (transaction) => {
-    const transferRef = doc(db, 'stock_transfers', transferId)
-    const transferSnap = await transaction.get(transferRef)
-    
-    if (!transferSnap.exists()) {
-      throw new Error('Transfer not found')
+  if (isBackendAvailable()) {
+    try {
+      await transitionBackendTransfer(transferId, 'receive', {
+        items: receipts.map((receipt) => ({
+          productId: receipt.productId,
+          quantityReceived: receipt.receivedQuantity
+        }))
+      })
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend transfer receive unavailable, falling back to Firestore:', error)
     }
-    
-    const transfer = transferSnap.data() as StockTransfer
-    
-    // Update transfer with receipts
-    const updatedItems = transfer.items.map(item => {
-      const receipt = receipts.find(r => r.productId === item.productId)
-      return {
-        ...item,
-        receivedQuantity: receipt?.receivedQuantity || 0
-      }
-    })
-    
-    transaction.update(transferRef, {
-      items: updatedItems,
-      status: 'RECEIVED',
-      receivedBy: userId,
-      receivedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    })
-    
-    // Create inbound stock movements and update inventory
-    for (const item of updatedItems) {
-      if ((item.receivedQuantity || 0) > 0) {
-        const movementId = crypto.randomUUID()
-        const inMovement: StockMovement = {
-          id: movementId,
-          productId: item.productId,
-          branchId: transfer.toBranchId,
-          movementType: 'TRANSFER_IN',
-          quantity: item.receivedQuantity || 0,
-          previousStock: 0, // Will be updated below
-          newStock: 0,
-          fromBranchId: transfer.fromBranchId,
-          toBranchId: transfer.toBranchId,
-          transferId,
-          referenceType: 'TRANSFER',
-          referenceId: transferId,
-          status: 'APPROVED',
-          batchNumber: item.batchNumber,
-          userId: transfer.userId
-        }
-        
-        // Update or create destination inventory
-        const destinationInventory = await getInventoryItem(item.productId, transfer.toBranchId)
-        
-        if (destinationInventory) {
-          const newStock = destinationInventory.currentStock + (item.receivedQuantity || 0)
-          transaction.update(doc(db, 'inventory', destinationInventory.id), {
-            currentStock: newStock,
-            availableStock: newStock - destinationInventory.reservedStock,
-            updatedAt: serverTimestamp()
-          })
-          
-          inMovement.previousStock = destinationInventory.currentStock
-          inMovement.newStock = newStock
-        } else {
-          // Create new inventory item for destination
-          const inventoryId = crypto.randomUUID()
-          const newInventoryItem: InventoryItem = {
-            id: inventoryId,
-            productId: item.productId,
-            branchId: transfer.toBranchId,
-            currentStock: item.receivedQuantity || 0,
-            reservedStock: 0,
-            availableStock: item.receivedQuantity || 0,
-            minStockLevel: 0,
-            averageCostPrice: 0,
-            lastCostPrice: 0,
-            batches: [],
-            userId: transfer.userId
-          }
-          
-          transaction.set(doc(db, 'inventory', inventoryId), {
-            ...newInventoryItem,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          })
-          
-          inMovement.previousStock = 0
-          inMovement.newStock = item.receivedQuantity || 0
-        }
-        
-        transaction.set(doc(db, 'stock_movements', movementId), {
-          ...inMovement,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        })
-      }
+  }
+
+  const transferRef = doc(db, 'stock_transfers', transferId)
+  const transferSnap = await getDoc(transferRef)
+
+  if (!transferSnap.exists()) {
+    throw new Error('Transfer not found')
+  }
+
+  const transfer = transferSnap.data() as StockTransfer
+
+  if (transfer.userId !== userId) {
+    throw new Error('You do not have access to this transfer')
+  }
+
+  if (transfer.status !== 'IN_TRANSIT') {
+    throw new Error('Only in-transit transfers can be received')
+  }
+
+  const updatedItems = transfer.items.map(item => {
+    const receipt = receipts.find(r => r.productId === item.productId)
+    const receivedQuantity = receipt?.receivedQuantity ?? item.approvedQuantity ?? item.requestedQuantity
+    const approvedQuantity = item.approvedQuantity ?? item.requestedQuantity
+    return {
+      ...item,
+      receivedQuantity: Math.min(receivedQuantity, approvedQuantity)
     }
   })
+
+  await updateDoc(transferRef, {
+    items: updatedItems,
+    status: 'RECEIVED',
+    receivedBy: userId,
+    receivedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  })
+
+  for (const item of updatedItems) {
+    const quantity = item.receivedQuantity || 0
+    if (quantity <= 0) continue
+
+    const sourceInventory = await getInventoryItem(item.productId, transfer.fromBranchId)
+    const previousSourceStock = sourceInventory?.currentStock || 0
+    const newSourceStock = Math.max(0, previousSourceStock - quantity)
+    const destinationInventory = await getInventoryItem(item.productId, transfer.toBranchId)
+    const previousDestinationStock = destinationInventory?.currentStock || 0
+    const newDestinationStock = previousDestinationStock + quantity
+
+    await createStockMovement(transfer.userId, {
+      productId: item.productId,
+      branchId: transfer.fromBranchId,
+      movementType: 'TRANSFER_OUT',
+      quantity,
+      previousStock: previousSourceStock,
+      newStock: newSourceStock,
+      fromBranchId: transfer.fromBranchId,
+      toBranchId: transfer.toBranchId,
+      transferId,
+      referenceType: 'TRANSFER',
+      referenceId: transferId,
+      status: 'APPROVED',
+      batchNumber: item.batchNumber,
+      notes: `Transfer to ${transfer.toBranchId}`
+    })
+
+    await createStockMovement(transfer.userId, {
+      productId: item.productId,
+      branchId: transfer.toBranchId,
+      movementType: 'TRANSFER_IN',
+      quantity,
+      previousStock: previousDestinationStock,
+      newStock: newDestinationStock,
+      fromBranchId: transfer.fromBranchId,
+      toBranchId: transfer.toBranchId,
+      transferId,
+      referenceType: 'TRANSFER',
+      referenceId: transferId,
+      status: 'APPROVED',
+      batchNumber: item.batchNumber,
+      notes: `Transfer from ${transfer.fromBranchId}`
+    })
+
+    await createOrUpdateInventoryItem(transfer.userId, item.productId, transfer.fromBranchId, {
+      currentStock: newSourceStock,
+      reservedStock: sourceInventory?.reservedStock || 0,
+      availableStock: Math.max(0, newSourceStock - (sourceInventory?.reservedStock || 0)),
+      minStockLevel: sourceInventory?.minStockLevel || 0,
+      averageCostPrice: sourceInventory?.averageCostPrice || 0,
+      lastCostPrice: sourceInventory?.lastCostPrice || 0
+    })
+
+    await createOrUpdateInventoryItem(transfer.userId, item.productId, transfer.toBranchId, {
+      currentStock: newDestinationStock,
+      reservedStock: destinationInventory?.reservedStock || 0,
+      availableStock: Math.max(0, newDestinationStock - (destinationInventory?.reservedStock || 0)),
+      minStockLevel: destinationInventory?.minStockLevel || 0,
+      averageCostPrice: destinationInventory?.averageCostPrice || 0,
+      lastCostPrice: destinationInventory?.lastCostPrice || 0
+    })
+  }
 }
 
 export async function getStockTransfers(userId: string, branchId?: string): Promise<StockTransfer[]> {
-  let q = query(collection(db, 'stock_transfers'), where('userId', '==', userId))
-  
-  if (branchId) {
-    q = query(q, where('fromBranchId', '==', branchId))
-    // Note: This doesn't include transfers TO this branch. You might want separate methods for that.
+  if (isBackendAvailable()) {
+    try {
+      const transfers = await getBackendTransfers()
+      const stockTransfers = transfers.map((transfer) => ({
+        id: transfer.id,
+        fromBranchId: transfer.fromBranchId,
+        toBranchId: transfer.toBranchId,
+        items: transfer.items.map((item) => ({
+          productId: item.productId,
+          requestedQuantity: item.requestedQuantity,
+          approvedQuantity: item.approvedQuantity,
+          receivedQuantity: item.receivedQuantity,
+          notes: item.notes
+        })),
+        status: transfer.status === 'REQUESTED' ? 'PENDING' : transfer.status,
+        requestedBy: transfer.requestedBy,
+        requestedAt: transfer.requestedAt,
+        reason: transfer.requestReason,
+        notes: transfer.internalNotes,
+        userId: transfer.userId
+      } as StockTransfer))
+
+      return branchId
+        ? stockTransfers.filter(transfer => transfer.fromBranchId === branchId || transfer.toBranchId === branchId)
+        : stockTransfers
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend transfers unavailable, falling back to Firestore:', error)
+    }
   }
-  
-  q = query(q, orderBy('createdAt', 'desc'))
-  
+
+  const q = query(collection(db, 'stock_transfers'), where('userId', '==', userId))
   const snap = await getDocs(q)
-  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as StockTransfer))
+  const transfers = snap.docs
+    .map(doc => ({ id: doc.id, ...doc.data() } as StockTransfer))
+    .sort((a, b) => {
+      const aDate = Number((a.createdAt as any)?.seconds || 0)
+      const bDate = Number((b.createdAt as any)?.seconds || 0)
+      return bDate - aDate
+    })
+
+  return branchId
+    ? transfers.filter(transfer => transfer.fromBranchId === branchId || transfer.toBranchId === branchId)
+    : transfers
 }
 
 // ============================================================================

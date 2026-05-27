@@ -7,9 +7,9 @@ import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  StaffRole, 
-  STAFF_PERMISSIONS 
+import {
+  StaffRole,
+  STAFF_PERMISSIONS
 } from '@/lib/firestore'
 import { getBranches } from '@/lib/branches-service'
 import { Branch } from '@/lib/branches-types'
@@ -45,7 +45,7 @@ export default function AddStaffPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [branchSearchTerm, setBranchSearchTerm] = useState('')
   const [passwordError, setPasswordError] = useState('')
-  
+
   // Form state for adding new staff
   const [newStaff, setNewStaff] = useState({
     fullName: '',
@@ -86,7 +86,7 @@ export default function AddStaffPage() {
   const validatePasswords = (password?: string, confirmPassword?: string) => {
     const pwd = password !== undefined ? password : newStaff.password
     const confirmPwd = confirmPassword !== undefined ? confirmPassword : newStaff.confirmPassword
-    
+
     if (pwd !== confirmPwd) {
       setPasswordError('Passwords do not match')
       return false
@@ -101,7 +101,7 @@ export default function AddStaffPage() {
 
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!user || !newStaff.fullName || !newStaff.email || !newStaff.password) {
       alert('Please fill in all required fields')
       return
@@ -138,7 +138,7 @@ export default function AddStaffPage() {
       })
 
       const result = await response.json()
-      
+
       if (result.success) {
         // Navigate back to staff list with success message
         router.push('/dashboard/staff?created=true&name=' + encodeURIComponent(newStaff.fullName))
@@ -165,12 +165,12 @@ export default function AddStaffPage() {
     <ProtectedRoute>
       <StaffProtectedRoute requiredPermission="staff:create">
         <DashboardLayout>
-          <motion.div 
+          <motion.div
             className="space-y-6 max-w-4xl mx-auto"
             {...fadeInUp}
           >
             {/* Header */}
-            <div className="bg-white rounded-xl p-8 shadow-lg border-0">
+            <div className="dashboard-panel p-8">
               <motion.div {...fadeInUp} className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-4 mb-4">
@@ -187,8 +187,8 @@ export default function AddStaffPage() {
                       <UserPlus className="h-8 w-8 text-white" />
                     </div>
                     <div>
-                      <h1 className="text-3xl font-bold text-gray-900">Add New Staff Member</h1>
-                      <p className="text-gray-600 mt-1 text-base">
+                      <h1 className="dashboard-page-title">Add New Staff Member</h1>
+                      <p className="dashboard-page-subtitle mt-1">
                         Create a new team member account with proper permissions
                       </p>
                     </div>
@@ -198,7 +198,7 @@ export default function AddStaffPage() {
             </div>
 
             {/* Form */}
-            <Card className="bg-white border-0 shadow-lg">
+            <Card className="dashboard-panel">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
@@ -386,7 +386,7 @@ export default function AddStaffPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-3">
                         Assigned Branches
                       </label>
-                      
+
                       {/* Branch Search */}
                       <div className="mb-3">
                         <div className="relative">
@@ -482,8 +482,8 @@ export default function AddStaffPage() {
                           <input
                             type="text"
                             value={newStaff.emergencyContact.name}
-                            onChange={(e) => setNewStaff(prev => ({ 
-                              ...prev, 
+                            onChange={(e) => setNewStaff(prev => ({
+                              ...prev,
                               emergencyContact: { ...prev.emergencyContact, name: e.target.value }
                             }))}
                             className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -497,8 +497,8 @@ export default function AddStaffPage() {
                           <input
                             type="tel"
                             value={newStaff.emergencyContact.phone}
-                            onChange={(e) => setNewStaff(prev => ({ 
-                              ...prev, 
+                            onChange={(e) => setNewStaff(prev => ({
+                              ...prev,
                               emergencyContact: { ...prev.emergencyContact, phone: e.target.value }
                             }))}
                             className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -511,8 +511,8 @@ export default function AddStaffPage() {
                           </label>
                           <select
                             value={newStaff.emergencyContact.relationship}
-                            onChange={(e) => setNewStaff(prev => ({ 
-                              ...prev, 
+                            onChange={(e) => setNewStaff(prev => ({
+                              ...prev,
                               emergencyContact: { ...prev.emergencyContact, relationship: e.target.value }
                             }))}
                             className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"

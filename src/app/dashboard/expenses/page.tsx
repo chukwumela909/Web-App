@@ -202,7 +202,7 @@ function ExpensesPageContent() {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
+            <div className="dashboard-panel p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">This Month</p>

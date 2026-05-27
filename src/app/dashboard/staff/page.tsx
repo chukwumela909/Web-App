@@ -6,10 +6,10 @@ import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  Staff, 
-  StaffActivityLog, 
-  StaffRole, 
+import {
+  Staff,
+  StaffActivityLog,
+  StaffRole,
   StaffStatus,
   STAFF_PERMISSIONS,
   getStaff,
@@ -126,7 +126,7 @@ export default function StaffPage() {
     const urlParams = new URLSearchParams(window.location.search)
     const created = urlParams.get('created')
     const name = urlParams.get('name')
-    
+
     if (created === 'true' && name) {
       setSuccessStaffName(decodeURIComponent(name))
       setShowSuccessMessage(true)
@@ -196,7 +196,7 @@ export default function StaffPage() {
       })
 
       const result = await response.json()
-      
+
       if (result.success) {
         await loadStaff()
         await loadActivityLogs()
@@ -218,11 +218,11 @@ export default function StaffPage() {
     const matchesSearch = s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          s.employeeId?.toLowerCase().includes(searchTerm.toLowerCase())
-    
+
     const matchesRole = selectedRole === 'all' || s.role === selectedRole
     const matchesStatus = selectedStatus === 'all' || s.status === selectedStatus
     const matchesBranch = selectedBranch === 'all' || s.branchIds.includes(selectedBranch)
-    
+
     return matchesSearch && matchesRole && matchesStatus && matchesBranch
   })
 
@@ -232,7 +232,7 @@ export default function StaffPage() {
     return (
       <ProtectedRoute>
         <DashboardLayout>
-          <Card className="bg-white border-0 shadow-lg">
+          <Card className="dashboard-panel">
             <div className="flex flex-col items-center justify-center py-16">
               <div className="relative mb-6">
                 <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-100"></div>
@@ -253,12 +253,12 @@ export default function StaffPage() {
     <ProtectedRoute>
       <DashboardLayout>
         <PlanGate feature="staff">
-          <motion.div 
+          <motion.div
             className="space-y-6"
             {...fadeInUp}
           >
           {/* Consistent Header */}
-          <div className="bg-white rounded-xl p-8 shadow-lg border-0">
+          <div className="dashboard-panel p-8">
             <motion.div {...fadeInUp} className="flex justify-between items-start">
               <div>
                 <div className="flex items-center gap-4 mb-4">
@@ -266,13 +266,13 @@ export default function StaffPage() {
                     <Users className="h-8 w-8 text-white" />
                   </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Staff Management</h1>
-                    <p className="text-gray-600 mt-1 text-base">
+              <h1 className="dashboard-page-title">Staff Management</h1>
+                    <p className="dashboard-page-subtitle mt-1">
                 Manage your team members, roles, and permissions
               </p>
             </div>
                 </div>
-                
+
                 <div className="flex items-center gap-8 text-sm text-gray-500">
                   <span>{staff.length} Team Members</span>
                   <span>{staff.filter(s => s.status === 'active').length} Active</span>
@@ -281,7 +281,7 @@ export default function StaffPage() {
               </div>
 
               <div className="flex items-center gap-3">
-                <Button 
+                <Button
                   onClick={loadStaff}
                   variant="outline"
                   size="sm"
@@ -290,10 +290,10 @@ export default function StaffPage() {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
-                
+
                 <Button
                   onClick={() => router.push('/dashboard/staff/add')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                  className="dashboard-action-primary"
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
                   Add Staff Member
@@ -303,7 +303,7 @@ export default function StaffPage() {
           </div>
 
           {/* Consistent Stats Cards */}
-          <motion.div 
+          <motion.div
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
             initial="initial"
             animate="animate"
@@ -312,7 +312,7 @@ export default function StaffPage() {
             }}
           >
             <motion.div variants={fadeInUp}>
-                            <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                            <Card className="dashboard-panel transition-all duration-200">
                 <div className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -327,9 +327,9 @@ export default function StaffPage() {
                 </div>
               </Card>
             </motion.div>
-            
+
                         <motion.div variants={fadeInUp}>
-              <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="dashboard-panel transition-all duration-200">
                 <div className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -337,10 +337,10 @@ export default function StaffPage() {
                       <p className="text-2xl font-bold text-gray-900 mt-1">{staff.filter(s => s.status === 'active').length}</p>
                       <div className="flex items-center mt-2">
                         <div className="bg-gray-100 rounded-full h-1.5 w-12 mr-2">
-                          <div 
-                            className="bg-blue-600 h-1.5 rounded-full transition-all duration-500" 
-                            style={{ 
-                              width: `${staff.length ? (staff.filter(s => s.status === 'active').length / staff.length) * 100 : 0}%` 
+                          <div
+                            className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
+                            style={{
+                              width: `${staff.length ? (staff.filter(s => s.status === 'active').length / staff.length) * 100 : 0}%`
                             }}
                           />
                         </div>
@@ -358,7 +358,7 @@ export default function StaffPage() {
             </motion.div>
 
             <motion.div variants={fadeInUp}>
-              <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="dashboard-panel transition-all duration-200">
                 <div className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -375,7 +375,7 @@ export default function StaffPage() {
             </motion.div>
 
             <motion.div variants={fadeInUp}>
-              <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="dashboard-panel transition-all duration-200">
                 <div className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -396,24 +396,24 @@ export default function StaffPage() {
 
           {/* Consistent Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                        <Card className="bg-white border-0 shadow-lg mb-6">
+                        <Card className="dashboard-panel mb-6">
               <div className="p-3">
                 <TabsList className="grid w-full grid-cols-3 bg-gray-50 rounded-lg p-1">
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="staff-list"
                     className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 text-gray-600 font-medium transition-all duration-200"
                   >
                     <Users className="h-4 w-4" />
                     Staff List
                   </TabsTrigger>
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="permissions"
                     className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 text-gray-600 font-medium transition-all duration-200"
                   >
                     <Shield className="h-4 w-4" />
                     Permissions
                   </TabsTrigger>
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="activity-logs"
                     className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 text-gray-600 font-medium transition-all duration-200"
                   >
@@ -427,7 +427,7 @@ export default function StaffPage() {
             {/* Staff List Tab */}
             <TabsContent value="staff-list" className="space-y-6">
                             {/* Consistent Filters */}
-              <Card className="bg-white border-0 shadow-lg">
+              <Card className="dashboard-panel">
                 <div className="p-6">
                   <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-1 relative">
@@ -517,7 +517,7 @@ export default function StaffPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3 }}
                   >
-                    <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
+                    <Card className="dashboard-panel transition-all duration-200 group">
                       <div className="p-6">
                         {/* Header */}
                         <div className="flex items-start justify-between mb-4">
@@ -563,14 +563,14 @@ export default function StaffPage() {
                             <Mail className="h-4 w-4 text-gray-400" />
                             <span className="font-medium truncate">{member.email}</span>
                           </div>
-                          
+
                                 {member.phone && (
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                               <Phone className="h-4 w-4 text-gray-400" />
                               <span>{member.phone}</span>
                                   </div>
                                 )}
-                          
+
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <Calendar className="h-4 w-4 text-gray-400" />
                             <span>Last Login: {member.lastLogin ? new Date(member.lastLogin).toLocaleDateString() : 'Never'}</span>
@@ -604,8 +604,8 @@ export default function StaffPage() {
 
                         {/* Action Buttons */}
                         <div className="flex items-center gap-2">
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => handleStaffDetails(member)}
                             className="flex-1 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
@@ -639,7 +639,7 @@ export default function StaffPage() {
                   </div>
 
                                     {filteredStaff.length === 0 && (
-                <Card className="bg-white border-0 shadow-lg">
+                <Card className="dashboard-panel">
                   <div className="text-center py-16">
                     <div className="bg-gray-50 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
                       <Users className="h-10 w-10 text-gray-400" />
@@ -648,14 +648,14 @@ export default function StaffPage() {
                       {(searchTerm || selectedRole !== 'all' || selectedStatus !== 'all' || selectedBranch !== 'all') ? 'No Staff Match Your Search' : 'No Staff Members Yet'}
                     </h3>
                     <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                      {(searchTerm || selectedRole !== 'all' || selectedStatus !== 'all' || selectedBranch !== 'all') 
+                      {(searchTerm || selectedRole !== 'all' || selectedStatus !== 'all' || selectedBranch !== 'all')
                         ? 'Try adjusting your search filters or add a new staff member.'
                         : 'Build your team by adding staff members with different roles and permissions.'}
                     </p>
-                    
+
                     {(searchTerm || selectedRole !== 'all' || selectedStatus !== 'all' || selectedBranch !== 'all') ? (
                       <div className="flex items-center justify-center gap-4">
-                        <Button 
+                        <Button
                           variant="outline"
                           onClick={() => {
                             setSearchTerm('')
@@ -666,9 +666,9 @@ export default function StaffPage() {
                         >
                           Clear Filters
                         </Button>
-                        <Button 
-                          onClick={() => router.push('/dashboard/staff/add')} 
-                          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                        <Button
+                          onClick={() => router.push('/dashboard/staff/add')}
+                          className="dashboard-action-primary"
                         >
                           <UserPlus className="h-4 w-4 mr-2" />
                           Add Staff Member
@@ -676,9 +676,9 @@ export default function StaffPage() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <Button 
+                        <Button
                           onClick={() => router.push('/dashboard/staff/add')}
-                          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm px-6 py-3"
+                          className="dashboard-action-primary px-6 py-3"
                         >
                           <UserPlus className="h-4 w-4 mr-2" />
                           Add Your First Staff Member
@@ -721,7 +721,7 @@ export default function StaffPage() {
                             {role === 'owner' ? 'Full system access' : `${permissions.length} permissions`}
                           </span>
                         </div>
-                        
+
                         {role === 'owner' ? (
                           <p className="text-gray-600">
                             Owners have complete access to all system features and can perform any action.
@@ -800,7 +800,7 @@ export default function StaffPage() {
         {/* Success Dialog */}
         {showSuccessMessage && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center"

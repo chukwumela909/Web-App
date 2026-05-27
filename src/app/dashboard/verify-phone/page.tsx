@@ -21,25 +21,25 @@ type Step = 1 | 2
 export default function VerifyPhonePage() {
   const router = useRouter()
   const { user } = useAuth()
-  
+
   // Step management
   const [step, setStep] = useState<Step>(1)
-  
+
   // Step 1 state
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0])
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
   const [phoneNumber, setPhoneNumber] = useState('')
-  
+
   // Step 2 state
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [resendTimer, setResendTimer] = useState(60)
   const [canResend, setCanResend] = useState(false)
-  
+
   // Shared state
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [verificationId, setVerificationId] = useState<string | null>(null)
-  
+
   // Refs
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
@@ -79,7 +79,7 @@ export default function VerifyPhonePage() {
     if (step === 1 && !recaptchaVerifierRef.current) {
       initRecaptcha()
     }
-    
+
     return () => {
       clearRecaptcha()
     }
@@ -89,16 +89,16 @@ export default function VerifyPhonePage() {
   const initRecaptcha = async (): Promise<RecaptchaVerifier | null> => {
     // Clear any existing verifier first
     clearRecaptcha()
-    
+
     // Wait for DOM to be ready
     await new Promise(resolve => setTimeout(resolve, 100))
-    
+
     const container = document.getElementById('recaptcha-container')
     if (!container) {
       console.error('reCAPTCHA container not found')
       return null
     }
-    
+
     try {
       const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         size: 'normal',
@@ -111,11 +111,11 @@ export default function VerifyPhonePage() {
           setRecaptchaReady(false)
         }
       })
-      
+
       // Render the reCAPTCHA widget
       await verifier.render()
       recaptchaVerifierRef.current = verifier
-      
+
       return verifier
     } catch (err) {
       console.error('Error initializing reCAPTCHA:', err)
@@ -163,7 +163,7 @@ export default function VerifyPhonePage() {
       // Create a PhoneAuthProvider instance and verify the phone number
       const provider = new PhoneAuthProvider(auth)
       const verId = await provider.verifyPhoneNumber(fullPhoneNumber, appVerifier)
-      
+
       setVerificationId(verId)
       setStep(2)
       setResendTimer(60)
@@ -171,12 +171,12 @@ export default function VerifyPhonePage() {
     } catch (err: unknown) {
       console.error('Error sending OTP:', err)
       clearRecaptcha()
-      
+
       // Re-initialize reCAPTCHA for retry
       setTimeout(() => {
         initRecaptcha()
       }, 500)
-      
+
       if (err instanceof Error) {
         const errorMessage = err.message.toLowerCase()
         if (errorMessage.includes('invalid-phone-number')) {
@@ -285,7 +285,7 @@ export default function VerifyPhonePage() {
       router.push('/dashboard')
     } catch (err: unknown) {
       console.error('Error verifying OTP:', err)
-      
+
       if (err instanceof Error) {
         if (err.message.includes('invalid-verification-code')) {
           setError('Invalid verification code. Please check and try again.')
@@ -305,13 +305,13 @@ export default function VerifyPhonePage() {
   // Handle resend OTP - user needs to go back to step 1 to complete reCAPTCHA again
   const handleResendOtp = async () => {
     if (!canResend) return
-    
+
     // Go back to step 1 to re-verify reCAPTCHA
     setStep(1)
     setOtp(['', '', '', '', '', ''])
     setError('')
     setRecaptchaReady(false)
-    
+
     // Re-initialize reCAPTCHA
     setTimeout(() => {
       initRecaptcha()

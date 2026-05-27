@@ -7,7 +7,7 @@ import Image from 'next/image'
 import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
-import { 
+import {
   CubeIcon,
   PlusIcon,
   MagnifyingGlassIcon,
@@ -48,7 +48,7 @@ const categories = [
   "Garden & Outdoor",
   "Fasteners & Fixings",
   "Electronics",
-  "Food & Beverages", 
+  "Food & Beverages",
   "Clothing",
   "Beauty & Health",
   "Home & Garden",
@@ -65,6 +65,10 @@ const units = [
 
 const allowedProductImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
+function getProductImageUrl(product: Pick<FPProduct, 'images' | 'imageUrl'>) {
+  return product.images?.find(image => image.isPrimary)?.url || product.images?.[0]?.url || product.imageUrl || null
+}
+
 // Helper function to remove undefined values from objects before saving to Firestore
 function cleanFirestoreData<T extends Record<string, any>>(obj: T): T {
   const cleaned = {} as T
@@ -75,7 +79,7 @@ function cleanFirestoreData<T extends Record<string, any>>(obj: T): T {
         cleaned[key as keyof T] = cleanFirestoreData(value)
       } else if (Array.isArray(value)) {
         // Clean arrays by filtering undefined values and cleaning each element
-        cleaned[key as keyof T] = value.filter(item => item !== undefined).map(item => 
+        cleaned[key as keyof T] = value.filter(item => item !== undefined).map(item =>
           item && typeof item === 'object' && !(item instanceof Date) ? cleanFirestoreData(item) : item
         ) as T[keyof T]
       } else {
@@ -123,7 +127,7 @@ interface ProductFormData {
   images: ProductImage[]
   selectedFiles: File[]
   branchId: string // NEW: Branch assignment for product
-  
+
   // NEW ENHANCED FIELDS - Supplier Integration
   selectedSuppliers: Array<{
     supplierId: string
@@ -188,7 +192,7 @@ function ProductsPageContent() {
     images: [],
     selectedFiles: [],
     branchId: '', // Will be set to default branch when branches load
-    
+
     // NEW ENHANCED FIELDS
     selectedSuppliers: [],
     preferredSupplierId: ''
@@ -313,7 +317,7 @@ function ProductsPageContent() {
       images: [],
       selectedFiles: [],
       branchId: branches.find(b => b.status === 'ACTIVE')?.id || branches[0]?.id || '',
-      
+
       // NEW ENHANCED FIELDS
       selectedSuppliers: [],
       preferredSupplierId: ''
@@ -340,7 +344,7 @@ function ProductsPageContent() {
 
   const handleUpdateProduct = async (updates: Partial<FPProduct>) => {
     if (!selectedProductForDetail) return
-    
+
     try {
       await updateProduct(selectedProductForDetail.id, updates)
       await invalidateAllBusinessData()
@@ -356,12 +360,12 @@ function ProductsPageContent() {
   useEffect(() => {
     const loadBranches = async () => {
       if (!effectiveUserId) return
-      
+
       try {
         setBranchesLoading(true)
         const userBranches = await getBranches(effectiveUserId)
         setBranches(userBranches)
-        
+
         // Set default branch for new products
         if (userBranches.length > 0 && !productForm.branchId) {
           const defaultBranch = userBranches.find(b => b.status === 'ACTIVE') || userBranches[0]
@@ -380,7 +384,7 @@ function ProductsPageContent() {
   useEffect(() => {
     const newParam = searchParams?.get('new')
     const editParam = searchParams?.get('edit')
-    
+
     if (newParam) {
       setShowAddProduct(true)
       router.replace('/dashboard/products')
@@ -421,7 +425,7 @@ function ProductsPageContent() {
     }
 
     const primaryImage = productForm.images.find(img => img.isPrimary)
-    
+
     // Convert selected suppliers to supplier links format
     const supplierLinks = productForm.selectedSuppliers.map(supplier => ({
       supplierId: supplier.supplierId,
@@ -453,7 +457,7 @@ function ProductsPageContent() {
       images: productForm.images,
       imageUrl: primaryImage?.url || null, // Backward compatibility
       branchId: productForm.branchId || null, // NEW: Branch assignment
-      
+
       // NEW ENHANCED FIELDS
       supplierLinks: supplierLinks,
       preferredSupplierId: productForm.preferredSupplierId || null,
@@ -461,7 +465,7 @@ function ProductsPageContent() {
       lastPurchasePrice: null,
       averagePurchasePrice: null,
       lastPurchaseDate: null,
-      
+
       // Track who created/modified this product (for staff accountability)
       createdBy: user?.uid || null, // The actual user who created/modified (staff or owner)
     }
@@ -473,12 +477,12 @@ function ProductsPageContent() {
         await updateProduct(editingProduct.id, cleanedProductData)
       } else {
         const productId = productData.sku || crypto.randomUUID()
-        
+
         // Clean the product data to remove any undefined values before saving to Firestore
         const cleanedProductData = cleanFirestoreData({ ...productData, id: productId })
         // Use effectiveUserId so products go to owner's account when staff adds them
         await createProduct(effectiveUserId, cleanedProductData)
-        
+
         // Add supplier links if any
         for (const link of supplierLinks) {
           try {
@@ -500,7 +504,7 @@ function ProductsPageContent() {
 
   const handleEdit = (product: FPProduct) => {
     setEditingProduct(product)
-    
+
     // Handle both new images array and legacy imageUrl
     let images: ProductImage[] = []
     if (product.images && product.images.length > 0) {
@@ -514,7 +518,7 @@ function ProductsPageContent() {
         isPrimary: true
       }]
     }
-    
+
     // Convert supplier links to form format
     const selectedSuppliers = (product.supplierLinks || []).map(link => ({
       supplierId: link.supplierId,
@@ -523,7 +527,7 @@ function ProductsPageContent() {
       leadTimeInDays: link.leadTimeInDays,
       minimumOrderQuantity: link.minimumOrderQuantity
     }))
-    
+
     setProductForm({
       name: product.name,
       sku: product.sku || '',
@@ -545,7 +549,7 @@ function ProductsPageContent() {
       images: images,
       selectedFiles: [],
       branchId: (product as any).branchId || '', // Include branchId for editing
-      
+
       // NEW ENHANCED FIELDS
       selectedSuppliers: selectedSuppliers,
       preferredSupplierId: product.preferredSupplierId || ''
@@ -603,47 +607,47 @@ function ProductsPageContent() {
         >
           {/* Overview Section - Mobile App Style */}
           <motion.div variants={fadeInUp}>
-            <h2 className="text-xl font-bold text-foreground mb-6">Overview</h2>
-            
+            <h2 className="dashboard-section-title mb-6">Overview</h2>
+
             {/* First Row - Total Products and Cost Value */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
+              <div className="dashboard-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <CubeIcon className="h-6 w-6 text-[#2175C7]" />
-                  <span className="text-sm font-medium text-muted-foreground">Total Products</span>
+                  <span className="text-sm font-medium text-[#64748b]">Total Products</span>
                 </div>
-                <p className="text-3xl font-bold text-card-foreground">{totalProducts}</p>
+                <p className="dashboard-metric-value text-3xl font-semibold tracking-[-0.02em] text-[#0f172a]">{totalProducts}</p>
               </div>
-              
-              <div 
+
+              <div
                 onClick={() => setShowSellingValue(!showSellingValue)}
-                className="bg-card rounded-xl p-6 shadow-sm border border-border cursor-pointer hover:shadow-md transition-all duration-200"
+                className="dashboard-card cursor-pointer p-6"
               >
                 {/* Header with icon and toggle indicator */}
                 <div className="flex items-center justify-between mb-4">
                   <TagIcon className="h-6 w-6 text-[#66BB6A]" />
                   <div className="flex items-center space-x-1">
-                    <span className="text-sm font-medium text-[#2175C7]">
+                    <span className="text-sm font-semibold text-[#004aad]">
                       {showSellingValue ? "Selling" : "Cost"}
                     </span>
-                    <ArrowsRightLeftIcon className="h-4 w-4 text-[#2175C7]" />
+                    <ArrowsRightLeftIcon className="h-4 w-4 text-[#004aad]" />
                   </div>
                 </div>
-                
+
                 <div className="mb-2">
-                  <span className="text-sm font-medium text-muted-foreground">
+                  <span className="text-sm font-medium text-[#64748b]">
                     {showSellingValue ? "Selling Value" : "Cost Value"}
                   </span>
                 </div>
-                
-                <p className="text-3xl font-bold text-card-foreground mb-2">
+
+                <p className="dashboard-metric-value mb-2 text-3xl font-semibold tracking-[-0.02em] text-[#0f172a]">
                   {currencySymbol} {Math.round(showSellingValue ? totalSellingValue : totalCostValue).toLocaleString()}
                 </p>
-                
+
                 {/* Profit/Potential indicator */}
                 {totalSellingValue > totalCostValue && (
                   <p className="text-sm font-medium text-[#66BB6A]">
-                    {showSellingValue 
+                    {showSellingValue
                       ? `Profit: ${currencySymbol} ${Math.round(totalSellingValue - totalCostValue).toLocaleString()}`
                       : `Potential: ${currencySymbol} ${Math.round(totalSellingValue).toLocaleString()}`
                     }
@@ -651,33 +655,33 @@ function ProductsPageContent() {
                 )}
               </div>
             </div>
-            
+
             {/* Second Row - Low Stock and Out of Stock */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
+              <div className="dashboard-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <ExclamationTriangleIcon className="h-6 w-6 text-[#F29F05]" />
-                  <span className="text-sm font-medium text-muted-foreground">Low Stock</span>
+                  <span className="text-sm font-medium text-[#64748b]">Low Stock</span>
                 </div>
-                <p className="text-3xl font-bold text-card-foreground">{lowStockCount}</p>
+                <p className="dashboard-metric-value text-3xl font-semibold tracking-[-0.02em] text-[#0f172a]">{lowStockCount}</p>
               </div>
-              
-              <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
+
+              <div className="dashboard-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <ExclamationTriangleIcon className="h-6 w-6 text-[#DC2626]" />
-                  <span className="text-sm font-medium text-muted-foreground">Out of Stock</span>
+                  <span className="text-sm font-medium text-[#64748b]">Out of Stock</span>
                 </div>
-                <p className="text-3xl font-bold text-card-foreground">{products.filter(p => p.quantity === 0).length}</p>
+                <p className="dashboard-metric-value text-3xl font-semibold tracking-[-0.02em] text-[#0f172a]">{products.filter(p => p.quantity === 0).length}</p>
               </div>
             </div>
           </motion.div>
 
           {/* Quick Actions Section - Mobile App Style */}
           <motion.div variants={fadeInUp}>
-            <h2 className="text-xl font-bold text-foreground mb-6">Quick Actions</h2>
-            
+            <h2 className="dashboard-section-title mb-6">Quick Actions</h2>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <button 
+              <button
                 onClick={async () => {
                   const limitCheck = await canAddProduct()
                   if (!limitCheck.allowed) {
@@ -692,30 +696,30 @@ function ProductsPageContent() {
                     setShowAddProduct(true)
                   }
                 }}
-                className="bg-[#E3F2FD] hover:bg-[#d9edfc] text-card-foreground rounded-xl p-6 transition-all duration-200 shadow-sm hover:shadow-md border border-border"
+                className="dashboard-action-secondary min-h-[72px] w-full p-6"
               >
                 <div className="flex items-center justify-center space-x-3">
-                  <PlusIcon className="h-5 w-5 text-[#2175C7]" />
+                  <PlusIcon className="h-5 w-5 text-[#004aad]" />
                   <span className="font-medium text-sm">Add Product</span>
                 </div>
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => setShowBulkUpload(true)}
-                className="bg-[#FFF3E0] hover:bg-[#FFECB3] text-card-foreground rounded-xl p-6 transition-all duration-200 shadow-sm hover:shadow-md border border-border"
+                className="dashboard-action-secondary min-h-[72px] w-full p-6"
               >
                 <div className="flex items-center justify-center space-x-3">
-                  <CloudArrowUpIcon className="h-5 w-5 text-[#F57C00]" />
+                  <CloudArrowUpIcon className="h-5 w-5 text-[#004aad]" />
                   <span className="font-medium text-sm">Bulk Upload</span>
                 </div>
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => router.push('/dashboard/products/browse')}
-                className="bg-[#E8F5E8] hover:bg-[#dff3df] text-card-foreground rounded-xl p-6 transition-all duration-200 shadow-sm hover:shadow-md border border-border"
+                className="dashboard-action-secondary min-h-[72px] w-full p-6"
               >
                 <div className="flex items-center justify-center space-x-3">
-                  <MagnifyingGlassIcon className="h-5 w-5 text-[#2175C7]" />
+                  <MagnifyingGlassIcon className="h-5 w-5 text-[#004aad]" />
                   <span className="font-medium text-sm">Browse Products</span>
                 </div>
               </button>
@@ -725,28 +729,41 @@ function ProductsPageContent() {
           {/* Recently Added Section - Mobile App Style */}
           {products.length > 0 && (
             <motion.div variants={fadeInUp}>
-              <h2 className="text-xl font-bold text-foreground mb-6">Recently Added</h2>
+              <h2 className="dashboard-section-title mb-6">Recently Added</h2>
               <div className="space-y-4">
-                {products
+                {[...products]
                   .sort((a, b) => {
                     const aTime = typeof a.createdAt === 'number' ? a.createdAt : 0
                     const bTime = typeof b.createdAt === 'number' ? b.createdAt : 0
                     return bTime - aTime
                   })
                   .slice(0, 3)
-                  .map((product) => (
-                    <div key={product.id} className="bg-card rounded-xl p-4 shadow-sm border border-border hover:shadow-md transition-shadow">
+                  .map((product) => {
+                    const primaryImageUrl = getProductImageUrl(product)
+
+                    return (
+                    <div key={product.id} className="dashboard-list-item p-4">
                       <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#004AAD] to-[#0056CC] flex items-center justify-center">
-                          <CubeIcon className="h-6 w-6 text-white" />
+                        <div className="relative flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-[#e6ebf2] bg-[#f8fafc]">
+                          {primaryImageUrl ? (
+                            <Image
+                              src={primaryImageUrl}
+                              alt={product.name}
+                              fill
+                              sizes="56px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <CubeIcon className="h-6 w-6 text-[#94a3b8]" />
+                          )}
                         </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-card-foreground">{product.name}</h3>
-                          <p className="text-sm text-muted-foreground">{product.quantity} {product.unitOfMeasure || 'pcs'} - {product.category}</p>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate font-semibold text-[#0f172a]">{product.name}</h3>
+                          <p className="truncate text-sm font-medium text-[#64748b]">{product.quantity} {product.unitOfMeasure || 'pcs'} - {product.category}</p>
                         </div>
-                        <div className="text-right">
+                        <div className="flex-shrink-0 text-right">
                           <p className="font-semibold text-[#66BB6A]">{currencySymbol} {product.sellingPrice.toLocaleString()}</p>
-                          <p className="text-sm text-muted-foreground mb-2">
+                          <p className="mb-2 text-sm font-medium text-[#64748b]">
                             {product.quantity <= product.minStockLevel ? (
                               <span className="text-[#F29F05]">Low Stock</span>
                             ) : product.quantity === 0 ? (
@@ -757,14 +774,15 @@ function ProductsPageContent() {
                           </p>
                           <button
                             onClick={() => router.push(`/dashboard/products/${product.id}`)}
-                            className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                            className="text-xs font-semibold text-[#004aad] transition-colors hover:text-[#003d8f]"
                           >
-                            View Details →
+                            View details
                           </button>
                         </div>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
               </div>
             </motion.div>
           )}
@@ -842,13 +860,13 @@ function ProductsPageContent() {
                         <div className="space-y-6">
                           <div>
                             <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
-                            
+
                             {/* Enhanced Product Images Upload */}
                             <div className="mb-6">
                               <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Product Images <span className="text-gray-500">(Max 3 images)</span>
                               </label>
-                              
+
                               {/* Image Gallery */}
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                                 {productForm.images.map((image, index) => (
@@ -889,14 +907,14 @@ function ProductsPageContent() {
                                     </div>
                                   </div>
                                 ))}
-                                
+
                                 {/* Upload Progress Display */}
                                 {uploadProgress.map((upload, index) => (
                                   <div key={`progress-${index}`} className="aspect-square bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center p-4">
                                     <div className="w-full mb-2">
                                       <div className="text-xs text-gray-600 mb-1 truncate">{upload.file.name}</div>
                                       <div className="w-full bg-gray-200 rounded-full h-2">
-                                        <div 
+                                        <div
                                           className={`h-2 rounded-full transition-all duration-300 ${
                                             upload.status === 'completed' ? 'bg-green-600' :
                                             upload.status === 'error' ? 'bg-red-600' : 'bg-blue-600'
@@ -919,7 +937,7 @@ function ProductsPageContent() {
                                     </div>
                                   </div>
                                 ))}
-                                
+
                                 {/* Add New Images Button */}
                                 {(productForm.images.length + productForm.selectedFiles.length) < 3 && (
                                   <div className="aspect-square">
@@ -949,7 +967,7 @@ function ProductsPageContent() {
                                   </div>
                                 )}
                               </div>
-                              
+
                               <p className="text-xs text-gray-500">
                                 Uploaded to Firebase Storage. First image will be used as the primary display image.
                               </p>
@@ -966,7 +984,7 @@ function ProductsPageContent() {
                                   value={productForm.name}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
                                   placeholder="e.g., Coca-Cola 500ml"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 />
                               </div>
 
@@ -978,7 +996,7 @@ function ProductsPageContent() {
                                   required
                                   value={productForm.category}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, category: e.target.value }))}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 >
                                   <option value="">Select Category</option>
                                   {categories.slice(1).map(category => (
@@ -997,7 +1015,7 @@ function ProductsPageContent() {
                                     required
                                     value={productForm.branchId}
                                     onChange={(e) => setProductForm(prev => ({ ...prev, branchId: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                    className="dashboard-field w-full px-3 py-2"
                                     disabled={branchesLoading}
                                   >
                                     <option value="">Select Branch</option>
@@ -1020,7 +1038,7 @@ function ProductsPageContent() {
                                   value={productForm.sku}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, sku: e.target.value }))}
                                   placeholder="Auto-generated if left empty"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 />
                               </div>
 
@@ -1032,7 +1050,7 @@ function ProductsPageContent() {
                                     value={productForm.barcode}
                                     onChange={(e) => setProductForm(prev => ({ ...prev, barcode: e.target.value }))}
                                     placeholder="Scan or enter manually"
-                                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                    className="dashboard-field w-full px-3 py-2 pr-10"
                                   />
                                   <button
                                     type="button"
@@ -1051,7 +1069,7 @@ function ProductsPageContent() {
                                 value={productForm.description}
                                 onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
                                 placeholder="Optional product description or notes"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                className="dashboard-field w-full px-3 py-2"
                               />
                             </div>
                           </div>
@@ -1063,7 +1081,7 @@ function ProductsPageContent() {
                         <div className="space-y-6">
                           <div>
                             <h3 className="text-lg font-semibold text-gray-900 mb-4">Pricing & Stock Information</h3>
-                            
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1077,7 +1095,7 @@ function ProductsPageContent() {
                                   value={productForm.costPrice}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, costPrice: e.target.value }))}
                                   placeholder="0.00"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">How much you paid for this product</p>
                               </div>
@@ -1094,7 +1112,7 @@ function ProductsPageContent() {
                                   value={productForm.sellingPrice}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, sellingPrice: e.target.value }))}
                                   placeholder="0.00"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">Price you sell to customers</p>
                               </div>
@@ -1110,7 +1128,7 @@ function ProductsPageContent() {
                                   value={productForm.quantity}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, quantity: e.target.value }))}
                                   placeholder="0"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 />
                               </div>
 
@@ -1122,7 +1140,7 @@ function ProductsPageContent() {
                                   required
                                   value={productForm.unitOfMeasure}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, unitOfMeasure: e.target.value }))}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 >
                                   {units.map(unit => (
                                     <option key={unit} value={unit}>{unit}</option>
@@ -1138,7 +1156,7 @@ function ProductsPageContent() {
                                   value={productForm.minStockLevel}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, minStockLevel: e.target.value }))}
                                   placeholder="5"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">Alert when stock falls below this level</p>
                               </div>
@@ -1162,7 +1180,7 @@ function ProductsPageContent() {
                                 <div className="flex items-center justify-between">
                                   <span className="text-sm font-medium text-green-800">Profit Margin:</span>
                                   <span className="text-lg font-bold text-green-900">
-                                    {currencySymbol} {(Number(productForm.sellingPrice) - Number(productForm.costPrice)).toFixed(2)} 
+                                    {currencySymbol} {(Number(productForm.sellingPrice) - Number(productForm.costPrice)).toFixed(2)}
                                     ({Math.round(((Number(productForm.sellingPrice) - Number(productForm.costPrice)) / Number(productForm.costPrice)) * 100)}%)
                                   </span>
                                 </div>
@@ -1177,7 +1195,7 @@ function ProductsPageContent() {
                         <div className="space-y-6">
                           <div>
                             <h3 className="text-lg font-semibold text-gray-900 mb-4">Advanced Information</h3>
-                            
+
                             {/* Enhanced Supplier Selection */}
                             <div className="mb-6">
                               <SupplierSelection
@@ -1187,7 +1205,7 @@ function ProductsPageContent() {
                                 productCategory={productForm.category}
                               />
                             </div>
-                            
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1198,7 +1216,7 @@ function ProductsPageContent() {
                                   value={productForm.supplier}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, supplier: e.target.value }))}
                                   placeholder="e.g., ABC Distributors"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">Use the enhanced supplier selection above instead</p>
                               </div>
@@ -1210,7 +1228,7 @@ function ProductsPageContent() {
                                   value={productForm.location}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, location: e.target.value }))}
                                   placeholder="e.g., Shelf A-1, Warehouse 2"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 />
                               </div>
 
@@ -1221,7 +1239,7 @@ function ProductsPageContent() {
                                   value={productForm.batchNumber}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, batchNumber: e.target.value }))}
                                   placeholder="For tracking bulk purchases"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 />
                               </div>
 
@@ -1231,7 +1249,7 @@ function ProductsPageContent() {
                                   type="date"
                                   value={productForm.expiryDate}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, expiryDate: e.target.value }))}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 />
                               </div>
 
@@ -1242,7 +1260,7 @@ function ProductsPageContent() {
                                   value={productForm.tags}
                                   onChange={(e) => setProductForm(prev => ({ ...prev, tags: e.target.value }))}
                                   placeholder="e.g., organic, imported, bestseller (comma separated)"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-[#004AAD] outline-none"
+                                  className="dashboard-field w-full px-3 py-2"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">Separate multiple tags with commas</p>
                               </div>
@@ -1271,8 +1289,8 @@ function ProductsPageContent() {
                           onClick={previousStep}
                           disabled={currentStep === 'basic'}
                           className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-                            currentStep === 'basic' 
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                            currentStep === 'basic'
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                           }`}
                         >
@@ -1316,7 +1334,7 @@ function ProductsPageContent() {
                               type="submit"
                               disabled={isUploading}
                               className={`flex items-center px-6 py-2 rounded-lg transition-colors font-medium shadow-md ${
-                                isUploading 
+                                isUploading
                                   ? 'bg-gray-400 text-white cursor-not-allowed'
                                   : 'bg-[#004AAD] text-white hover:bg-[#003a8c]'
                               }`}
@@ -1379,7 +1397,7 @@ function ProductsPageContent() {
                       <XMarkIcon className="h-6 w-6" />
                     </button>
                   </div>
-                  
+
                   {/* Enhanced Product Detail Component */}
                   <div className="p-6">
                     <EnhancedProductDetail

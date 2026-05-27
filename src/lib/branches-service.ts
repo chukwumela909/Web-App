@@ -98,6 +98,61 @@ function removeUndefinedValues(obj: any): any {
   return obj
 }
 
+type BranchInventoryTotals = Pick<Branch, 'totalProducts' | 'totalInventoryValue' | 'lowStockItemsCount'>
+
+function isActiveProductData(product: any) {
+  if (typeof product.isActive === 'boolean') return product.isActive
+  if (typeof product.active === 'boolean') return product.active
+  return true
+}
+
+async function getFirestoreBranchInventoryTotals(
+  userId: string,
+  branches: Branch[]
+): Promise<Map<string, BranchInventoryTotals>> {
+  const totals = new Map<string, BranchInventoryTotals>()
+
+  for (const branch of branches) {
+    totals.set(branch.id, {
+      totalProducts: 0,
+      totalInventoryValue: 0,
+      lowStockItemsCount: 0
+    })
+  }
+
+  if (branches.length === 0) return totals
+
+  const productsSnap = await getDocs(query(
+    collection(db, 'products'),
+    where('userId', '==', userId)
+  ))
+
+  const defaultBranch = branches.find(branch => branch.branchType === 'MAIN')
+    || branches.find(branch => branch.status === 'ACTIVE')
+    || branches[0]
+
+  productsSnap.docs.forEach(productDoc => {
+    const product = productDoc.data()
+    if (!isActiveProductData(product)) return
+
+    const productBranchId = product.branchId || (branches.length === 1 ? defaultBranch.id : '')
+    const branchTotals = totals.get(productBranchId)
+    if (!branchTotals) return
+
+    const quantity = Number(product.quantity || 0)
+    const costPrice = Number(product.averagePurchasePrice || product.costPrice || 0)
+    const minStockLevel = Number(product.minStockLevel || 0)
+
+    branchTotals.totalProducts = (branchTotals.totalProducts || 0) + 1
+    branchTotals.totalInventoryValue = (branchTotals.totalInventoryValue || 0) + (quantity * costPrice)
+    if (quantity > 0 && quantity <= minStockLevel) {
+      branchTotals.lowStockItemsCount = (branchTotals.lowStockItemsCount || 0) + 1
+    }
+  })
+
+  return totals
+}
+
 // ============================================================================
 // BRANCH OPERATIONS
 // ============================================================================
@@ -111,7 +166,7 @@ export async function getBranches(
 ): Promise<Branch[]> {
   if (isBackendAvailable()) {
     try {
-      let branches = await getBackendBranches()
+      let branches = await getBackendBranches({ includeInventorySummary: true })
       if (filters?.searchTerm) {
         const term = filters.searchTerm.toLowerCase()
         branches = branches.filter((branch) =>
@@ -260,6 +315,12 @@ export async function getBranches(
         b.description?.toLowerCase().includes(term)
       )
     }
+
+    const inventoryTotals = await getFirestoreBranchInventoryTotals(userId, branches)
+    branches = branches.map(branch => ({
+      ...branch,
+      ...(inventoryTotals.get(branch.id) || {})
+    }))
     
     // Client-side sorting if server-side sorting failed
     if (branches.length > 0) {
@@ -297,7 +358,7 @@ export async function getBranch(branchId: string): Promise<Branch | null> {
     const docSnap = await getDoc(doc(db, 'branches', branchId))
     if (docSnap.exists()) {
       const data = docSnap.data()
-      return { 
+      const branch = {
         id: docSnap.id, 
         ...data,
         // Ensure required fields exist with defaults
@@ -309,6 +370,11 @@ export async function getBranch(branchId: string): Promise<Branch | null> {
         totalInventoryValue: data.totalInventoryValue || 0,
         lowStockItemsCount: data.lowStockItemsCount || 0
       } as Branch
+      const inventoryTotals = await getFirestoreBranchInventoryTotals(branch.userId, [branch])
+      return {
+        ...branch,
+        ...(inventoryTotals.get(branch.id) || {})
+      }
     }
     return null
   } catch (error) {
@@ -1160,7 +1226,7 @@ function buildBranchDashboard(branches: Branch[], transfers: BranchTransfer[] = 
 export async function getBranchDashboard(userId: string): Promise<BranchDashboard> {
   if (isBackendAvailable()) {
     try {
-      const branches = await getBackendBranches()
+      const branches = await getBackendBranches({ includeInventorySummary: true })
       const branch = branches.find((item) => item.status === 'ACTIVE') || branches[0]
       const transfers = await getBackendTransfers().catch((error) => {
         console.warn('Backend transfers unavailable while building branch dashboard:', error)

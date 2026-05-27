@@ -141,9 +141,9 @@ export default function NotificationsPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <motion.div 
-          initial="initial" 
-          animate="animate" 
+        <motion.div
+          initial="initial"
+          animate="animate"
           variants={staggerContainer}
           className="space-y-6"
         >
@@ -162,7 +162,7 @@ export default function NotificationsPage() {
             <div className="flex flex-col gap-6">
               <AnimatePresence mode="popLayout">
                 {notifications.length === 0 ? (
-                  <motion.div 
+                  <motion.div
                     key="empty-state"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -197,7 +197,7 @@ export default function NotificationsPage() {
                         <div className="shrink-0">
                           {getNotificationIcon(notification.type)}
                         </div>
-                        
+
                         {/* Notification text */}
                         <div className="flex flex-col gap-4 max-w-[534px]">
                           {/* Title section */}
@@ -207,14 +207,14 @@ export default function NotificationsPage() {
                             </h3>
                             {renderMessage(notification)}
                           </div>
-                          
+
                           {/* Timestamp */}
                           <p className="font-dm-sans font-light text-[14px] text-[#717171] leading-normal">
                             {formatTimeAgo(notification.createdAt)}
                           </p>
                         </div>
                       </div>
-                      
+
                       {/* Close button */}
                       <motion.button
                         whileHover={{ scale: 1.1 }}

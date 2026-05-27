@@ -24,7 +24,7 @@ function PricingPageContent() {
             return billingCycle === 'monthly' ? '10' : '100'
         }
     }
-    
+
     const currencySymbol = getCurrencySymbol(currency)
 
     return (
@@ -170,7 +170,7 @@ function PricingPageContent() {
                         </div>
 
                         {/* CTA Button */}
-                        <button 
+                        <button
                             onClick={handleGetPro}
                             className="bg-[#004aad] rounded-[24px] h-[50px] w-[200px] flex items-center justify-center hover:bg-[#FF9500] transition-all duration-300 ease-in-out group"
                         >
@@ -274,7 +274,7 @@ function PricingPageContent() {
 
                     {/* Compare Features Button */}
                     <div className="flex justify-center">
-                        <button 
+                        <button
                             onClick={() => document.getElementById('compare-features')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                             className="border-[1.5px] border-[#004aad] rounded-[24px] px-6 py-[6px] flex gap-2 items-center hover:bg-[#004aad] hover:text-white transition-colors group"
                         >
@@ -314,7 +314,7 @@ function PricingPageContent() {
 
                     {/* Back to Plan Button */}
                     <div className="flex justify-center mt-16">
-                        <button 
+                        <button
                             onClick={() => document.getElementById('pricing-plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                             className="bg-[#004aad] rounded-[36px] h-[56px] w-[215px] px-6 py-[6px] flex gap-1 items-center justify-center hover:bg-[#FF9500] transition-all duration-300 ease-in-out group"
                         >
@@ -459,7 +459,7 @@ function PricingPageContent() {
                         </div>
 
                         {/* CTA Button */}
-                        <button 
+                        <button
                             onClick={handleGetPro}
                             className="bg-[#004aad] rounded-[24px] h-[50px] w-[200px] flex items-center justify-center hover:bg-[#FF9500] transition-all duration-300 ease-in-out group"
                         >
@@ -527,10 +527,10 @@ function PricingPageContent() {
                             <h4 className="text-base md:text-lg leading-[28px] font-segoe text-white mb-3 md:mb-4">Contact</h4>
                             <ul className="space-y-2 md:space-y-3">
                                 <li className="flex items-center gap-2">
-                                    <Image 
-                                        src="/assets/figma/subscription/footer-email.svg" 
-                                        alt="email" 
-                                        width={16} 
+                                    <Image
+                                        src="/assets/figma/subscription/footer-email.svg"
+                                        alt="email"
+                                        width={16}
                                         height={16}
                                     />
                                     <Link
@@ -541,10 +541,10 @@ function PricingPageContent() {
                                     </Link>
                                 </li>
                                 <li className="flex items-center gap-2">
-                                    <Image 
-                                        src="/assets/figma/subscription/footer-whatsapp.svg" 
-                                        alt="whatsapp" 
-                                        width={16} 
+                                    <Image
+                                        src="/assets/figma/subscription/footer-whatsapp.svg"
+                                        alt="whatsapp"
+                                        width={16}
                                         height={16}
                                     />
                                     <Link href="#" className="text-xs md:text-sm leading-5 font-segoe text-[#99A1AF] hover:text-white transition-colors">

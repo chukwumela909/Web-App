@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
-import { 
+import {
   TruckIcon,
   UserGroupIcon,
   PlusIcon,
@@ -108,7 +108,7 @@ function SuppliersContent() {
   // Load dashboard data
   const loadDashboard = async () => {
     if (!user) return
-    
+
     try {
       const data = await getSupplierDashboard(user.uid)
       setDashboard(data as any)
@@ -120,7 +120,7 @@ function SuppliersContent() {
   // Load suppliers
   const loadSuppliers = async () => {
     if (!user) return
-    
+
     try {
       const data = await getSuppliers(user.uid, {
         status: statusFilter && statusFilter !== 'ALL' ? [statusFilter as any] : undefined,
@@ -135,7 +135,7 @@ function SuppliersContent() {
   // Create supplier
   const createSupplier = async (supplierData: any) => {
     if (!user) return false
-    
+
     try {
       await createSupplierRecord(user.uid, supplierData)
       await loadSuppliers()
@@ -165,7 +165,7 @@ function SuppliersContent() {
         loadSuppliers()
       }
     }, 300)
-    
+
     return () => clearTimeout(timeoutId)
   }, [searchTerm, statusFilter])
 
@@ -207,7 +207,7 @@ function SuppliersContent() {
         message={upgradeModalData?.message}
       />
       {/* Consistent Header */}
-      <div className="bg-white rounded-xl p-8 shadow-lg border-0">
+      <div className="dashboard-panel p-8">
         <motion.div {...fadeInUp} className="flex justify-between items-start">
           <div>
             <div className="flex items-center gap-4 mb-4">
@@ -215,13 +215,13 @@ function SuppliersContent() {
                 <TruckIcon className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Supplier Management</h1>
-                <p className="text-gray-600 mt-1 text-base">
+                <h1 className="dashboard-page-title">Supplier Management</h1>
+                <p className="dashboard-page-subtitle mt-1">
                   Manage your suppliers and vendor relationships
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-8 text-sm text-gray-500">
               <span>{dashboard?.totalSuppliers || 0} Suppliers</span>
               <span>{dashboard?.activeSuppliers || 0} Active</span>
@@ -230,7 +230,7 @@ function SuppliersContent() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button 
+            <Button
               onClick={() => {
                 loadDashboard()
                 loadSuppliers()
@@ -242,7 +242,7 @@ function SuppliersContent() {
               <ArrowPathIcon className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            
+
             <Button
               onClick={async () => {
                 const limitCheck = await canAddSupplier()
@@ -258,7 +258,7 @@ function SuppliersContent() {
                   setShowAddModal(true)
                 }
               }}
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+              className="dashboard-action-primary"
             >
               <PlusIcon className="h-4 w-4 mr-2" />
               Add Supplier
@@ -285,19 +285,19 @@ function SuppliersContent() {
           <Card className="border-0 shadow-lg mb-6">
             <div className="p-2">
               <TabsList className="grid w-full grid-cols-3 bg-gray-50 rounded-xl p-1">
-                <TabsTrigger 
+                <TabsTrigger
                   value="dashboard"
                   className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
                 >
                   📊 Dashboard
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="suppliers"
                   className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
                 >
                   🚛 Suppliers
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="performance"
                   className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
                 >
@@ -309,14 +309,14 @@ function SuppliersContent() {
 
           <TabsContent value="dashboard" className="space-y-8">
             {/* Enhanced Key Metrics */}
-            <motion.div 
+            <motion.div
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
               variants={staggerChildren}
               initial="initial"
               animate="animate"
             >
               <motion.div variants={fadeInUp}>
-                <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <Card className="dashboard-panel transition-all duration-200">
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -333,7 +333,7 @@ function SuppliersContent() {
               </motion.div>
 
               <motion.div variants={fadeInUp}>
-                <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <Card className="dashboard-panel transition-all duration-200">
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -341,10 +341,10 @@ function SuppliersContent() {
                         <p className="text-2xl font-bold text-gray-900 mt-1">{dashboard?.activeSuppliers || 0}</p>
                         <div className="flex items-center mt-2">
                           <div className="bg-gray-100 rounded-full h-1.5 w-12 mr-2">
-                            <div 
-                              className="bg-blue-600 h-1.5 rounded-full transition-all duration-500" 
-                              style={{ 
-                                width: `${dashboard?.totalSuppliers ? (dashboard.activeSuppliers / dashboard.totalSuppliers) * 100 : 0}%` 
+                            <div
+                              className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
+                              style={{
+                                width: `${dashboard?.totalSuppliers ? (dashboard.activeSuppliers / dashboard.totalSuppliers) * 100 : 0}%`
                               }}
                             />
                           </div>
@@ -362,7 +362,7 @@ function SuppliersContent() {
               </motion.div>
 
               <motion.div variants={fadeInUp}>
-                <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <Card className="dashboard-panel transition-all duration-200">
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -381,7 +381,7 @@ function SuppliersContent() {
               </motion.div>
 
               <motion.div variants={fadeInUp}>
-                <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <Card className="dashboard-panel transition-all duration-200">
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -482,14 +482,14 @@ function SuppliersContent() {
                       placeholder="Search suppliers by name, contact, or categories..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border-0 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-green-500 focus:shadow-md transition-all duration-200"
+                      className="dashboard-field w-full py-3 pl-10 pr-4 transition-all duration-200"
                     />
                   </div>
                   <div className="relative">
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="appearance-none px-4 py-3 pr-10 border-0 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-green-500 focus:shadow-md transition-all duration-200 cursor-pointer"
+                      className="dashboard-field appearance-none px-4 py-3 pr-10 transition-all duration-200 cursor-pointer"
                     >
                       <option value="ALL">All Status</option>
                       <option value="ACTIVE">Active</option>
@@ -568,14 +568,14 @@ function SuppliersContent() {
                           <PhoneIcon className="h-4 w-4 text-gray-400" />
                           <span className="font-medium">{supplier.phone}</span>
                         </div>
-                        
+
                         {supplier.email && (
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <EnvelopeIcon className="h-4 w-4 text-gray-400" />
                             <span className="truncate">{supplier.email}</span>
                           </div>
                         )}
-                        
+
                         <div className="flex items-start gap-2 text-sm text-gray-600">
                           <MapPinIcon className="h-4 w-4 text-gray-400 mt-0.5" />
                           <span className="font-medium">{supplier.address}</span>
@@ -608,7 +608,7 @@ function SuppliersContent() {
                           <p className="text-2xl font-bold text-blue-700">{supplier.totalOrders}</p>
                           <p className="text-xs text-blue-600 font-medium">Orders</p>
                         </div>
-                        
+
                         <div className="bg-green-50 rounded-lg p-3 text-center">
                           <div className="flex items-center justify-center mb-1">
                             <CheckCircleIcon className="h-4 w-4 text-green-600 mr-1" />
@@ -660,24 +660,24 @@ function SuppliersContent() {
 
                       {/* Action Buttons */}
                       <div className="flex items-center gap-2">
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           className="flex-1 hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition-colors"
                         >
                           <EyeIcon className="h-4 w-4 mr-2" />
                           View Details
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => setShowEditModal(supplier)}
                           className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
                         >
                           <PencilIcon className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           className="hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
                         >
@@ -700,14 +700,14 @@ function SuppliersContent() {
                     {(searchTerm || statusFilter !== 'ALL') ? 'No Suppliers Match Your Search' : 'No Suppliers Yet'}
                   </h3>
                   <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                    {(searchTerm || statusFilter !== 'ALL') 
+                    {(searchTerm || statusFilter !== 'ALL')
                       ? 'Try adjusting your search filters or add a new supplier.'
                       : 'Build your supply network by adding suppliers across different categories.'}
                   </p>
-                  
+
                   {(searchTerm || statusFilter !== 'ALL') ? (
                     <div className="flex items-center justify-center gap-4">
-                      <Button 
+                      <Button
                         variant="outline"
                         onClick={() => {
                           setSearchTerm('')
@@ -717,8 +717,8 @@ function SuppliersContent() {
                       >
                         Clear Filters
                       </Button>
-                      <Button 
-                        onClick={() => setShowAddModal(true)} 
+                      <Button
+                        onClick={() => setShowAddModal(true)}
                         className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
                       >
                         <PlusIcon className="h-5 w-5 mr-2" />
@@ -727,7 +727,7 @@ function SuppliersContent() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <Button 
+                      <Button
                         onClick={() => setShowAddModal(true)}
                         className="bg-gradient-to-r from-green-500 via-emerald-600 to-teal-600 hover:from-green-600 hover:via-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl transition-all duration-300 px-8 py-3"
                       >
@@ -801,7 +801,7 @@ function AddSupplierModal({ onSave, onCancel }: AddSupplierModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    
+
     const success = await onSave(formData)
     if (success) {
       setFormData({
@@ -836,13 +836,13 @@ function AddSupplierModal({ onSave, onCancel }: AddSupplierModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
       >
         <h3 className="text-2xl font-semibold mb-6">Add New Supplier</h3>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -974,8 +974,8 @@ function AddSupplierModal({ onSave, onCancel }: AddSupplierModalProps) {
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="flex-1"
               disabled={saving || formData.categories.length === 0}
             >

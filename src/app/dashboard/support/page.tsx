@@ -126,7 +126,7 @@ export default function SupportPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <motion.div 
+        <motion.div
           className="space-y-8 p-4 md:p-6"
           {...fadeInUp}
         >
@@ -134,7 +134,7 @@ export default function SupportPage() {
           <div className="text-center">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">Support Center</h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Get the help you need to make the most of FahamPesa. Browse our comprehensive FAQ, 
+              Get the help you need to make the most of FahamPesa. Browse our comprehensive FAQ,
               contact our support team, or explore our learning resources.
             </p>
           </div>
@@ -147,9 +147,9 @@ export default function SupportPage() {
                 <h2 className="text-2xl font-bold mb-2">Quick Search</h2>
                 <p className="opacity-90 mb-4">Find answers instantly with our intelligent search</p>
                 <div className="max-w-md mx-auto">
-                  <input 
-                    type="text" 
-                    placeholder="Search for help topics..." 
+                  <input
+                    type="text"
+                    placeholder="Search for help topics..."
                     className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-500"
                     disabled
                   />

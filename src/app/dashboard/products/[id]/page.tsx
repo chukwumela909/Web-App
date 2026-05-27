@@ -29,7 +29,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotifications } from '@/contexts/NotificationsContext'
-import { Product, getProducts, updateProduct } from '@/lib/firestore'
+import { Product, getProducts, softDeleteProduct } from '@/lib/firestore'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { getProductInventoryData, getProductPriceHistory } from '@/lib/product-enhancements'
 import { getSuppliers } from '@/lib/suppliers-service'
@@ -118,7 +118,7 @@ export default function ProductDetailPage() {
     
     if (confirm(`Are you sure you want to delete "${product.name}"? This action cannot be undone.`)) {
       try {
-        await updateProduct(productId, { isActive: false })
+        await softDeleteProduct(productId)
         addNotification({
           id: `deleted-product-${product.id}`,
           type: 'alert',

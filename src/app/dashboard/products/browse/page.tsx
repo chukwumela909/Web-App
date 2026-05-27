@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import Image from 'next/image'
 import { useCallback, useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
+import {
   CubeIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
@@ -21,7 +21,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotifications } from '@/contexts/NotificationsContext'
-import { Product as FPProduct, getProducts, updateProduct } from '@/lib/firestore'
+import { Product as FPProduct, getProducts, softDeleteProduct, updateProduct } from '@/lib/firestore'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import EnhancedProductDetail from '@/components/products/EnhancedProductDetail'
 
@@ -37,7 +37,7 @@ const categories = [
   "Garden & Outdoor",
   "Fasteners & Fixings",
   "Electronics",
-  "Food & Beverages", 
+  "Food & Beverages",
   "Clothing",
   "Beauty & Health",
   "Home & Garden",
@@ -106,7 +106,7 @@ function BrowseProductsContent() {
   const handleDelete = async (product: FPProduct) => {
     if (confirm('Are you sure you want to delete this product?')) {
       try {
-        await updateProduct(product.id, { isActive: false })
+        await softDeleteProduct(product.id)
         addNotification({
           id: `deleted-product-${product.id}`,
           type: 'alert',
@@ -130,7 +130,7 @@ function BrowseProductsContent() {
 
   const handleUpdateProduct = async (updates: Partial<FPProduct>) => {
     if (!selectedProductForDetail) return
-    
+
     try {
       await updateProduct(selectedProductForDetail.id, updates)
       fetchData()
@@ -256,7 +256,7 @@ function BrowseProductsContent() {
                 </button>
               </div>
             </div>
-            
+
             <h1 className="text-2xl font-bold text-foreground">Browse Products</h1>
             <p className="text-muted-foreground">
               Showing {filteredProducts.length} of {products.filter(p => p.isActive !== false).length} products
@@ -265,7 +265,7 @@ function BrowseProductsContent() {
 
           {/* Search and Filters */}
           <motion.div variants={fadeInUp}>
-            <div className="bg-card rounded-xl p-6 shadow-sm border border-border space-y-4">
+            <div className="dashboard-panel p-6 space-y-4">
               {/* Search Bar */}
               <div className="relative">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -352,7 +352,7 @@ function BrowseProductsContent() {
                     <motion.div
                       key={product.id}
                       whileHover={{ scale: 1.02 }}
-                      className="bg-card rounded-xl p-4 shadow-sm border border-border hover:shadow-md transition-all duration-200"
+                      className="dashboard-panel p-4 hover:shadow-md transition-all duration-200"
                     >
                       {/* Product Image */}
                       <div className="aspect-square bg-muted rounded-lg mb-4 overflow-hidden relative">
@@ -368,7 +368,7 @@ function BrowseProductsContent() {
                             <CubeIcon className="h-16 w-16 text-muted-foreground" />
                           </div>
                         )}
-                        
+
                         {/* Status Badges */}
                         <div className="absolute top-2 left-2 space-y-1">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${stockStatus.color}`}>
@@ -394,7 +394,7 @@ function BrowseProductsContent() {
                       {/* Product Info */}
                       <div className="space-y-2">
                         <h3 className="font-semibold text-foreground line-clamp-2">{product.name}</h3>
-                        
+
                         <div className="flex items-center justify-between text-sm text-muted-foreground">
                           <span>{product.category}</span>
                           {product.sku && <span>SKU: {product.sku}</span>}
@@ -461,7 +461,7 @@ function BrowseProductsContent() {
           {/* Pagination */}
           {filteredProducts.length > 0 && totalPages > 1 && (
             <motion.div variants={fadeInUp}>
-              <div className="flex items-center justify-between bg-card rounded-xl p-4 shadow-sm border border-border">
+              <div className="flex items-center justify-between dashboard-panel p-4">
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
                   disabled={currentPage === 0}
@@ -519,7 +519,7 @@ function BrowseProductsContent() {
                     <XMarkIcon className="h-6 w-6" />
                   </button>
                 </div>
-                
+
                 {/* Enhanced Product Detail Component */}
                 <div className="p-6">
                   <EnhancedProductDetail

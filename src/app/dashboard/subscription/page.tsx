@@ -160,11 +160,11 @@ export default function SubscriptionPage() {
             return isYearly ? 100 : 10
         }
     }
-    
+
     const proPrice = getProPrice()
     const proUnit = isYearly ? '/ Year' : '/ Month'
     const currencySymbol = getCurrencySymbol(currency)
-    
+
     // Free plan is always 0 but unit changes
     const freePrice = 0
     const freeUnit = isYearly ? '/ Year' : '/ Month'
@@ -341,23 +341,23 @@ export default function SubscriptionPage() {
 
                             {/* Mobile Menu Content */}
                             <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
-                                <Link 
-                                    href="/#product" 
-                                    onClick={() => setMobileMenuOpen(false)} 
+                                <Link
+                                    href="/#product"
+                                    onClick={() => setMobileMenuOpen(false)}
                                     className="font-dm-sans font-bold text-[16px] text-[#001031] py-3 px-4 rounded-[8px] hover:bg-gray-50 w-full text-center"
                                 >
                                     Product
                                 </Link>
-                                <Link 
-                                    href="/#who-we-serve" 
-                                    onClick={() => setMobileMenuOpen(false)} 
+                                <Link
+                                    href="/#who-we-serve"
+                                    onClick={() => setMobileMenuOpen(false)}
                                     className="font-dm-sans font-bold text-[16px] text-[#001031] py-3 px-4 rounded-[8px] hover:bg-gray-50 w-full text-center"
                                 >
                                     Customers
                                 </Link>
-                                <Link 
-                                    href="/dashboard/subscription" 
-                                    onClick={() => setMobileMenuOpen(false)} 
+                                <Link
+                                    href="/dashboard/subscription"
+                                    onClick={() => setMobileMenuOpen(false)}
                                     className="font-dm-sans font-bold text-[16px] text-[#004AAD] py-3 px-4 rounded-[8px] bg-[#E6F0FF] w-full text-center"
                                 >
                                     Pricing
@@ -366,9 +366,9 @@ export default function SubscriptionPage() {
 
                             {/* Mobile Menu Footer Actions */}
                             <div className="border-t border-gray-100 p-4 sm:p-6 flex flex-col gap-3 shrink-0">
-                                <Link 
-                                    href="/login" 
-                                    onClick={() => setMobileMenuOpen(false)} 
+                                <Link
+                                    href="/login"
+                                    onClick={() => setMobileMenuOpen(false)}
                                     className="font-dm-sans font-semibold text-[14px] text-[#001031] px-6 py-3 rounded-[8px] hover:bg-[#E6F0FF] transition-colors text-center border border-gray-200"
                                 >
                                     Login
@@ -542,7 +542,7 @@ export default function SubscriptionPage() {
                                     </span>
                                 </div>
 
-                                <button 
+                                <button
                                     onClick={handleGetPro}
                                     className="w-full h-11 py-[6px] px-3 bg-[#004AAD] border-[1.5px] border-[#004AAD] rounded-[24px] text-[18px] leading-[23.44px] font-semibold font-dm-sans text-white text-center hover:bg-[#FF9500] hover:text-[#004AAD] hover:border-[#FF9500] transition-colors"
                                 >
@@ -568,7 +568,7 @@ export default function SubscriptionPage() {
 
                 {/* Compare Features Button */}
                 <div className="flex justify-center mt-8 md:mt-[60px]">
-                    <button 
+                    <button
                         onClick={scrollToCompareFeatures}
                         className="flex items-center gap-2 px-6 py-[6px] border-[1.5px] border-[#004AAD] rounded-[24px] h-11 hover:bg-[#004AAD] transition-colors group"
                     >
@@ -594,8 +594,8 @@ export default function SubscriptionPage() {
                         <button
                             onClick={() => setActiveTab('mobile')}
                             className={`flex-1 py-2 px-1 text-[12px] sm:text-[13px] font-medium rounded-[8px] text-center transition-all ${
-                                activeTab === 'mobile' 
-                                ? 'bg-[#E9F2F8] text-[#004AAD]' 
+                                activeTab === 'mobile'
+                                ? 'bg-[#E9F2F8] text-[#004AAD]'
                                 : 'text-[#64748B]'
                             }`}
                         >
@@ -604,8 +604,8 @@ export default function SubscriptionPage() {
                         <button
                             onClick={() => setActiveTab('web')}
                             className={`flex-1 py-2 px-1 text-[12px] sm:text-[13px] font-medium rounded-[8px] text-center transition-all ${
-                                activeTab === 'web' 
-                                ? 'bg-[#E9F2F8] text-[#004AAD]' 
+                                activeTab === 'web'
+                                ? 'bg-[#E9F2F8] text-[#004AAD]'
                                 : 'text-[#64748B]'
                             }`}
                         >
@@ -614,8 +614,8 @@ export default function SubscriptionPage() {
                         <button
                             onClick={() => setActiveTab('desktop')}
                             className={`flex-1 py-2 px-1 text-[12px] sm:text-[13px] font-medium rounded-[8px] text-center transition-all ${
-                                activeTab === 'desktop' 
-                                ? 'bg-[#E9F2F8] text-[#004AAD]' 
+                                activeTab === 'desktop'
+                                ? 'bg-[#E9F2F8] text-[#004AAD]'
                                 : 'text-[#64748B]'
                             }`}
                         >
@@ -655,7 +655,7 @@ export default function SubscriptionPage() {
                 <img className='hidden md:block mx-auto max-w-6xl' src="/assets/pricing-table.svg" alt="Feature comparison table"  />
 
                   <div className="flex justify-center items-center mt-12">
-                        <button 
+                        <button
                             onClick={scrollToTop}
                             className="flex items-center justify-center gap-1 px-6 bg-[#004AAD] border-[1.5px] border-[#004AAD] rounded-[36px] h-12 md:h-14 hover:bg-[#FF9500] hover:border-[#FF9500] transition-colors group"
                         >
@@ -726,7 +726,7 @@ export default function SubscriptionPage() {
                     </div> */}
 
                     {/* See All Plans Button */}
-                  
+
                 {/* </div> */}
             </div>
 

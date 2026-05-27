@@ -423,7 +423,7 @@ function CheckoutContent() {
                                                     <circle fill="#F79E1B" cx="23" cy="12" r="7" />
                                                     <path fill="#FF5F00" d="M22 12c0-2.4-1.2-4.5-3-5.7-1.8 1.3-3 3.4-3 5.7s1.2 4.5 3 5.7c1.8-1.2 3-3.3 3-5.7z" />
                                                 </svg>
-                                             
+
                                             </div>
                                         </div>
 

@@ -27,6 +27,21 @@ interface UsePlanLimitsReturn {
   refreshLimits: () => Promise<void>
 }
 
+function getTimestampMillis(value: unknown): number {
+  if (typeof value === 'number') return value
+  if (value instanceof Date) return value.getTime()
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value)
+    return Number.isNaN(parsed) ? 0 : parsed
+  }
+  if (value && typeof value === 'object') {
+    const timestamp = value as { seconds?: number; toMillis?: () => number }
+    if (typeof timestamp.toMillis === 'function') return timestamp.toMillis()
+    if (typeof timestamp.seconds === 'number') return timestamp.seconds * 1000
+  }
+  return 0
+}
+
 /**
  * Hook to check plan limits and enforce billing restrictions
  * For staff members, this uses the owner's subscription instead of the staff's
@@ -184,23 +199,31 @@ export function usePlanLimits(): UsePlanLimitsReturn {
       }
 
       try {
-        const collectionRef = collection(db, collectionName)
-        // Use effectiveUserId so staff counts against owner's data
-        let q = query(collectionRef, where('userId', '==', effectiveUserId))
-
-        // For daily sales, filter by today's date using numeric timestamp (milliseconds)
         if (feature === 'dailySales') {
           const { startOfDay, endOfDay } = getTodayRange()
-          q = query(
-            collectionRef,
-            where('userId', '==', effectiveUserId),
-            where('timestamp', '>=', startOfDay.getTime()),
-            where('timestamp', '<=', endOfDay.getTime())
+          const startTime = startOfDay.getTime()
+          const endTime = endOfDay.getTime()
+          const saleCollections = ['sales', 'multi_item_sales']
+          const snapshots = await Promise.all(
+            saleCollections.map(name =>
+              getDocs(query(collection(db, name), where('userId', '==', effectiveUserId)))
+            )
           )
-        }
 
-        const snapshot = await getDocs(q)
-        currentCount = snapshot.size
+          currentCount = snapshots.reduce((count, snapshot) => {
+            const todaysSales = snapshot.docs.filter(saleDoc => {
+              const data = saleDoc.data() as { timestamp?: unknown; isDeleted?: boolean }
+              const saleTime = getTimestampMillis(data.timestamp)
+              return data.isDeleted !== true && saleTime >= startTime && saleTime <= endTime
+            })
+            return count + todaysSales.length
+          }, 0)
+        } else {
+          const collectionRef = collection(db, collectionName)
+          const q = query(collectionRef, where('userId', '==', effectiveUserId))
+          const snapshot = await getDocs(q)
+          currentCount = snapshot.size
+        }
 
         const limitReached = currentCount >= numericLimit
         const allowed = !limitReached

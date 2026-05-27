@@ -135,12 +135,12 @@ function PaymentsPageContent() {
         } else {
           subs = await fetchSubscriptionsFromFirestore()
         }
-        
+
         // Sort by createdAt descending (newest first)
         subs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-        
+
         setSubscriptions(subs)
-        
+
         // Determine current plan based on active subscription
         const activeSubscription = subs.find(s => s.status === 'active')
         if (activeSubscription) {
@@ -154,7 +154,7 @@ function PaymentsPageContent() {
         setIsLoading(false)
       }
     }
-    
+
     fetchSubscriptions()
   }, [user])
 
@@ -166,7 +166,7 @@ function PaymentsPageContent() {
     if (!date) return '-'
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
-      month: '2-digit', 
+      month: '2-digit',
       day: '2-digit'
     }).replace(/\//g, '-')
   }
@@ -213,7 +213,7 @@ function PaymentsPageContent() {
           <h2 className="font-dm-sans font-semibold text-[24px] text-[#001223]">
             Current Plan
           </h2>
-          
+
           <div className="flex items-center justify-between">
             {/* Current Plan Display (Read-only) */}
             <div className="flex gap-4 items-center">
@@ -307,7 +307,7 @@ function PaymentsPageContent() {
 
             {/* Upgrade Plan Button - only show if on free plan */}
             {currentPlan === 'free' && (
-              <button 
+              <button
                 onClick={handleUpgradePlan}
                 className="bg-[#004aad] border-[1.5px] border-[#004aad] rounded-full px-6 py-1.5 h-14 w-[180px] flex items-center justify-center hover:bg-[#003a8c] transition-colors"
               >

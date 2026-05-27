@@ -174,6 +174,7 @@ export interface Product {
   isPerishable?: boolean
   lowStockAlertEnabled?: boolean
   isActive: boolean
+  branchId?: string | null
   userId: string
   createdAt?: Date
   updatedAt?: Date
@@ -525,10 +526,10 @@ export interface StaffActivityLog {
   userId: string // Owner/company
 }
 
-export async function getProducts(userId: string): Promise<Product[]> {
+export async function getProducts(userId: string, branchId?: string): Promise<Product[]> {
   if (isBackendAvailable()) {
     try {
-      return await getBackendProducts()
+      return await getBackendProducts(branchId)
     } catch (error) {
       if (!shouldUseFirebaseFallback(error)) throw error
       console.warn('Backend products unavailable, falling back to Firestore:', error)
@@ -555,7 +556,7 @@ export async function getProducts(userId: string): Promise<Product[]> {
     if (typeof isActive === 'boolean') return isActive
     if (typeof active === 'boolean') return active
     return true
-  }) as Product[]
+  }).filter(p => !branchId || !p.branchId || p.branchId === branchId) as Product[]
 }
 
 export async function createProduct(userId: string, data: Partial<Product>): Promise<void> {
@@ -592,6 +593,7 @@ export async function createProduct(userId: string, data: Partial<Product>): Pro
     isPerishable: Boolean(data.isPerishable) || false,
     lowStockAlertEnabled: data.lowStockAlertEnabled ?? true,
     isActive: true,
+    branchId: data.branchId ?? null,
     userId,
     
     // NEW ENHANCED FIELDS - Initialize with empty/null values

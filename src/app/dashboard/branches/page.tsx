@@ -8,7 +8,7 @@ import { useCurrency, formatCurrency } from '@/hooks/useCurrency'
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
+import {
   BuildingOfficeIcon,
   MapPinIcon,
   PlusIcon,
@@ -136,7 +136,7 @@ function BranchesContent() {
   // Load dashboard data
   const loadDashboard = async () => {
     if (!user) return
-    
+
     try {
       const data = await getBranchDashboard(user.uid)
       setDashboard(data as any)
@@ -148,18 +148,18 @@ function BranchesContent() {
   // Load branches
   const loadBranches = async () => {
     if (!user) return
-    
+
     try {
       console.log('Frontend: Loading branches for user ID:', user.uid)
-      
+
       const params = new URLSearchParams({
         userId: user.uid
       })
-      
+
       if (statusFilter && statusFilter !== 'ALL') {
         params.append('status', statusFilter)
       }
-      
+
       if (searchTerm.trim()) {
         params.append('searchTerm', searchTerm.trim())
       }
@@ -177,7 +177,7 @@ function BranchesContent() {
   // Load transfers
   const loadTransfers = async () => {
     if (!user) return
-    
+
     try {
       const data = await getBranchTransfers(user.uid, undefined, 'requestedAt', 'desc', 20)
       setTransfers(data as any)
@@ -195,7 +195,7 @@ function BranchesContent() {
       router.push('/dashboard/subscription')
       return false
     }
-    
+
     try {
       await createBranchRecord(user.uid, branchData)
       await loadBranches()
@@ -212,7 +212,7 @@ function BranchesContent() {
   // Update branch
   const updateBranch = async (branchId: string, branchData: any) => {
     if (!user) return false
-    
+
     try {
       await updateBranchRecord(branchId, { id: branchId, ...branchData } as any)
       await loadBranches()
@@ -243,7 +243,7 @@ function BranchesContent() {
         loadBranches()
       }
     }, 300)
-    
+
     return () => clearTimeout(timeoutId)
   }, [searchTerm, statusFilter])
 
@@ -278,15 +278,15 @@ function BranchesContent() {
 
   const formatOpeningHours = (hours: any[]) => {
     if (!hours || hours.length === 0) return 'Hours not set'
-    
+
     const openDays = hours.filter(h => h.isOpen)
     if (openDays.length === 0) return 'Closed all days'
-    
+
     const firstOpen = openDays[0]
     if (openDays.length === 7 && openDays.every(h => h.openTime === firstOpen.openTime && h.closeTime === firstOpen.closeTime)) {
       return `Daily ${firstOpen.openTime} - ${firstOpen.closeTime}`
     }
-    
+
     return `${openDays.length} days/week`
   }
 
@@ -295,7 +295,7 @@ function BranchesContent() {
   return (
     <div className="space-y-6">
       {/* Consistent Header */}
-      <div className="bg-white rounded-xl p-8 shadow-lg border-0">
+      <div className="dashboard-panel p-8">
         <motion.div {...fadeInUp} className="flex justify-between items-start">
           <div>
             <div className="flex items-center gap-4 mb-4">
@@ -303,13 +303,13 @@ function BranchesContent() {
                 <BuildingOfficeIcon className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Branch Management</h1>
-                <p className="text-gray-600 mt-1 text-base">
+                <h1 className="dashboard-page-title">Branch Management</h1>
+                <p className="dashboard-page-subtitle mt-1">
                   Manage your locations and track inventory transfers
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-8 text-sm text-gray-500">
               <span>{dashboard?.totalBranches || 0} Total Locations</span>
               <span>{dashboard?.activeBranches || 0} Active</span>
@@ -318,7 +318,7 @@ function BranchesContent() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button 
+            <Button
               onClick={() => {
                 loadDashboard()
                 loadBranches()
@@ -331,8 +331,8 @@ function BranchesContent() {
               <ArrowPathIcon className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-                
-            <Button 
+
+            <Button
               onClick={() => {
                 if (!subscriptionLoading && !isSubscribed && branches.length >= 1) {
                   alert('Your free plan includes one main branch. Upgrade to Pro to add more branches.')
@@ -341,7 +341,7 @@ function BranchesContent() {
                 }
                 setShowAddModal(true)
               }}
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+              className="dashboard-action-primary"
             >
               <PlusIcon className="h-4 w-4 mr-2" />
               Add Branch
@@ -368,25 +368,25 @@ function BranchesContent() {
           <Card className="border-0 shadow-lg mb-6">
             <div className="p-2">
               <TabsList className="grid w-full grid-cols-4 bg-gray-50 rounded-xl p-1">
-                <TabsTrigger 
+                <TabsTrigger
                   value="dashboard"
                   className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
                 >
                   📊 Dashboard
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="branches"
                   className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
                 >
                   🏢 Branches
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="transfers"
                   className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
                 >
                   🚚 Transfers
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="reports"
                   className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
                 >
@@ -398,14 +398,14 @@ function BranchesContent() {
 
           <TabsContent value="dashboard" className="space-y-8">
             {/* Key Metrics */}
-            <motion.div 
+            <motion.div
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
               variants={staggerChildren}
               initial="initial"
               animate="animate"
             >
               <motion.div variants={fadeInUp}>
-                <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <Card className="dashboard-panel transition-all duration-200">
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -422,7 +422,7 @@ function BranchesContent() {
               </motion.div>
 
               <motion.div variants={fadeInUp}>
-                <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <Card className="dashboard-panel transition-all duration-200">
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -430,10 +430,10 @@ function BranchesContent() {
                         <p className="text-2xl font-bold text-gray-900 mt-1">{dashboard?.activeBranches || 0}</p>
                         <div className="flex items-center mt-2">
                           <div className="bg-gray-100 rounded-full h-1.5 w-12 mr-2">
-                            <div 
-                              className="bg-blue-600 h-1.5 rounded-full transition-all duration-500" 
-                              style={{ 
-                                width: `${dashboard?.totalBranches ? (dashboard.activeBranches / dashboard.totalBranches) * 100 : 0}%` 
+                            <div
+                              className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
+                              style={{
+                                width: `${dashboard?.totalBranches ? (dashboard.activeBranches / dashboard.totalBranches) * 100 : 0}%`
                               }}
                             />
                           </div>
@@ -451,7 +451,7 @@ function BranchesContent() {
               </motion.div>
 
               <motion.div variants={fadeInUp}>
-                <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <Card className="dashboard-panel transition-all duration-200">
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -470,7 +470,7 @@ function BranchesContent() {
               </motion.div>
 
               <motion.div variants={fadeInUp}>
-                <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <Card className="dashboard-panel transition-all duration-200">
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -714,21 +714,21 @@ function BranchesContent() {
                             {branch.location.city && `, ${branch.location.city}`}
                           </span>
                         </div>
-                        
+
                         {branch.contact.phone && (
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <PhoneIcon className="h-4 w-4 text-gray-400" />
                             <span>{branch.contact.phone}</span>
                           </div>
                         )}
-                        
+
                         {branch.contact.email && (
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <EnvelopeIcon className="h-4 w-4 text-gray-400" />
                             <span className="truncate">{branch.contact.email}</span>
                           </div>
                         )}
-                        
+
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <ClockIcon className="h-4 w-4 text-gray-400" />
                           <span>{formatOpeningHours(branch.openingHours)}</span>
@@ -744,7 +744,7 @@ function BranchesContent() {
                           <p className="text-2xl font-bold text-blue-700">{branch.totalProducts || 0}</p>
                           <p className="text-xs text-blue-600 font-medium">Products</p>
                         </div>
-                        
+
                         <div className="bg-green-50 rounded-lg p-3 text-center">
                           <div className="flex items-center justify-center mb-1">
                             <CheckCircleIcon className="h-4 w-4 text-green-600 mr-1" />
@@ -766,7 +766,7 @@ function BranchesContent() {
                             </span>
                           </div>
                         )}
-                        
+
                         {branch.managerName && (
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-blue-500 rounded-full flex items-center justify-center">
@@ -782,8 +782,8 @@ function BranchesContent() {
 
                       {/* Action Buttons */}
                       <div className="flex items-center gap-2">
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => router.push(`/dashboard/branches/${branch.id}`)}
                           className="flex-1 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
@@ -791,16 +791,16 @@ function BranchesContent() {
                           <EyeIcon className="h-4 w-4 mr-2" />
                           View Details
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => setShowEditModal(branch)}
                           className="hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition-colors"
                         >
                           <PencilIcon className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           className="hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
                         >
@@ -811,7 +811,7 @@ function BranchesContent() {
                   </Card>
                 </motion.div>
               ))}
-                
+
             </div>
 
             {branches.length === 0 && (
@@ -824,14 +824,14 @@ function BranchesContent() {
                     {searchTerm || statusFilter !== 'ALL' ? 'No Branches Match Your Search' : 'No Branches Yet'}
                   </h3>
                   <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                    {searchTerm || statusFilter !== 'ALL' 
+                    {searchTerm || statusFilter !== 'ALL'
                       ? 'Try adjusting your search filters or create a new branch if needed.'
                       : 'Transform your business with multiple locations. Start by creating your first branch to expand your reach.'}
                   </p>
-                  
+
                   {searchTerm || statusFilter !== 'ALL' ? (
                     <div className="flex items-center justify-center gap-4">
-                      <Button 
+                      <Button
                         variant="outline"
                         onClick={() => {
                           setSearchTerm('')
@@ -848,7 +848,7 @@ function BranchesContent() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <Button 
+                      <Button
                         onClick={() => setShowAddModal(true)}
                         className="bg-gradient-to-r from-blue-500 via-blue-600 to-purple-600 hover:from-blue-600 hover:via-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-300 px-8 py-3"
                       >
@@ -905,7 +905,7 @@ function BranchesContent() {
                         </Badge>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                       <div>
                         <span className="font-medium">Items: </span>
@@ -922,7 +922,7 @@ function BranchesContent() {
                     </div>
                   </div>
                 ))}
-                
+
                 {transfers.length === 0 && (
                   <div className="text-center py-12">
                     <TruckIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
@@ -1010,7 +1010,7 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    
+
     const success = await onSave(formData)
     if (success) {
       setFormData({
@@ -1036,13 +1036,13 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
       >
         <h3 className="text-2xl font-semibold mb-6">Add New Branch</h3>
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
           <div>
@@ -1106,8 +1106,8 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
                 <label className="block text-sm font-medium mb-2">Address *</label>
                 <textarea
                   value={formData.location.address}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
                     location: { ...prev.location, address: e.target.value }
                   }))}
                   className="w-full px-3 py-2 border rounded-md"
@@ -1121,8 +1121,8 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
                 <input
                   type="text"
                   value={formData.location.city}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
                     location: { ...prev.location, city: e.target.value }
                   }))}
                   className="w-full px-3 py-2 border rounded-md"
@@ -1134,8 +1134,8 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
                 <input
                   type="text"
                   value={formData.location.region}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
                     location: { ...prev.location, region: e.target.value }
                   }))}
                   className="w-full px-3 py-2 border rounded-md"
@@ -1153,8 +1153,8 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
                 <input
                   type="tel"
                   value={formData.contact.phone}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
                     contact: { ...prev.contact, phone: e.target.value }
                   }))}
                   className="w-full px-3 py-2 border rounded-md"
@@ -1166,8 +1166,8 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
                 <input
                   type="email"
                   value={formData.contact.email}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
                     contact: { ...prev.contact, email: e.target.value }
                   }))}
                   className="w-full px-3 py-2 border rounded-md"
@@ -1177,8 +1177,8 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="flex-1"
               disabled={saving}
             >
@@ -1215,20 +1215,20 @@ function EditBranchModal({ branch, onSave, onCancel }: EditBranchModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    
+
     const success = await onSave(formData)
     setSaving(false)
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
       >
         <h3 className="text-2xl font-semibold mb-6">Edit Branch</h3>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -1261,8 +1261,8 @@ function EditBranchModal({ branch, onSave, onCancel }: EditBranchModalProps) {
             <label className="block text-sm font-medium mb-2">Address *</label>
             <textarea
               value={formData.location.address}
-              onChange={(e) => setFormData(prev => ({ 
-                ...prev, 
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
                 location: { ...prev.location, address: e.target.value }
               }))}
               className="w-full px-3 py-2 border rounded-md"
@@ -1272,8 +1272,8 @@ function EditBranchModal({ branch, onSave, onCancel }: EditBranchModalProps) {
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="flex-1"
               disabled={saving}
             >

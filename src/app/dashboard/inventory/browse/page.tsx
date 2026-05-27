@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import Image from 'next/image'
 import { useCallback, useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
+import {
   CubeIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
@@ -35,7 +35,7 @@ const categories = [
   "Garden & Outdoor",
   "Fasteners & Fixings",
   "Electronics",
-  "Food & Beverages", 
+  "Food & Beverages",
   "Clothing",
   "Beauty & Health",
   "Home & Garden",
@@ -208,7 +208,7 @@ function BrowseProductsContent() {
           </motion.div>
 
           {/* Search and Filters */}
-          <motion.div variants={fadeInUp} className="bg-card rounded-xl p-6 shadow-sm border border-border">
+          <motion.div variants={fadeInUp} className="dashboard-panel p-6">
             {/* Search Bar */}
             <div className="mb-4">
               <div className="relative">
@@ -236,8 +236,8 @@ function BrowseProductsContent() {
               <button
                 onClick={() => setSelectedFilter(ProductFilter.ALL)}
                 className={`px-3 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedFilter === ProductFilter.ALL 
-                    ? 'bg-[#2175C7] text-white' 
+                  selectedFilter === ProductFilter.ALL
+                    ? 'bg-[#2175C7] text-white'
                     : 'bg-muted text-muted-foreground hover:bg-[#2175C7]/10'
                 }`}
               >
@@ -246,8 +246,8 @@ function BrowseProductsContent() {
               <button
                 onClick={() => setSelectedFilter(ProductFilter.LOW_STOCK)}
                 className={`px-3 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedFilter === ProductFilter.LOW_STOCK 
-                    ? 'bg-[#F29F05] text-white' 
+                  selectedFilter === ProductFilter.LOW_STOCK
+                    ? 'bg-[#F29F05] text-white'
                     : 'bg-muted text-muted-foreground hover:bg-[#F29F05]/10'
                 }`}
               >
@@ -256,8 +256,8 @@ function BrowseProductsContent() {
               <button
                 onClick={() => setSelectedFilter(ProductFilter.OUT_OF_STOCK)}
                 className={`px-3 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedFilter === ProductFilter.OUT_OF_STOCK 
-                    ? 'bg-[#DC2626] text-white' 
+                  selectedFilter === ProductFilter.OUT_OF_STOCK
+                    ? 'bg-[#DC2626] text-white'
                     : 'bg-muted text-muted-foreground hover:bg-[#DC2626]/10'
                 }`}
               >
@@ -307,13 +307,13 @@ function BrowseProductsContent() {
               <div className="space-y-4">
                 {paginatedProducts.map((product) => {
                   const status = getStockStatus(product)
-                  const primaryImageUrl = product.images?.find(img => img.isPrimary)?.url || 
-                                        product.images?.[0]?.url || 
-                                        product.imageUrl || 
+                  const primaryImageUrl = product.images?.find(img => img.isPrimary)?.url ||
+                                        product.images?.[0]?.url ||
+                                        product.imageUrl ||
                                         null
 
                   return (
-                    <div key={product.id} className="bg-card rounded-xl p-4 shadow-sm border border-border hover:shadow-md transition-shadow">
+                    <div key={product.id} className="dashboard-panel p-4 hover:shadow-md transition-shadow">
                       <div className="flex items-center space-x-4">
                         {/* Product Image/Icon */}
                         <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted flex items-center justify-center">
@@ -397,7 +397,7 @@ function BrowseProductsContent() {
           {/* Pagination */}
           {filteredProducts.length > 0 && totalPages > 1 && (
             <motion.div variants={fadeInUp}>
-              <div className="flex items-center justify-between bg-card rounded-xl p-4 shadow-sm border border-border">
+              <div className="flex items-center justify-between dashboard-panel p-4">
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
                   disabled={currentPage === 0}

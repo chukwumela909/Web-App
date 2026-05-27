@@ -11,7 +11,6 @@ import {
   Plus,
   Power,
   Printer,
-  Receipt,
   Search,
   ShoppingCart,
   Trash2,
@@ -150,7 +149,7 @@ function normaliseDiscount(value: number, subtotal: number): number {
 
 function SalesPOSContent() {
   const router = useRouter()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const { staff } = useStaff()
   const { selectedBranchId } = useBranch()
   const { currency } = useCurrency()
@@ -577,10 +576,10 @@ function SalesPOSContent() {
   return (
     <ProtectedRoute>
       <StaffProtectedRoute requiredPermission="sales:read">
-        <div className="min-h-screen overflow-hidden bg-[#e9ecef] font-dm-sans text-[#06112b]">
-          <header className="flex h-[78px] items-center bg-[#061124] text-white shadow-[0_2px_18px_rgba(6,17,36,0.18)]">
-            <div className="flex h-full w-[190px] shrink-0 items-center border-r border-white/20 px-7">
-              <h1 className="text-[18px] font-bold tracking-[-0.01em]">Fahampesa POS</h1>
+        <div className="min-h-screen overflow-hidden bg-[#f6f8fb] font-dm-sans text-[#0f172a]">
+          <header className="flex h-[78px] items-center border-b border-[#e7ebf2] bg-white/90 text-[#0f172a] shadow-[0_1px_2px_rgba(15,23,42,0.04)] supports-[backdrop-filter]:bg-white/80 supports-[backdrop-filter]:backdrop-blur-md">
+            <div className="flex h-full w-[190px] shrink-0 items-center border-r border-[#eef2f7] px-7">
+              <h1 className="text-[18px] font-semibold tracking-[-0.01em]">Fahampesa POS</h1>
             </div>
 
             <div className="flex min-w-0 flex-1 items-center justify-end gap-6 px-7">
@@ -588,22 +587,22 @@ function SalesPOSContent() {
                 <User className="h-5 w-5" />
                 <span>User: {cashierName}</span>
               </div>
-              <div className="hidden h-8 w-px bg-white/25 md:block" />
+              <div className="hidden h-8 w-px bg-[#e6ebf2] md:block" />
               <div className="hidden items-center gap-3 text-sm font-medium sm:flex">
                 <Wifi className={`h-5 w-5 ${online ? 'text-[#20c75a]' : 'text-[#f97316]'}`} />
                 <span>{online ? 'Online' : 'Offline'}</span>
               </div>
-              <div className="h-8 w-px bg-white/25" />
+              <div className="h-8 w-px bg-[#e6ebf2]" />
               <div className="text-center leading-tight">
                 <div className="text-[18px] font-bold">{displayTime}</div>
-                <div className="text-[14px] text-white/85">{displayDate}</div>
+                <div className="text-[14px] text-[#64748b]">{displayDate}</div>
               </div>
-              <div className="h-8 w-px bg-white/25" />
+              <div className="h-8 w-px bg-[#e6ebf2]" />
               <button
                 type="button"
-                onClick={() => logout()}
-                className="grid h-11 w-11 place-items-center rounded-full text-white transition hover:bg-white/10"
-                title="Log out"
+                onClick={() => router.push('/dashboard')}
+                className="grid h-11 w-11 place-items-center rounded-full text-[#64748b] transition hover:bg-[#f1f5f9] hover:text-[#0f172a]"
+                title="Back to dashboard"
               >
                 <Power className="h-7 w-7" />
               </button>
@@ -611,7 +610,7 @@ function SalesPOSContent() {
           </header>
 
           <main className="grid h-[calc(100vh-78px)] grid-cols-1 gap-4 overflow-hidden p-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <section className="min-h-0 overflow-hidden rounded-[8px] bg-white px-5 py-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <section className="dashboard-panel min-h-0 overflow-hidden px-5 py-6">
               <div className="mb-6 grid gap-4 lg:grid-cols-[130px_minmax(240px,1fr)] lg:items-center">
                 <h2 className="text-[24px] font-bold tracking-[-0.02em]">Products</h2>
                 <div className="relative">
@@ -620,7 +619,7 @@ function SalesPOSContent() {
                     value={searchQuery}
                     onChange={event => setSearchQuery(event.target.value)}
                     placeholder="Search products by name, SKU, category, barcode, or tags..."
-                    className="h-10 w-full rounded-[8px] border border-[#d9dde5] bg-white pl-12 pr-4 text-[13px] text-[#06112b] outline-none transition focus:border-[#1f57c8] focus:ring-2 focus:ring-[#1f57c8]/15"
+                    className="dashboard-field h-10 w-full pl-12 pr-4 text-[13px]"
                   />
                 </div>
               </div>
@@ -727,7 +726,7 @@ function SalesPOSContent() {
                                     type="button"
                                     onClick={() => reduceProduct(product.id)}
                                     disabled={quantity === 0}
-                                    className="grid h-6 w-6 place-items-center rounded-[5px] bg-[#2354b8] text-white shadow-sm transition hover:bg-[#17439b] disabled:bg-[#d6dbe6]"
+                                    className="grid h-6 w-6 place-items-center rounded-[6px] bg-[#004aad] text-white shadow-sm transition hover:bg-[#003d8f] disabled:bg-[#d6dbe6]"
                                     title="Decrease quantity"
                                   >
                                     <Minus className="h-4 w-4" />
@@ -737,7 +736,7 @@ function SalesPOSContent() {
                                     type="button"
                                     onClick={() => addProduct(product)}
                                     disabled={outOfStock}
-                                    className="grid h-6 w-6 place-items-center rounded-[5px] bg-[#2354b8] text-white shadow-sm transition hover:bg-[#17439b] disabled:bg-[#d6dbe6]"
+                                    className="grid h-6 w-6 place-items-center rounded-[6px] bg-[#004aad] text-white shadow-sm transition hover:bg-[#003d8f] disabled:bg-[#d6dbe6]"
                                     title="Increase quantity"
                                   >
                                     <Plus className="h-4 w-4" />
@@ -756,7 +755,7 @@ function SalesPOSContent() {
 
             <aside className="min-h-0 overflow-hidden rounded-[8px]">
               {isSaleActive ? (
-                <section className="flex h-full flex-col rounded-[8px] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                <section className="dashboard-panel flex h-full flex-col p-5">
                   <div className="mb-7 flex items-center justify-between">
                     <h2 className="text-[24px] font-bold tracking-[-0.02em]">Record Sale</h2>
                     <button
@@ -775,7 +774,7 @@ function SalesPOSContent() {
                       value={customerName}
                       onChange={event => setCustomerName(event.target.value)}
                       placeholder="Customer name"
-                      className="h-10 w-full rounded-[8px] border-0 bg-[#f3f3f4] px-4 text-[13px] outline-none focus:ring-2 focus:ring-[#1f57c8]/20"
+                      className="dashboard-field h-10 w-full px-4 text-[13px]"
                     />
                   </label>
 
@@ -849,7 +848,7 @@ function SalesPOSContent() {
                         value={discount}
                         onChange={event => setDiscount(event.target.value)}
                         placeholder="0"
-                        className="h-10 rounded-[8px] border-0 bg-[#f3f3f4] px-4 text-[13px] outline-none focus:ring-2 focus:ring-[#1f57c8]/20"
+                        className="dashboard-field h-10 px-4 text-[13px]"
                       />
                     </label>
 
@@ -877,7 +876,7 @@ function SalesPOSContent() {
                       type="button"
                       onClick={handleCompleteSale}
                       disabled={submitting || cartItems.length === 0}
-                      className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-[8px] bg-[#2354b8] text-[18px] font-bold text-white transition hover:bg-[#17439b] disabled:bg-[#aeb9d2]"
+                      className="dashboard-action-primary mt-2 flex h-12 w-full text-[18px] disabled:bg-[#aeb9d2]"
                     >
                       {submitting && <Loader2 className="h-5 w-5 animate-spin" />}
                       Complete Sale
@@ -885,7 +884,7 @@ function SalesPOSContent() {
                   </div>
                 </section>
               ) : selectedRecentSale?.kind === 'sale' ? (
-                <section className="flex h-full flex-col rounded-[8px] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                <section className="dashboard-panel flex h-full flex-col p-5">
                   <div className="mb-8 flex items-center justify-between">
                     <h2 className="text-[24px] font-bold tracking-[-0.02em]">Recent Sale</h2>
                     <button
@@ -936,7 +935,7 @@ function SalesPOSContent() {
                     <button
                       type="button"
                       onClick={() => openReceiptFromRecent(selectedRecentSale)}
-                      className="mt-auto h-12 w-full rounded-[8px] bg-[#2354b8] text-[18px] font-bold text-white transition hover:bg-[#17439b]"
+                      className="dashboard-action-primary mt-auto h-12 w-full text-[18px]"
                     >
                       View Receipt
                     </button>
@@ -944,11 +943,10 @@ function SalesPOSContent() {
                 </section>
               ) : (
                 <div className="flex h-full flex-col gap-4">
-                  <section className="flex min-h-[405px] flex-col rounded-[8px] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                  <section className="dashboard-panel flex min-h-[405px] flex-col p-5">
                     <h2 className="text-[24px] font-bold tracking-[-0.02em]">Record Sale</h2>
                     <div className="grid flex-1 place-items-center text-center">
                       <div className="text-[#777e8b]">
-                        <Receipt className="mx-auto mb-4 h-12 w-12 text-[#d0d5dd]" />
                         <p className="text-[15px] font-bold">Sales Point</p>
                         <p className="mt-2 text-[13px]">Click the button to Record a sale</p>
                       </div>
@@ -956,13 +954,13 @@ function SalesPOSContent() {
                     <button
                       type="button"
                       onClick={startSale}
-                      className="h-12 rounded-[8px] bg-[#2354b8] text-[18px] font-bold text-white transition hover:bg-[#17439b]"
+                      className="dashboard-action-primary h-12 text-[18px]"
                     >
                       Record Sale
                     </button>
                   </section>
 
-                  <section className="min-h-0 flex-1 rounded-[8px] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                  <section className="dashboard-panel min-h-0 flex-1 p-5">
                     <div className="mb-8 flex items-center justify-between">
                       <h2 className="text-[18px] font-bold">Recent Sales</h2>
                       <button

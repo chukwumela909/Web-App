@@ -177,9 +177,39 @@ export function clearStoredBranchId() {
   }
 }
 
-export async function getBackendBranches(): Promise<Branch[]> {
+interface BackendBranchOptions {
+  includeInventorySummary?: boolean
+}
+
+function productInventoryValue(product: Product) {
+  return Number(product.costPrice || 0) * Number(product.quantity || 0)
+}
+
+export async function getBackendBranches(options: BackendBranchOptions = {}): Promise<Branch[]> {
   const rows = listFrom<AnyRecord>(await api('/branches'), ['branches'])
-  return rows.map(mapBranch)
+  const branches = rows.map(mapBranch)
+
+  if (!options.includeInventorySummary || branches.length === 0) {
+    return branches
+  }
+
+  return Promise.all(branches.map(async (branch) => {
+    try {
+      const products = await getBackendProducts(branch.id)
+      return {
+        ...branch,
+        totalProducts: products.length,
+        totalInventoryValue: products.reduce((sum, product) => sum + productInventoryValue(product), 0),
+        lowStockItemsCount: products.filter((product) => {
+          const quantity = Number(product.quantity || 0)
+          return quantity > 0 && quantity <= Number(product.minStockLevel || 0)
+        }).length
+      }
+    } catch (error) {
+      console.warn(`Unable to load inventory summary for branch ${branch.id}:`, error)
+      return branch
+    }
+  }))
 }
 
 export async function getSelectedBackendBranchId(): Promise<string> {
@@ -296,6 +326,7 @@ export function mapProduct(row: AnyRecord): Product {
     isPerishable: Boolean(product.isPerishable ?? row.isPerishable),
     lowStockAlertEnabled: true,
     isActive: row.isActive !== false,
+    branchId: row.branchId || inventory.branchId || product.branchId || null,
     userId: row.userId || '',
     createdAt: new Date(toMillis(row.createdAt)),
     updatedAt: new Date(toMillis(row.updatedAt))
@@ -338,6 +369,34 @@ export async function createBackendProduct(data: Partial<Product>, branchId?: st
         expiryDate: optionalDate(data.expiryDate),
         batchNumber: optionalString(data.batchNumber),
         binLocation: optionalString(data.location)
+      }
+    })
+  })
+}
+
+export interface LinkProductInventoryInput {
+  reorderLevel?: number
+  costPrice?: number
+  sellingPrice?: number
+  batchNumber?: string
+  binLocation?: string
+  expiryDate?: string | number | Date | null
+}
+
+export async function linkBackendProductToBranch(productId: string, branchId: string, inventory: LinkProductInventoryInput) {
+  await api(`/branches/${branchId}/products`, {
+    method: 'POST',
+    body: JSON.stringify({
+      productId,
+      inventory: {
+        initialQuantity: 0,
+        initialStockReason: 'Linked for transfer',
+        reorderLevel: Number(inventory.reorderLevel || 0),
+        costPrice: Number(inventory.costPrice || 0),
+        sellingPrice: Number(inventory.sellingPrice || 0),
+        expiryDate: optionalDate(inventory.expiryDate),
+        batchNumber: optionalString(inventory.batchNumber),
+        binLocation: optionalString(inventory.binLocation)
       }
     })
   })
@@ -870,7 +929,7 @@ export async function getBackendTransfers(): Promise<BranchTransfer[]> {
 }
 
 export async function createBackendTransfer(data: AnyRecord) {
-  return idOf(await api<AnyRecord>('/transfers', {
+  const result = await api<AnyRecord>('/transfers', {
     method: 'POST',
     body: JSON.stringify({
       fromBranchId: data.fromBranchId,
@@ -882,7 +941,8 @@ export async function createBackendTransfer(data: AnyRecord) {
       priority: String(data.priority || 'normal').toLowerCase(),
       notes: data.notes || data.requestReason
     })
-  }))
+  })
+  return idOf(result) || result.transferId || result.transfer?.id || result.transfer?._id || ''
 }
 
 export async function transitionBackendTransfer(transferId: string, action: 'approve' | 'ship' | 'receive' | 'cancel' | 'reject', payload?: AnyRecord) {
