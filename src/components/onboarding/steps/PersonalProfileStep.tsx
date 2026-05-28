@@ -75,7 +75,8 @@ export default function PersonalProfileStep({
     }
   }
 
-  const isFormValid = formData.fullName.trim() && formData.phoneNumber.trim()
+  const isPhoneValid = (p: string) => /^\+?[\d\s\-()]+$/.test(p)
+  const isFormValid = formData.fullName.trim() && formData.phoneNumber.trim() && isPhoneValid(formData.phoneNumber)
 
   return (
     <div className="max-w-2xl mx-auto">

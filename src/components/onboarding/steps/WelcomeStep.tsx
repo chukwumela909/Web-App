@@ -2,9 +2,9 @@
 
 import React from 'react'
 import { motion } from 'framer-motion'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { 
+import {
   Sparkles,
   ArrowRight,
   Clock,
@@ -18,7 +18,6 @@ interface WelcomeStepProps {
   data: OnboardingData
   updateData: (updates: Partial<OnboardingData>) => void
   onNext: () => void
-  onSkipToEnd: () => void
   isLoading: boolean
   isSaving: boolean
 }
@@ -54,33 +53,36 @@ export default function WelcomeStep({
   isSaving
 }: WelcomeStepProps) {
   return (
-    <div className="p-8 text-center">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="mb-8"
-      >
-        <div className="w-20 h-20 bg-gradient-to-br from-[#004AAD] to-[#FF9500] rounded-2xl flex items-center justify-center mx-auto mb-6">
-          <Sparkles className="w-10 h-10 text-white" />
-        </div>
-        
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          Welcome to FahamPesa! 🎉
-        </h1>
-        
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto mb-8">
-          Let's set up your account so you can start managing your business like a pro. 
-          This will only take a few minutes.
-        </p>
-      </motion.div>
+    <div className="text-center">
+      <CardHeader className="pb-2">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="mb-2"
+        >
+          <div className="w-16 h-16 bg-gradient-to-br from-[#004AAD] to-[#FF9500] rounded-xl flex items-center justify-center mx-auto mb-4">
+            <Sparkles className="w-8 h-8 text-white" />
+          </div>
 
+          <CardTitle className="text-3xl font-bold text-gray-900 mb-4">
+            Welcome to FahamPesa! 🎉
+          </CardTitle>
+
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Let's set up your account so you can start managing your business like a pro.
+            This will only take a few minutes.
+          </p>
+        </motion.div>
+      </CardHeader>
+
+      <CardContent className="space-y-8">
       {/* Features Grid */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.2 }}
-        className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12"
+        className="grid grid-cols-2 md:grid-cols-4 gap-4"
       >
         {features.map((feature, index) => (
           <motion.div
@@ -128,11 +130,12 @@ export default function WelcomeStep({
 
         <div className="text-xs text-gray-500 max-w-md mx-auto">
           <p>
-            <strong>Pro tip:</strong> Completing setup now gives your account the business workspace it needs. 
+            <strong>Pro tip:</strong> Completing setup now gives your account the business workspace it needs.
             You can always update your information later in Settings.
           </p>
         </div>
       </motion.div>
+      </CardContent>
     </div>
   )
 }

@@ -4,9 +4,10 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { 
+import {
   ArrowRight,
   MapPin,
+  Tag,
   DollarSign,
   CheckCircle,
   ChevronDown,
@@ -14,6 +15,7 @@ import {
   Info
 } from 'lucide-react'
 import { OnboardingData } from '../OnboardingWizard'
+import { currencies } from '../constants'
 
 interface BranchSetupStepProps {
   data: OnboardingData
@@ -23,15 +25,6 @@ interface BranchSetupStepProps {
   isLoading: boolean
   isSaving: boolean
 }
-
-const currencies = [
-  { value: 'KES', label: 'KES - Kenyan Shilling', symbol: 'KSh' },
-  { value: 'USD', label: 'USD - US Dollar', symbol: '$' },
-  { value: 'EUR', label: 'EUR - Euro', symbol: '€' },
-  { value: 'GBP', label: 'GBP - British Pound', symbol: '£' },
-  { value: 'UGX', label: 'UGX - Ugandan Shilling', symbol: 'USh' },
-  { value: 'TZS', label: 'TZS - Tanzanian Shilling', symbol: 'TSh' }
-]
 
 export default function BranchSetupStep({
   data,
@@ -150,7 +143,7 @@ export default function BranchSetupStep({
             Branch Name *
           </label>
           <div className="relative">
-            <MapPin className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+            <Tag className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
             <input
               id="branchName"
               type="text"

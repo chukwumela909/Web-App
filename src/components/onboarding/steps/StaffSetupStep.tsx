@@ -118,8 +118,7 @@ export default function StaffSetupStep({
     updateData({
       staffSetup: {
         ...data.staffSetup,
-        skipForNow: skip,
-        teamMembers: skip ? [] : teamMembers
+        skipForNow: skip
       }
     })
   }

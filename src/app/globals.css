@@ -74,9 +74,6 @@ body {
   box-shadow: var(--tw-shadow, 0 0 #0000) !important;
 }
 
-:where(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
-  box-shadow: 0 0 0 3px rgba(0, 74, 173, 0.18) !important;
-}
 
 /* Login page input - no focus outline */
 .login-input,
@@ -384,7 +381,6 @@ textarea {
 .dashboard-field:focus-visible,
 .dashboard-field:focus-within {
   border-color: #b8cbe6;
-  box-shadow: 0 0 0 3px rgba(0, 74, 173, 0.12) !important;
 }
 
 .dashboard-empty-state {
