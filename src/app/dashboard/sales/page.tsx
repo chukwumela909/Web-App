@@ -577,8 +577,8 @@ function SalesPOSContent() {
     <ProtectedRoute>
       <StaffProtectedRoute requiredPermission="sales:read">
         <div className="min-h-screen overflow-hidden bg-[#f6f8fb] font-dm-sans text-[#0f172a]">
-          <header className="flex h-[78px] items-center border-b border-[#e7ebf2] bg-white/90 text-[#0f172a] shadow-[0_1px_2px_rgba(15,23,42,0.04)] supports-[backdrop-filter]:bg-white/80 supports-[backdrop-filter]:backdrop-blur-md">
-            <div className="flex h-full w-[190px] shrink-0 items-center border-r border-[#eef2f7] px-7">
+          <header className="flex h-[78px] items-center border-b border-[#1a2547] bg-[#0b1733] text-white shadow-[0_1px_2px_rgba(0,0,0,0.25)]">
+            <div className="flex h-full w-[190px] shrink-0 items-center border-r border-[#1a2547] px-7">
               <h1 className="text-[18px] font-semibold tracking-[-0.01em]">Fahampesa POS</h1>
             </div>
 
@@ -587,21 +587,21 @@ function SalesPOSContent() {
                 <User className="h-5 w-5" />
                 <span>User: {cashierName}</span>
               </div>
-              <div className="hidden h-8 w-px bg-[#e6ebf2] md:block" />
+              <div className="hidden h-8 w-px bg-[#1f2a4a] md:block" />
               <div className="hidden items-center gap-3 text-sm font-medium sm:flex">
                 <Wifi className={`h-5 w-5 ${online ? 'text-[#20c75a]' : 'text-[#f97316]'}`} />
                 <span>{online ? 'Online' : 'Offline'}</span>
               </div>
-              <div className="h-8 w-px bg-[#e6ebf2]" />
+              <div className="h-8 w-px bg-[#1f2a4a]" />
               <div className="text-center leading-tight">
                 <div className="text-[18px] font-bold">{displayTime}</div>
-                <div className="text-[14px] text-[#64748b]">{displayDate}</div>
+                <div className="text-[14px] text-[#94a3b8]">{displayDate}</div>
               </div>
-              <div className="h-8 w-px bg-[#e6ebf2]" />
+              <div className="h-8 w-px bg-[#1f2a4a]" />
               <button
                 type="button"
                 onClick={() => router.push('/dashboard')}
-                className="grid h-11 w-11 place-items-center rounded-full text-[#64748b] transition hover:bg-[#f1f5f9] hover:text-[#0f172a]"
+                className="grid h-11 w-11 place-items-center rounded-full text-[#cbd5e1] transition hover:bg-[#1a2547] hover:text-white"
                 title="Back to dashboard"
               >
                 <Power className="h-7 w-7" />
