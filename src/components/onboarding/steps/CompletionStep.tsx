@@ -71,11 +71,14 @@ export default function CompletionStep({
 }: CompletionStepProps) {
   const { user } = useAuth()
 
+  const effectiveBranchName = data.branchSetup.branchName.trim()
+    || `${data.businessProfile.businessName.trim()} - Main`
+
   const completedFeatures = [
     data.personalProfile.fullName && "Personal profile",
-    data.companyProfile.legalCompanyName && "Company information", 
+    data.companyProfile.legalCompanyName && "Company information",
     data.businessProfile.businessName && "Business settings",
-    data.branchSetup.branchName && "First branch location",
+    effectiveBranchName && "First branch location",
     data.staffSetup.teamMembers.length > 0 && `${data.staffSetup.teamMembers.length} team member${data.staffSetup.teamMembers.length > 1 ? 's' : ''} invited`
   ].filter(Boolean)
 
@@ -233,7 +236,6 @@ export default function CompletionStep({
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
             ) : (
               <>
-                <Sparkles className="w-6 h-6" />
                 Go to Dashboard
                 <ArrowRight className="w-6 h-6" />
               </>

@@ -294,7 +294,7 @@ export default function OnboardingWizard() {
 
     switch (onboardingData.currentStep) {
       case 1:
-        return <WelcomeStep {...stepProps} onSkipToEnd={skipStep} />
+        return <WelcomeStep {...stepProps} />
       case 2:
         return <PersonalProfileStep {...stepProps} />
       case 3:
@@ -308,7 +308,7 @@ export default function OnboardingWizard() {
       case 7:
         return <CompletionStep {...stepProps} onComplete={completeOnboarding} />
       default:
-        return <WelcomeStep {...stepProps} onSkipToEnd={skipStep} />
+        return <WelcomeStep {...stepProps} />
     }
   }
 
@@ -417,22 +417,19 @@ export default function OnboardingWizard() {
             
             {/* Navigation */}
             {onboardingData.currentStep > 1 && onboardingData.currentStep < TOTAL_STEPS && (
-              <div className="px-6 pb-6">
-                <div className="flex justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={previousStep}
-                    disabled={isLoading}
-                    className="flex items-center gap-2"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back
-                  </Button>
-                  
-                  <div className="text-sm text-gray-500">
-                    Business setup is required before opening the dashboard.
-                  </div>
-                </div>
+              <div className="px-6 pb-6 space-y-3">
+                <Button
+                  variant="outline"
+                  onClick={previousStep}
+                  disabled={isLoading}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </Button>
+                <p className="text-xs text-gray-400 text-center">
+                  Business setup is required before opening the dashboard.
+                </p>
               </div>
             )}
           </div>
