@@ -146,6 +146,35 @@ export async function request<T>(
   return (body as ApiEnvelope<T>).data
 }
 
+export async function requestText(
+  path: string,
+  options: RequestInit & { user?: User | null } = {}
+): Promise<string> {
+  const { user, headers, ...requestOptions } = options
+  const token = user ? await user.getIdToken() : null
+
+  const response = await fetch(`${BACKEND_API_BASE_URL}${path}`, {
+    ...requestOptions,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers
+    }
+  })
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as ApiErrorEnvelope | null
+    const error = body?.error
+    throw new BackendApiError(
+      response.status,
+      error?.code || `http_${response.status}`,
+      error?.message || 'Request failed',
+      error?.details
+    )
+  }
+
+  return response.text()
+}
+
 export async function phoneExists(phone: string) {
   const result = await request<{ exists: boolean }>(
     `/auth/phone-exists?phone=${encodeURIComponent(phone)}`

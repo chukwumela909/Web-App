@@ -15,6 +15,11 @@ import {
   writeBatch
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import {
+  getBackendAdminAuditLogs,
+  isBackendAvailable,
+  shouldUseFirebaseFallback
+} from '@/lib/backend-business-api'
 
 // Types for real Firebase data
 export interface SystemAlert {
@@ -334,6 +339,30 @@ export class SuperAdminService {
   
   // Audit Logs
   static async getAuditLogs(limit_count = 100): Promise<AuditLogEntry[]> {
+    if (isBackendAvailable()) {
+      try {
+        const logs = await getBackendAdminAuditLogs()
+        return logs.slice(0, limit_count).map((log: any) => ({
+          id: String(log.id || log._id || ''),
+          userId: String(log.actorUserId || log.userId || ''),
+          userEmail: String(log.actorEmail || log.actorRole || log.actorUserId || 'Platform admin'),
+          action: String(log.action || ''),
+          resource: String(log.targetType || log.resource || ''),
+          resourceId: log.targetId || log.resourceId,
+          ipAddress: String(log.ipAddress || ''),
+          userAgent: String(log.userAgent || ''),
+          timestamp: this.safeDate(log.createdAt || log.timestamp) || new Date(),
+          status: 'success',
+          details: log.metadata ? JSON.stringify(log.metadata) : undefined,
+          changes: log.metadata,
+          sessionId: log.sessionId
+        }))
+      } catch (error) {
+        if (!shouldUseFirebaseFallback(error)) throw error
+        console.warn('Backend admin audit logs unavailable, falling back to Firestore:', error)
+      }
+    }
+
     try {
       const logsRef = collection(db, 'audit_logs')
       const logsQuery = query(logsRef, orderBy('timestamp', 'desc'), limit(limit_count))

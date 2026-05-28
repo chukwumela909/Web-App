@@ -46,6 +46,8 @@ import { getBranches as getBranchesFromService, getBranch as getBranchFromServic
 import {
   adjustBackendStock,
   createBackendTransfer,
+  getBackendInventoryAlerts,
+  getBackendInventoryMovements,
   getBackendTransfers,
   getBackendProducts,
   getSelectedBackendBranchId,
@@ -79,6 +81,62 @@ function removeUndefinedValues(obj: any): any {
   }
   
   return obj
+}
+
+function dateFrom(value: any): Date | undefined {
+  if (!value) return undefined
+  if (value instanceof Date) return value
+  if (typeof value.toDate === 'function') return value.toDate()
+  if (typeof value === 'object' && typeof value.seconds === 'number') return new Date(value.seconds * 1000)
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? undefined : date
+}
+
+function mapBackendStockMovement(row: any): StockMovement {
+  return {
+    id: String(row.id || row._id || ''),
+    productId: String(row.productId || ''),
+    branchId: String(row.branchId || ''),
+    movementType: String(row.movementType || 'ADJUSTMENT').toUpperCase() as StockMovementType,
+    quantity: Number(row.quantity || 0),
+    previousStock: Number(row.previousQuantity ?? row.previousStock ?? 0),
+    newStock: Number(row.newQuantity ?? row.newStock ?? 0),
+    unitCostPrice: row.unitCostPrice !== undefined ? Number(row.unitCostPrice) : undefined,
+    totalValue: row.totalValue !== undefined ? Number(row.totalValue) : undefined,
+    fromBranchId: row.fromBranchId,
+    toBranchId: row.toBranchId,
+    transferId: row.transferId,
+    batchNumber: row.batchNumber,
+    referenceType: String(row.referenceType || row.movementType || 'ADJUSTMENT').toUpperCase() as StockMovement['referenceType'],
+    referenceId: row.referenceId,
+    status: String(row.status || 'APPROVED').toUpperCase() as StockMovement['status'],
+    reason: row.reason,
+    notes: row.notes,
+    userId: String(row.createdBy || row.userId || ''),
+    createdAt: dateFrom(row.createdAt),
+    updatedAt: dateFrom(row.updatedAt)
+  }
+}
+
+function mapBackendLowStockAlert(row: any): LowStockAlert {
+  const quantity = Number(row.metadata?.quantity ?? row.currentStock ?? 0)
+  const reorderLevel = Number(row.metadata?.reorderLevel ?? row.minStockLevel ?? 0)
+
+  return {
+    id: String(row.id || row._id || ''),
+    productId: String(row.productId || ''),
+    branchId: String(row.branchId || ''),
+    currentStock: quantity,
+    minStockLevel: reorderLevel,
+    shortage: Math.max(0, reorderLevel - quantity),
+    isActive: row.status ? row.status === 'active' : row.isActive !== false,
+    acknowledgedBy: row.acknowledgedBy,
+    acknowledgedAt: dateFrom(row.acknowledgedAt),
+    resolvedAt: dateFrom(row.resolvedAt),
+    userId: String(row.createdBy || row.userId || ''),
+    createdAt: dateFrom(row.createdAt),
+    updatedAt: dateFrom(row.updatedAt)
+  }
 }
 
 // ============================================================================
@@ -424,6 +482,36 @@ export async function getStockMovements(
   },
   pagination?: { limit: number; startAfterDoc?: any }
 ): Promise<StockMovementHistory> {
+  if (isBackendAvailable()) {
+    try {
+      const branchId = filters?.branchId || await getSelectedBackendBranchId()
+      let movements = (await getBackendInventoryMovements(branchId, filters?.productId))
+        .map(mapBackendStockMovement)
+
+      if (filters?.movementType) {
+        movements = movements.filter((movement) => movement.movementType === filters.movementType)
+      }
+      if (filters?.startDate) {
+        movements = movements.filter((movement) => !movement.createdAt || movement.createdAt >= filters.startDate!)
+      }
+      if (filters?.endDate) {
+        movements = movements.filter((movement) => !movement.createdAt || movement.createdAt <= filters.endDate!)
+      }
+      if (pagination?.limit) {
+        movements = movements.slice(0, pagination.limit)
+      }
+
+      return {
+        movements,
+        totalCount: movements.length,
+        hasMore: false
+      }
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend stock movements unavailable, falling back to Firestore:', error)
+    }
+  }
+
   try {
     let q = query(collection(db, 'stock_movements'), where('userId', '==', userId))
     
@@ -1092,6 +1180,16 @@ export async function generateLowStockAlerts(userId: string, branchId?: string):
 }
 
 export async function getLowStockAlerts(userId: string, branchId?: string): Promise<LowStockAlert[]> {
+  if (isBackendAvailable()) {
+    try {
+      const targetBranch = branchId || await getSelectedBackendBranchId()
+      return (await getBackendInventoryAlerts(targetBranch)).map(mapBackendLowStockAlert)
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend inventory alerts unavailable, falling back to Firestore:', error)
+    }
+  }
+
   try {
     let q = query(
       collection(db, 'low_stock_alerts'),

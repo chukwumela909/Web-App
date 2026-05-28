@@ -32,13 +32,15 @@ import {
   getBackendMultiItemSales,
   getBackendProduct,
   getBackendProducts,
+  getBackendSettings,
   getBackendSingleItemSales,
   isBackendAvailable,
   recordBackendDebtorPayment,
   shouldUseFirebaseFallback,
   updateBackendExpense,
   updateBackendProduct,
-  updateBackendSale
+  updateBackendSale,
+  updateBackendSettings
 } from '@/lib/backend-business-api'
 
 export interface ProductImage {
@@ -1051,16 +1053,89 @@ export async function upsertUserProfile(userId: string, profile: Partial<UserPro
   await setDoc(ref, payload)
 }
 
+function backendSettingsProfile(userId: string, settings: Record<string, any>): BusinessProfile {
+  const businessProfile = settings.businessProfile || {}
+  const receiptSettings = settings.receiptSettings || {}
+
+  return {
+    uid: userId,
+    businessName: businessProfile.businessName || '',
+    businessType: businessProfile.businessType || '',
+    businessAddress: businessProfile.businessAddress || businessProfile.address || '',
+    businessPhone: businessProfile.businessPhone || businessProfile.phone || '',
+    businessEmail: businessProfile.businessEmail || businessProfile.email || '',
+    currency: businessProfile.currency || 'KES',
+    taxRate: Number(businessProfile.taxRate || 0),
+    lowStockThreshold: Number(businessProfile.lowStockThreshold || 5),
+    companyLegalName: businessProfile.companyLegalName || businessProfile.legalCompanyName || '',
+    companyRegistrationNumber: businessProfile.companyRegistrationNumber || businessProfile.registrationNumber || '',
+    companyLogoUrl: businessProfile.companyLogoUrl || '',
+    receiptHeaderText: receiptSettings.receiptHeaderText || receiptSettings.headerText || '',
+    receiptFooterText: receiptSettings.receiptFooterText || receiptSettings.footerText || '',
+    receiptThankYouMessage: receiptSettings.receiptThankYouMessage || receiptSettings.thankYouMessage || '',
+    receiptLogoUrl: receiptSettings.receiptLogoUrl || receiptSettings.logoUrl || ''
+  }
+}
+
+function backendBusinessSettingsPayload(profile: Partial<BusinessProfile>) {
+  return {
+    businessProfile: {
+      businessName: profile.businessName || '',
+      businessType: profile.businessType || '',
+      businessAddress: profile.businessAddress || '',
+      businessPhone: profile.businessPhone || '',
+      businessEmail: profile.businessEmail || '',
+      currency: profile.currency || 'KES',
+      taxRate: Number(profile.taxRate || 0),
+      lowStockThreshold: Number(profile.lowStockThreshold || 5),
+      companyLegalName: profile.companyLegalName || '',
+      legalCompanyName: profile.companyLegalName || '',
+      companyRegistrationNumber: profile.companyRegistrationNumber || '',
+      registrationNumber: profile.companyRegistrationNumber || '',
+      companyLogoUrl: profile.companyLogoUrl || ''
+    },
+    receiptSettings: {
+      receiptHeaderText: profile.receiptHeaderText || '',
+      headerText: profile.receiptHeaderText || '',
+      receiptFooterText: profile.receiptFooterText || '',
+      footerText: profile.receiptFooterText || '',
+      receiptThankYouMessage: profile.receiptThankYouMessage || '',
+      thankYouMessage: profile.receiptThankYouMessage || '',
+      receiptLogoUrl: profile.receiptLogoUrl || '',
+      logoUrl: profile.receiptLogoUrl || ''
+    }
+  }
+}
+
 export async function getBusinessProfile(userId: string): Promise<BusinessProfile | null> {
+  if (isBackendAvailable()) {
+    try {
+      return backendSettingsProfile(userId, await getBackendSettings())
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend business settings unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const ref = doc(db, 'business_profiles', userId)
   const snap = await getDoc(ref)
   return snap.exists() ? ({ uid: userId, ...snap.data() } as BusinessProfile) : null
 }
 
 export async function upsertBusinessProfile(userId: string, profile: Partial<BusinessProfile>): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await updateBackendSettings(backendBusinessSettingsPayload(profile))
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend business settings update unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const ref = doc(db, 'business_profiles', userId)
   const existing = await getDoc(ref)
-  const existingData = existing.exists() ? existing.data() as BusinessProfile : {}
+  const existingData: Partial<BusinessProfile> = existing.exists() ? existing.data() as BusinessProfile : {}
   
   const payload: BusinessProfile = {
     uid: userId,
@@ -1086,15 +1161,37 @@ export async function upsertBusinessProfile(userId: string, profile: Partial<Bus
 }
 
 export async function getNotificationSettings(userId: string): Promise<NotificationSettings | null> {
+  if (isBackendAvailable()) {
+    try {
+      const settings = await getBackendSettings()
+      return settings.notificationSettings
+        ? ({ uid: userId, ...settings.notificationSettings } as NotificationSettings)
+        : null
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend notification settings unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const ref = doc(db, 'notification_settings', userId)
   const snap = await getDoc(ref)
   return snap.exists() ? ({ uid: userId, ...snap.data() } as NotificationSettings) : null
 }
 
 export async function upsertNotificationSettings(userId: string, settings: Partial<NotificationSettings>): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await updateBackendSettings({ notificationSettings: settings })
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend notification settings update unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const ref = doc(db, 'notification_settings', userId)
   const existing = await getDoc(ref)
-  const existingData = existing.exists() ? existing.data() as NotificationSettings : {}
+  const existingData: Partial<NotificationSettings> = existing.exists() ? existing.data() as NotificationSettings : {}
   
   const payload: NotificationSettings = {
     uid: userId,
@@ -1111,22 +1208,51 @@ export async function upsertNotificationSettings(userId: string, settings: Parti
 }
 
 export async function getDeviceSettings(userId: string): Promise<DeviceSettings | null> {
+  if (isBackendAvailable()) {
+    try {
+      const settings = await getBackendSettings()
+      return settings.deviceSettings
+        ? ({ uid: userId, ...settings.deviceSettings } as DeviceSettings)
+        : null
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend device settings unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const ref = doc(db, 'device_settings', userId)
   const snap = await getDoc(ref)
   return snap.exists() ? ({ uid: userId, ...snap.data() } as DeviceSettings) : null
 }
 
 export async function upsertDeviceSettings(userId: string, settings: Partial<DeviceSettings>): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await updateBackendSettings({ deviceSettings: settings })
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend device settings update unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const ref = doc(db, 'device_settings', userId)
   const existing = await getDoc(ref)
-  const existingData = existing.exists() ? existing.data() as DeviceSettings : {}
+  const existingData: Partial<DeviceSettings> = existing.exists() ? existing.data() as DeviceSettings : {}
   
   const payload: DeviceSettings = {
     uid: userId,
     pairedDevices: settings.pairedDevices || existingData.pairedDevices || [],
     printerSettings: settings.printerSettings || existingData.printerSettings || {},
+    scannerSettings: settings.scannerSettings || existingData.scannerSettings || {},
     barcodeSettings: settings.barcodeSettings || existingData.barcodeSettings || { format: 'CODE128', autoGenerate: true },
     bluetoothEnabled: settings.bluetoothEnabled ?? existingData.bluetoothEnabled ?? true,
+    wifiEnabled: settings.wifiEnabled ?? existingData.wifiEnabled,
+    usbEnabled: settings.usbEnabled ?? existingData.usbEnabled,
+    networkDiscoveryEnabled: settings.networkDiscoveryEnabled ?? existingData.networkDiscoveryEnabled,
+    autoConnectDevices: settings.autoConnectDevices ?? existingData.autoConnectDevices,
+    deviceTimeout: settings.deviceTimeout ?? existingData.deviceTimeout,
+    lastDeviceScan: settings.lastDeviceScan ?? existingData.lastDeviceScan,
     lastUpdated: Date.now(),
     createdAt: existing.exists() ? existingData.createdAt || Date.now() : Date.now()
   }
@@ -1134,15 +1260,37 @@ export async function upsertDeviceSettings(userId: string, settings: Partial<Dev
 }
 
 export async function getDataSyncSettings(userId: string): Promise<DataSyncSettings | null> {
+  if (isBackendAvailable()) {
+    try {
+      const settings = await getBackendSettings()
+      return settings.syncSettings
+        ? ({ uid: userId, ...settings.syncSettings } as DataSyncSettings)
+        : null
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend sync settings unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const ref = doc(db, 'data_sync_settings', userId)
   const snap = await getDoc(ref)
   return snap.exists() ? ({ uid: userId, ...snap.data() } as DataSyncSettings) : null
 }
 
 export async function upsertDataSyncSettings(userId: string, settings: Partial<DataSyncSettings>): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await updateBackendSettings({ syncSettings: settings })
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend sync settings update unavailable, falling back to Firestore:', error)
+    }
+  }
+
   const ref = doc(db, 'data_sync_settings', userId)
   const existing = await getDoc(ref)
-  const existingData = existing.exists() ? existing.data() as DataSyncSettings : {}
+  const existingData: Partial<DataSyncSettings> = existing.exists() ? existing.data() as DataSyncSettings : {}
   
   const payload: any = {
     uid: userId,

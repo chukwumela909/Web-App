@@ -29,6 +29,11 @@ import {
 import { MultiItemSale } from '@/lib/multi-item-sales-types'
 import { getBranches } from '@/lib/branches-service'
 import { Branch } from '@/lib/branches-types'
+import {
+  getBackendBranchPerformanceReport,
+  getBackendDashboardReport,
+  isBackendAvailable
+} from '@/lib/backend-business-api'
 import { PlanGate } from '@/components/PlanGate'
 import dynamic from 'next/dynamic'
 
@@ -68,6 +73,33 @@ if (typeof window !== 'undefined') {
 }
 
 type ReportPeriod = 'Last 7 Days' | 'Last 30 Days' | 'Last 90 Days' | 'Custom'
+
+type BackendDashboardReport = {
+  salesCount?: number
+  totalSales?: number
+  totalProfit?: number
+  totalExpenses?: number
+  inventoryValue?: number
+  supplierBalance?: number
+}
+
+type BackendBranchPerformance = {
+  branchId: string
+  branchName?: string
+  salesCount?: number
+  totalSales?: number
+  totalProfit?: number
+  totalExpenses?: number
+  inventoryValue?: number
+  supplierBalance?: number
+}
+
+function periodToDays(period: ReportPeriod) {
+  if (period === 'Last 7 Days') return 7
+  if (period === 'Last 30 Days') return 30
+  if (period === 'Last 90 Days') return 90
+  return 30
+}
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -195,6 +227,8 @@ export default function ReportsPage() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [debtors, setDebtors] = useState<Debtor[]>([])
+  const [backendDashboardReport, setBackendDashboardReport] = useState<BackendDashboardReport | null>(null)
+  const [backendBranchPerformanceReport, setBackendBranchPerformanceReport] = useState<BackendBranchPerformance[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('Last 7 Days')
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -230,6 +264,45 @@ export default function ReportsPage() {
     }
     load()
   }, [effectiveUserId])
+
+  useEffect(() => {
+    const loadBackendReports = async () => {
+      if (!effectiveUserId || !isBackendAvailable()) return
+
+      const days = periodToDays(selectedPeriod)
+      const params: Record<string, string> = {
+        from: new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString(),
+        to: new Date().toISOString()
+      }
+
+      if (!staff) {
+        params.branchId = 'all'
+      }
+
+      const [dashboardResult, branchResult] = await Promise.allSettled([
+        getBackendDashboardReport(params),
+        getBackendBranchPerformanceReport(params)
+      ])
+
+      if (dashboardResult.status === 'fulfilled') {
+        setBackendDashboardReport(dashboardResult.value as BackendDashboardReport)
+      } else {
+        setBackendDashboardReport(null)
+        console.warn('Backend dashboard report unavailable:', dashboardResult.reason)
+      }
+
+      if (branchResult.status === 'fulfilled' && Array.isArray(branchResult.value)) {
+        setBackendBranchPerformanceReport(branchResult.value as BackendBranchPerformance[])
+      } else {
+        setBackendBranchPerformanceReport([])
+        if (branchResult.status === 'rejected') {
+          console.warn('Backend branch performance report unavailable:', branchResult.reason)
+        }
+      }
+    }
+
+    loadBackendReports()
+  }, [effectiveUserId, selectedPeriod, staff])
 
   // Combine single-item and multi-item sales for calculations
   const allSalesData = useMemo(() => {
@@ -286,11 +359,20 @@ export default function ReportsPage() {
 
   // Calculate metrics from actual data (combined single and multi-item sales)
   const metrics = useMemo(() => {
+    const totalDebt = debtors.reduce((sum, debtor) => sum + (debtor.currentDebt || 0), 0)
+
+    if (backendDashboardReport) {
+      return {
+        totalSales: Number(backendDashboardReport.totalSales || 0),
+        totalProfit: Number(backendDashboardReport.totalProfit || 0),
+        totalTransactions: Number(backendDashboardReport.salesCount || 0),
+        debt: totalDebt
+      }
+    }
+
     // Filter sales based on selected period
     const now = Date.now()
-    const periodDays = selectedPeriod === 'Last 7 Days' ? 7 :
-                       selectedPeriod === 'Last 30 Days' ? 30 :
-                       selectedPeriod === 'Last 90 Days' ? 90 : 30
+    const periodDays = periodToDays(selectedPeriod)
     const periodStart = now - (periodDays * 24 * 60 * 60 * 1000)
 
     // Use combined sales data
@@ -306,16 +388,13 @@ export default function ReportsPage() {
     }, 0)
     const totalTransactions = filteredSales.length
 
-    // Calculate debt from debtors
-    const totalDebt = debtors.reduce((sum, debtor) => sum + (debtor.currentDebt || 0), 0)
-
     return {
       totalSales,
       totalProfit,
       totalTransactions,
       debt: totalDebt
     }
-  }, [allSalesData, debtors, selectedPeriod])
+  }, [allSalesData, backendDashboardReport, debtors, selectedPeriod])
 
   // Generate trend data for Sales vs Profit chart from actual sales data
   const trendData = useMemo(() => {
@@ -586,6 +665,23 @@ export default function ReportsPage() {
 
   // Branch performance data from real branches and sales
   const branchPerformance = useMemo(() => {
+    if (backendBranchPerformanceReport.length > 0) {
+      return backendBranchPerformanceReport.map((report) => {
+        const branch = branches.find((item) => item.id === report.branchId)
+        const branchStaff = staffList.filter((staffMember) => staffMember.branchIds?.includes(report.branchId))
+
+        return {
+          id: report.branchId,
+          name: report.branchName || branch?.name || 'Branch',
+          staff: branchStaff.length,
+          products: branch?.totalProducts || 0,
+          costValue: Number(report.inventoryValue || branch?.totalInventoryValue || 0),
+          sales: Number(report.totalSales || 0),
+          profit: Math.max(0, Number(report.totalProfit || 0))
+        }
+      })
+    }
+
     if (branches.length === 0) {
       return []
     }
@@ -640,7 +736,7 @@ export default function ReportsPage() {
         profit: Math.max(0, branchProfitTotal)
       }
     })
-  }, [branches, staffList, multiItemSales, recentSales])
+  }, [backendBranchPerformanceReport, branches, staffList, multiItemSales, recentSales])
 
   // Staff performance data from real staff and sales
   const staffPerformance = useMemo(() => {

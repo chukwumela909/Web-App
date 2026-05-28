@@ -1,7 +1,7 @@
 'use client'
 
 import { auth } from '@/lib/firebase'
-import { isBackendApiError, request } from '@/lib/backend-api'
+import { isBackendApiError, request, requestText } from '@/lib/backend-api'
 import type {
   Debtor,
   DebtorPayment,
@@ -279,6 +279,10 @@ export async function disableBackendBranch(branchId: string) {
   await api(`/branches/${branchId}/disable`, { method: 'POST' })
 }
 
+export async function enableBackendBranch(branchId: string) {
+  await api(`/branches/${branchId}/enable`, { method: 'POST' })
+}
+
 export async function getBackendBranchDashboard(branchId: string): Promise<BranchDashboard> {
   const data = await api<AnyRecord>(`/branches/${branchId}/dashboard`)
   return {
@@ -434,6 +438,19 @@ export async function updateBackendProduct(productId: string, data: Partial<Prod
 export async function deleteBackendProduct(productId: string, branchId?: string) {
   const targetBranch = branchId || await getSelectedBackendBranchId()
   await api(`/branches/${targetBranch}/products/${productId}`, { method: 'DELETE' })
+}
+
+export async function bulkUploadBackendProducts(branchId: string, payload?: AnyRecord) {
+  return api<AnyRecord>(`/branches/${branchId}/products/bulk-upload`, {
+    method: 'POST',
+    body: payload ? JSON.stringify(payload) : undefined
+  })
+}
+
+export async function exportBackendProducts(branchId?: string, search?: string) {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  const query = search ? `?search=${encodeURIComponent(search)}` : ''
+  return requestText(`/branches/${targetBranch}/products/export${query}`, { user: await currentUser() })
 }
 
 function saleItems(row: AnyRecord): AnyRecord[] {
@@ -745,6 +762,23 @@ export async function adjustBackendStock(data: AnyRecord, branchId?: string) {
   })
 }
 
+export async function getBackendInventory(branchId?: string, search?: string) {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  const query = search ? `?search=${encodeURIComponent(search)}` : ''
+  return listFrom<AnyRecord>(await api(`/branches/${targetBranch}/inventory${query}`), ['inventory', 'items'])
+}
+
+export async function getBackendInventoryMovements(branchId?: string, productId?: string) {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  const query = productId ? `?productId=${encodeURIComponent(productId)}` : ''
+  return listFrom<AnyRecord>(await api(`/branches/${targetBranch}/inventory/movements${query}`), ['movements'])
+}
+
+export async function getBackendInventoryAlerts(branchId?: string) {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  return listFrom<AnyRecord>(await api(`/branches/${targetBranch}/inventory/alerts`), ['alerts'])
+}
+
 export function mapSupplier(row: AnyRecord): Supplier {
   return {
     id: idOf(row),
@@ -770,6 +804,11 @@ export async function getBackendSuppliers(branchId?: string): Promise<Supplier[]
   const targetBranch = branchId || await getSelectedBackendBranchId()
   return listFrom<AnyRecord>(await api(`/branches/${targetBranch}/suppliers`), ['suppliers'])
     .map(mapSupplier)
+}
+
+export async function getBackendSupplier(supplierId: string, branchId?: string): Promise<AnyRecord> {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  return api<AnyRecord>(`/branches/${targetBranch}/suppliers/${supplierId}`)
 }
 
 export async function createBackendSupplier(data: Partial<Supplier>, branchId?: string) {
@@ -800,6 +839,30 @@ export async function updateBackendSupplier(supplierId: string, data: Partial<Su
 export async function deleteBackendSupplier(supplierId: string, branchId?: string) {
   const targetBranch = branchId || await getSelectedBackendBranchId()
   await api(`/branches/${targetBranch}/suppliers/${supplierId}`, { method: 'DELETE' })
+}
+
+export async function getBackendSupplierLedger(supplierId: string, branchId?: string) {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  return listFrom<AnyRecord>(await api(`/branches/${targetBranch}/suppliers/${supplierId}/ledger`), ['ledger', 'entries'])
+}
+
+export async function getBackendSupplierPayments(supplierId: string, branchId?: string) {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  return listFrom<AnyRecord>(await api(`/branches/${targetBranch}/suppliers/${supplierId}/payments`), ['payments'])
+}
+
+export async function recordBackendSupplierPayment(supplierId: string, data: AnyRecord, branchId?: string) {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  return api<AnyRecord>(`/branches/${targetBranch}/suppliers/${supplierId}/payments`, {
+    method: 'POST',
+    body: JSON.stringify({
+      purchaseOrderId: data.purchaseOrderId,
+      amount: Number(data.amount || 0),
+      paymentMethod: toBackendPaymentMethod(data.paymentMethod),
+      reference: data.reference || data.receiptNumber || undefined,
+      notes: data.notes || undefined
+    })
+  })
 }
 
 export async function getBackendSupplierDashboard(branchId?: string): Promise<SupplierDashboard> {
@@ -858,6 +921,11 @@ export async function getBackendPurchaseOrders(branchId?: string): Promise<Purch
     .map(mapPurchaseOrder)
 }
 
+export async function getBackendPurchaseOrder(purchaseOrderId: string, branchId?: string): Promise<PurchaseOrder | null> {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  return mapPurchaseOrder(await api(`/branches/${targetBranch}/purchase-orders/${purchaseOrderId}`))
+}
+
 export async function createBackendPurchaseOrder(data: AnyRecord, branchId?: string) {
   const targetBranch = branchId || data.branchId || await getSelectedBackendBranchId()
   return idOf(await api<AnyRecord>(`/branches/${targetBranch}/purchase-orders`, {
@@ -896,6 +964,11 @@ export async function receiveBackendPurchaseOrder(purchaseOrderId: string, items
   })
 }
 
+export async function cancelBackendPurchaseOrder(purchaseOrderId: string, branchId?: string) {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  await api(`/branches/${targetBranch}/purchase-orders/${purchaseOrderId}/cancel`, { method: 'POST' })
+}
+
 export function mapTransfer(row: AnyRecord): BranchTransfer {
   return {
     id: idOf(row) || row.transferId,
@@ -928,6 +1001,10 @@ export async function getBackendTransfers(): Promise<BranchTransfer[]> {
   return listFrom<AnyRecord>(await api('/transfers'), ['transfers']).map(mapTransfer)
 }
 
+export async function getBackendTransfer(transferId: string): Promise<BranchTransfer | null> {
+  return mapTransfer(await api(`/transfers/${transferId}`))
+}
+
 export async function createBackendTransfer(data: AnyRecord) {
   const result = await api<AnyRecord>('/transfers', {
     method: 'POST',
@@ -952,9 +1029,46 @@ export async function transitionBackendTransfer(transferId: string, action: 'app
   })
 }
 
-export async function getBackendReport(path = '/reports/dashboard', params?: Record<string, string>) {
+export type BackendReportPath =
+  | '/reports/dashboard'
+  | '/reports/sales'
+  | '/reports/inventory-valuation'
+  | '/reports/low-stock'
+  | '/reports/suppliers'
+  | '/reports/expenses'
+  | '/reports/branch-performance'
+
+export async function getBackendReport(path: BackendReportPath = '/reports/dashboard', params?: Record<string, string>) {
   const query = params ? `?${new URLSearchParams(params).toString()}` : ''
   return api<AnyRecord>(`${path}${query}`)
+}
+
+export function getBackendDashboardReport(params?: Record<string, string>) {
+  return getBackendReport('/reports/dashboard', params)
+}
+
+export function getBackendSalesReport(params?: Record<string, string>) {
+  return getBackendReport('/reports/sales', params)
+}
+
+export function getBackendInventoryValuationReport(params?: Record<string, string>) {
+  return getBackendReport('/reports/inventory-valuation', params)
+}
+
+export function getBackendLowStockReport(params?: Record<string, string>) {
+  return getBackendReport('/reports/low-stock', params)
+}
+
+export function getBackendSuppliersReport(params?: Record<string, string>) {
+  return getBackendReport('/reports/suppliers', params)
+}
+
+export function getBackendExpensesReport(params?: Record<string, string>) {
+  return getBackendReport('/reports/expenses', params)
+}
+
+export function getBackendBranchPerformanceReport(params?: Record<string, string>) {
+  return getBackendReport('/reports/branch-performance', params)
 }
 
 export async function getBackendSettings() {
@@ -980,6 +1094,10 @@ export async function getBackendBillingHistory() {
   return api<AnyRecord>('/billing/history')
 }
 
+export async function getBackendBillingReceipt(subscriptionId: string) {
+  return api<AnyRecord>(`/billing/receipts/${subscriptionId}`)
+}
+
 export async function startBackendMpesaCheckout(planType: 'monthly' | 'yearly', phoneNumber: string) {
   return api<AnyRecord>('/billing/mpesa/stk-push', {
     method: 'POST',
@@ -992,4 +1110,58 @@ export async function startBackendStripeCheckout(planType: 'monthly' | 'yearly',
     method: 'POST',
     body: JSON.stringify({ planType, successUrl, cancelUrl })
   })
+}
+
+export async function searchBackendAdminBusinesses(params?: { q?: string; status?: string }) {
+  const query = params ? `?${new URLSearchParams(Object.entries(params).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}` : ''
+  return listFrom<AnyRecord>(await api(`/admin/businesses${query}`), ['businesses', 'accounts'])
+}
+
+export async function getBackendAdminBusiness(businessAccountId: string) {
+  return api<AnyRecord>(`/admin/businesses/${businessAccountId}`)
+}
+
+export async function setBackendAdminBusinessStatus(
+  businessAccountId: string,
+  action: 'pause' | 'resume' | 'revoke'
+) {
+  return api<AnyRecord>(`/admin/businesses/${businessAccountId}/${action}`, { method: 'POST' })
+}
+
+export async function setBackendAdminBranchLimit(businessAccountId: string, branchLimitOverride: number | null) {
+  return api<AnyRecord>(`/admin/businesses/${businessAccountId}/branch-limit`, {
+    method: 'POST',
+    body: JSON.stringify({ branchLimitOverride })
+  })
+}
+
+export async function extendBackendAdminSubscription(businessAccountId: string, days: number, reason?: string) {
+  return api<AnyRecord>(`/admin/businesses/${businessAccountId}/subscriptions/extend`, {
+    method: 'POST',
+    body: JSON.stringify({ days, reason })
+  })
+}
+
+export async function manuallyActivateBackendAdminSubscription(
+  businessAccountId: string,
+  planType: 'monthly' | 'yearly',
+  days?: number,
+  reason?: string
+) {
+  return api<AnyRecord>(`/admin/businesses/${businessAccountId}/subscriptions/manual-activate`, {
+    method: 'POST',
+    body: JSON.stringify({ planType, days, reason })
+  })
+}
+
+export async function retryBackendAdminPaymentEvent(eventId: string) {
+  return api<AnyRecord>(`/admin/payment-events/${eventId}/retry`, { method: 'POST' })
+}
+
+export async function getBackendAdminAuditLogs() {
+  return listFrom<AnyRecord>(await api('/admin/audit-logs'), ['logs', 'auditLogs'])
+}
+
+export async function getBackendAdminPayments() {
+  return listFrom<AnyRecord>(await api('/admin/payments'), ['payments', 'events'])
 }

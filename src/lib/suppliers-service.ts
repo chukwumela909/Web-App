@@ -50,13 +50,16 @@ import {
 import { processPurchaseInventoryUpdate } from '@/lib/inventory-hooks'
 import {
   approveBackendPurchaseOrder,
+  cancelBackendPurchaseOrder,
   createBackendPurchaseOrder,
   createBackendSupplier,
   deleteBackendSupplier,
+  getBackendSupplier,
   getBackendPurchaseOrders,
   getBackendSupplierDashboard,
   getBackendSuppliers,
   isBackendAvailable,
+  mapSupplier as mapBackendSupplier,
   receiveBackendPurchaseOrder,
   shouldUseFirebaseFallback,
   updateBackendSupplier
@@ -181,8 +184,8 @@ export async function getSuppliers(
 export async function getSupplier(supplierId: string): Promise<Supplier | null> {
   if (isBackendAvailable()) {
     try {
-      const suppliers = await getBackendSuppliers()
-      return suppliers.find((supplier) => supplier.id === supplierId) || null
+      const row = await getBackendSupplier(supplierId)
+      return mapBackendSupplier(row)
     } catch (error) {
       if (!shouldUseFirebaseFallback(error)) throw error
       console.warn('Backend supplier detail unavailable, falling back to Firestore:', error)
@@ -700,6 +703,16 @@ export async function cancelPurchaseOrder(
   purchaseOrderId: string,
   reason: string
 ): Promise<void> {
+  if (isBackendAvailable()) {
+    try {
+      await cancelBackendPurchaseOrder(purchaseOrderId)
+      return
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend purchase order cancel unavailable, falling back to Firestore:', error)
+    }
+  }
+
   await updateDoc(doc(db, 'purchase_orders', purchaseOrderId), {
     status: 'CANCELLED',
     rejectionReason: reason,
@@ -766,6 +779,7 @@ async function updateSupplierPerformanceFromPO(purchaseOrder: PurchaseOrder): Pr
   const onTimeDelivery = deliveryDays <= 0 // On time or early
   
   await updateSupplierPerformance(purchaseOrder.supplierId, {
+    supplierId: purchaseOrder.supplierId,
     onTimeDelivery,
     deliveryDays: Math.abs(deliveryDays)
   })
