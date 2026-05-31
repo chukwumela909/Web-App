@@ -943,7 +943,7 @@ function SalesPOSContent() {
                 </section>
               ) : (
                 <div className="flex h-full flex-col gap-4">
-                  <section className="dashboard-panel flex min-h-[405px] flex-col p-5">
+                  <section className="dashboard-panel flex min-h-[340px] basis-[46%] flex-col p-5">
                     <h2 className="text-[24px] font-bold tracking-[-0.02em]">Record Sale</h2>
                     <div className="grid flex-1 place-items-center text-center">
                       <div className="text-[#777e8b]">
@@ -960,8 +960,8 @@ function SalesPOSContent() {
                     </button>
                   </section>
 
-                  <section className="dashboard-panel min-h-0 flex-1 p-5">
-                    <div className="mb-8 flex items-center justify-between">
+                  <section className="dashboard-panel flex min-h-0 flex-1 flex-col p-5">
+                    <div className="mb-5 flex items-center justify-between">
                       <h2 className="text-[18px] font-bold">Recent Sales</h2>
                       <button
                         type="button"
@@ -972,21 +972,21 @@ function SalesPOSContent() {
                       </button>
                     </div>
 
-                    <div className="space-y-4 overflow-y-auto pr-1">
+                    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                       {recentEntries.length === 0 ? (
-                        <div className="grid min-h-[180px] place-items-center text-center text-[#777e8b]">
+                        <div className="grid h-full min-h-[180px] place-items-center text-center text-[#777e8b]">
                           <div>
                             <Clock className="mx-auto mb-3 h-8 w-8 text-[#c1c7d0]" />
                             <p className="text-sm font-semibold">No recent sales</p>
                           </div>
                         </div>
                       ) : (
-                        recentEntries.slice(0, 3).map(entry => (
+                        recentEntries.slice(0, 5).map(entry => (
                           <button
                             key={`${entry.kind}-${entry.id}`}
                             type="button"
                             onClick={() => entry.kind === 'held' ? handleResumeHeldSale(entry.heldSale) : setSelectedRecentSale(entry)}
-                            className="w-full rounded-[12px] border border-[#edf0f4] p-4 text-left transition hover:border-[#d7dce5] hover:bg-[#fbfcfd]"
+                            className="w-full rounded-[8px] border border-[#edf0f4] p-3 text-left transition hover:border-[#d7dce5] hover:bg-[#fbfcfd]"
                           >
                             <div className="flex items-center justify-between gap-3">
                               <div className="min-w-0">
