@@ -1326,6 +1326,20 @@ export async function searchBackendAdminBusinesses(params?: { q?: string; status
   return listFrom<AnyRecord>(await api(`/admin/businesses${query}`), ['businesses', 'accounts'])
 }
 
+export async function searchBackendAdminUsers(params?: { q?: string; status?: string }) {
+  const query = params ? `?${new URLSearchParams(Object.entries(params).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}` : ''
+
+  try {
+    return listFrom<AnyRecord>(await api(`/admin/users${query}`), ['users', 'accounts'])
+  } catch (error) {
+    if (isBackendApiError(error) && error.status === 404) {
+      return searchBackendAdminBusinesses(params)
+    }
+
+    throw error
+  }
+}
+
 export async function getBackendAdminBusiness(businessAccountId: string) {
   return api<AnyRecord>(`/admin/businesses/${businessAccountId}`)
 }

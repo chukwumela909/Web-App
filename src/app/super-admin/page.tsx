@@ -42,6 +42,7 @@ import {
 } from '@/lib/super-admin-service'
 import RealtimeAlertsPanel from '@/components/alerts/RealtimeAlertsPanel'
 import BackupStatusPanel from '@/components/monitoring/BackupStatusPanel'
+import { searchBackendAdminUsers } from '@/lib/backend-business-api'
 
 interface MetricCardData {
   title: string
@@ -51,6 +52,31 @@ interface MetricCardData {
   trend?: string
   trendDirection?: 'up' | 'down' | 'neutral'
   color?: string
+}
+
+function getAdminUserDate(user: Record<string, any>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = user[key]
+    if (!value) continue
+
+    const date = new Date(value)
+    if (Number.isFinite(date.getTime())) return date
+  }
+
+  return null
+}
+
+function isAdminUserDisabled(user: Record<string, any>) {
+  const status = String(user.status || user.accountStatus || user.userStatus || user.businessStatus || '').toLowerCase()
+  return Boolean(user.disabled) || ['disabled', 'paused', 'suspended', 'inactive', 'revoked'].includes(status)
+}
+
+function getAdminUserRegion(user: Record<string, any>) {
+  return user.region || user.country || user.billingRegion || null
+}
+
+function hasAdminBusinessProfile(user: Record<string, any>) {
+  return Boolean(user.businessName || user.companyName || user.businessAccountId || user.accountId || user.id || user._id)
 }
 
 export default function SuperAdminDashboard() {
@@ -83,8 +109,8 @@ export default function SuperAdminDashboard() {
         alerts,
         analytics
       ] = await Promise.all([
-        // Use the same endpoint as users page for consistency
-        fetch('/api/admin/firebase-auth-users?includeFirestore=true').then(res => res.json()),
+        // Use the same Mongo-backed source as the users page for consistency
+        searchBackendAdminUsers(),
         SuperAdminService.getSalesMetrics(),
         SuperAdminService.getProductMetrics(),
         SuperAdminService.getRecentActivity(5),
@@ -96,16 +122,15 @@ export default function SuperAdminDashboard() {
       ])
 
       // Process user data to get metrics
-      const allUsers = userResponse.success ? userResponse.users : []
-      const activeUsers = allUsers.filter((user: any) => !user.disabled && user.displayName && !user.displayName.startsWith('[DISABLED]'))
-      const regions = new Set(allUsers.map((user: any) => user.region).filter(Boolean))
+      const allUsers = userResponse
+      const activeUsers = allUsers.filter((user: any) => !isAdminUserDisabled(user))
+      const regions = new Set(allUsers.map((user: any) => getAdminUserRegion(user)).filter(Boolean))
       
       // Calculate recent users (last 7 days)
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       const recentUsers = allUsers.filter((user: any) => {
-        if (!user.metadata?.creationTime) return false
-        const createdDate = new Date(user.metadata.creationTime)
-        return createdDate >= weekAgo
+        const createdDate = getAdminUserDate(user, 'createdAt', 'created_at', 'createdOn')
+        return Boolean(createdDate && createdDate >= weekAgo)
       })
 
       const userMetrics = {
@@ -115,12 +140,12 @@ export default function SuperAdminDashboard() {
         monthly: activeUsers.length,
         regions: regions.size,
         recentUsers: recentUsers.length,
-        verifiedEmails: allUsers.filter((user: any) => user.emailVerified).length,
-        usersWithFirestoreData: allUsers.filter((user: any) => user.firestoreData).length
+        verifiedEmails: allUsers.filter((user: any) => user.emailVerified || user.verified || user.auth?.emailVerified).length,
+        businessAccounts: allUsers.filter((user: any) => hasAdminBusinessProfile(user)).length
       }
 
 
-      // Set main metrics cards with real Firebase data
+      // Set main metrics cards with real Mongo-backed data
       setMetrics([
         {
           title: 'New Users This Week',
@@ -145,17 +170,17 @@ export default function SuperAdminDashboard() {
           value: userMetrics.verifiedEmails.toLocaleString(),
           description: 'Users with verified email addresses',
           icon: CheckCircle,
-          trend: `${Math.round((userMetrics.verifiedEmails / userMetrics.total) * 100)}%`,
+          trend: `${userMetrics.total > 0 ? Math.round((userMetrics.verifiedEmails / userMetrics.total) * 100) : 0}%`,
           trendDirection: userMetrics.verifiedEmails > userMetrics.total * 0.5 ? 'up' : 'down',
           color: 'text-emerald-600'
         },
         {
           title: 'Business Accounts',
-          value: userMetrics.usersWithFirestoreData.toLocaleString(),
+          value: userMetrics.businessAccounts.toLocaleString(),
           description: 'Users with complete business profiles',
           icon: Building,
-          trend: `${Math.round((userMetrics.usersWithFirestoreData / userMetrics.total) * 100)}%`,
-          trendDirection: userMetrics.usersWithFirestoreData > 0 ? 'up' : 'neutral',
+          trend: `${userMetrics.total > 0 ? Math.round((userMetrics.businessAccounts / userMetrics.total) * 100) : 0}%`,
+          trendDirection: userMetrics.businessAccounts > 0 ? 'up' : 'neutral',
           color: 'text-purple-600'
         }
       ])
@@ -181,10 +206,6 @@ export default function SuperAdminDashboard() {
   }
 
   const handleRefresh = async () => {
-    // Force complete refresh to ensure fresh data
-    const UserMetricsService = (await import('@/lib/user-metrics-service')).default
-    await UserMetricsService.forceRefresh()
-    
     fetchAllDashboardData()
   }
 

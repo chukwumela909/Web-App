@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { getBusinessProfile } from '@/lib/firestore'
 
 type Currency = 'USD' | 'KES' | 'KSH' | 'EUR' | 'GBP' | 'UGX' | 'TZS' | 'NGN' | 'GHS' | 'ZAR' | 'RWF' | 'ETB'
 
-const CURRENCY_CACHE_KEY = 'fahampesa_user_currency'
+export const CURRENCY_CACHE_KEY = 'fahampesa_user_currency'
+export const CURRENCY_UPDATED_EVENT = 'fahampesa:currency-updated'
 
 interface CurrencyCache {
   currency: Currency
@@ -82,6 +84,41 @@ const normalizeCurrency = (value: unknown): Currency | '' => {
   return normalized as Currency
 }
 
+const readCurrencyCache = (): CurrencyCache | null => {
+  if (typeof window === 'undefined') return null
+
+  const cachedData = localStorage.getItem(CURRENCY_CACHE_KEY)
+  if (!cachedData) return null
+
+  try {
+    return JSON.parse(cachedData) as CurrencyCache
+  } catch {
+    localStorage.removeItem(CURRENCY_CACHE_KEY)
+    return null
+  }
+}
+
+const writeCurrencyCache = (cacheData: CurrencyCache) => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(CURRENCY_CACHE_KEY, JSON.stringify(cacheData))
+}
+
+export function cacheUserCurrency(uid: string, currencyInput: unknown, country = '') {
+  const currency = normalizeCurrency(currencyInput)
+  if (!uid || !currency || typeof window === 'undefined') return
+
+  const existing = readCurrencyCache()
+  const cacheData: CurrencyCache = {
+    currency,
+    country: country || (existing?.uid === uid ? existing.country : ''),
+    timestamp: Date.now(),
+    uid
+  }
+
+  writeCurrencyCache(cacheData)
+  window.dispatchEvent(new CustomEvent<CurrencyCache>(CURRENCY_UPDATED_EVENT, { detail: cacheData }))
+}
+
 /**
  * Custom hook to detect user's currency based on their profile country
  * - Fetches from userProfiles Firestore document
@@ -103,17 +140,10 @@ export function useCurrency() {
       
       // Clear old cache when user changes
       if (user?.uid) {
-        const cachedData = localStorage.getItem(CURRENCY_CACHE_KEY)
-        if (cachedData) {
-          try {
-            const cache: CurrencyCache = JSON.parse(cachedData)
-            if (cache.uid !== user.uid) {
-              console.log('[useCurrency] Clearing old cache for different user')
-              localStorage.removeItem(CURRENCY_CACHE_KEY)
-            }
-          } catch {
-            localStorage.removeItem(CURRENCY_CACHE_KEY)
-          }
+        const cache = readCurrencyCache()
+        if (cache && cache.uid !== user.uid) {
+          console.log('[useCurrency] Clearing old cache for different user')
+          localStorage.removeItem(CURRENCY_CACHE_KEY)
         }
       }
     }
@@ -126,19 +156,15 @@ export function useCurrency() {
       return
     }
 
+    let cancelled = false
+
     // Try to load from cache first for immediate display
-    const cachedData = localStorage.getItem(CURRENCY_CACHE_KEY)
-    if (cachedData) {
-      try {
-        const cache: CurrencyCache = JSON.parse(cachedData)
-        if (cache.uid === user.uid) {
-          console.log('[useCurrency] Using cached currency:', cache)
-          setCurrency(cache.currency)
-          setCountry(cache.country)
-        }
-      } catch {
-        // Ignore cache parse errors
-      }
+    const cache = readCurrencyCache()
+    const userCache = cache?.uid === user.uid ? cache : null
+    if (userCache) {
+      console.log('[useCurrency] Using cached currency:', userCache)
+      setCurrency(userCache.currency)
+      setCountry(userCache.country)
     }
 
     const statusData = backendSession?.onboardingStatus?.data as any
@@ -147,18 +173,67 @@ export function useCurrency() {
     const detectedCountry = normalizeCountry(rawCountry)
     const detectedCurrency = normalizeCurrency(rawCurrency) || getCurrencyForCountry(detectedCountry)
 
-    setCurrency(detectedCurrency as Currency)
-    setCountry(detectedCountry)
-    setIsLoading(false)
-
-    const cacheData: CurrencyCache = {
-      currency: detectedCurrency as Currency,
-      country: detectedCountry,
-      timestamp: Date.now(),
-      uid: user.uid
+    const applyCurrency = (nextCurrency: Currency, nextCountry: string) => {
+      if (cancelled) return
+      setCurrency(nextCurrency)
+      setCountry(nextCountry)
+      setIsLoading(false)
+      writeCurrencyCache({
+        currency: nextCurrency,
+        country: nextCountry,
+        timestamp: Date.now(),
+        uid: user.uid
+      })
     }
-    localStorage.setItem(CURRENCY_CACHE_KEY, JSON.stringify(cacheData))
+
+    applyCurrency(userCache?.currency || detectedCurrency as Currency, userCache?.country || detectedCountry)
+
+    const loadSavedBusinessCurrency = async () => {
+      try {
+        const profile = await getBusinessProfile(user.uid)
+        const savedCurrency = normalizeCurrency(profile?.currency)
+        if (savedCurrency) {
+          applyCurrency(savedCurrency, detectedCountry)
+        }
+      } catch (error) {
+        console.warn('[useCurrency] Unable to load saved business currency:', error)
+      }
+    }
+
+    loadSavedBusinessCurrency()
+
+    return () => {
+      cancelled = true
+    }
   }, [user?.uid, backendSession])
+
+  useEffect(() => {
+    if (!user || typeof window === 'undefined') return
+
+    const applyCache = (cache: CurrencyCache | null) => {
+      if (!cache || cache.uid !== user.uid) return
+      setCurrency(normalizeCurrency(cache.currency) || DEFAULT_CURRENCY)
+      setCountry(cache.country)
+      setIsLoading(false)
+    }
+
+    const handleCurrencyUpdated = (event: Event) => {
+      applyCache((event as CustomEvent<CurrencyCache>).detail)
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== CURRENCY_CACHE_KEY) return
+      applyCache(readCurrencyCache())
+    }
+
+    window.addEventListener(CURRENCY_UPDATED_EVENT, handleCurrencyUpdated)
+    window.addEventListener('storage', handleStorage)
+
+    return () => {
+      window.removeEventListener(CURRENCY_UPDATED_EVENT, handleCurrencyUpdated)
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [user?.uid])
 
   return { currency, isLoading, country }
 }

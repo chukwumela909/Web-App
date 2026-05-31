@@ -6,6 +6,7 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
+import { cacheUserCurrency } from '@/hooks/useCurrency'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
@@ -303,6 +304,7 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       await upsertBusinessProfile(user.uid, businessProfile)
+      cacheUserCurrency(user.uid, businessProfile.currency)
     } catch (error) {
       console.error('Save error:', error)
     } finally {

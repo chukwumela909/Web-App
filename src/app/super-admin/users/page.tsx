@@ -5,7 +5,6 @@ import AdminRoute from '@/components/auth/AdminRoute'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { 
@@ -32,12 +31,9 @@ import {
   UserCheck, 
   UserX,
   UserPlus,
-  Clock,
-  Calendar,
   Activity,
   MoreHorizontal,
   Search,
-  Filter,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
@@ -46,17 +42,17 @@ import {
   Mail,
   Crown
 } from 'lucide-react'
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase'
-import { userManagementActions, isUserDisabled, getCleanDisplayName } from '@/lib/firebase-admin'
+import { auth } from '@/lib/firebase'
+import { userManagementActions } from '@/lib/firebase-admin'
 import { useToast } from '@/hooks/use-toast'
-import UserMetricsService from '@/lib/user-metrics-service'
 import { handleError } from '@/lib/error-handler'
 import { request } from '@/lib/backend-api'
 import {
   getBackendAdminBusiness,
   manuallyActivateBackendAdminSubscription,
   searchBackendAdminBusinesses,
+  searchBackendAdminUsers,
+  setBackendAdminBusinessStatus,
   type BackendPlanType,
   type BackendSubscriptionRecord
 } from '@/lib/backend-business-api'
@@ -152,27 +148,6 @@ function businessMatchesUser(business: Record<string, any>, user: User) {
   )
 }
 
-function mapApiUser(user: any, source?: string): User {
-  return {
-    id: user.uid,
-    email: user.email || 'No email',
-    displayName: user.displayName || 'No name',
-    createdAt: user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date(),
-    lastActiveAt: user.lastActiveAt ? new Date(user.lastActiveAt) : user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime) : new Date(),
-    status: user.disabled ? 'disabled' : 'active',
-    isDisabled: user.disabled,
-    emailVerified: user.emailVerified || false,
-    region: user.region || 'Unknown',
-    firestoreData: user.firestoreData,
-    source: user.source || source,
-    isSubscribed: user.isSubscribed || false,
-    subscriptionId: user.subscriptionId || null,
-    subscriptionEndDate: user.subscriptionEndDate || null,
-    planType: user.planType || null,
-    businessName: user.businessName || null
-  }
-}
-
 function getSubscriptionEndDate(subscription?: Record<string, any> | null, account?: Record<string, any>) {
   const value = subscription?.endDate
     || subscription?.endsAt
@@ -187,6 +162,117 @@ function getSubscriptionEndDate(subscription?: Record<string, any> | null, accou
 
 function getPlanType(value: unknown): BackendPlanType | null {
   return value === 'yearly' || value === 'monthly' ? value : null
+}
+
+function getFirstString(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim()
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  }
+
+  return ''
+}
+
+function toDate(value: unknown, fallback = new Date()) {
+  if (!value) return fallback
+
+  if (value instanceof Date) return value
+
+  if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate?: unknown }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate()
+  }
+
+  const date = new Date(value as string | number)
+  return Number.isFinite(date.getTime()) ? date : fallback
+}
+
+function isBackendAccountDisabled(account: Record<string, any>) {
+  const status = String(
+    account.status
+    || account.accountStatus
+    || account.userStatus
+    || account.businessStatus
+    || ''
+  ).toLowerCase()
+
+  return Boolean(account.disabled)
+    || ['disabled', 'paused', 'suspended', 'inactive', 'revoked'].includes(status)
+}
+
+function getBackendAccountId(account: Record<string, any>) {
+  return getFirstString(account.businessAccountId, account.accountId, account.id, account._id)
+}
+
+function mapBackendUser(user: Record<string, any>): User {
+  const businessAccountId = getBackendAccountId(user)
+  const email = getFirstString(
+    user.email,
+    user.createdByEmail,
+    user.ownerEmail,
+    user.userEmail,
+    user.createdBy?.email,
+    user.owner?.email,
+    user.auth?.email
+  )
+  const firebaseUid = getFirstString(
+    user.firebaseUid,
+    user.uid,
+    user.ownerFirebaseUid,
+    user.createdByFirebaseUid,
+    user.createdByUid,
+    user.ownerUid,
+    user.userId,
+    user.ownerId,
+    user.createdById,
+    user.createdByUserId,
+    user.auth?.firebaseUid,
+    user.createdBy?.firebaseUid,
+    user.createdBy?.uid,
+    user.createdBy?.id,
+    user.owner?.firebaseUid,
+    user.owner?.uid,
+    user.owner?.id
+  )
+  const subscriptionStatus = String(user.subscriptionStatus || user.currentSubscription?.status || user.subscription?.status || '').toLowerCase()
+  const planType = getPlanType(user.planType)
+    || getPlanType(user.currentSubscription?.planType)
+    || getPlanType(user.subscription?.planType)
+  const disabled = isBackendAccountDisabled(user)
+  const subscriptionEndDate = getSubscriptionEndDate(user.currentSubscription || user.subscription, user)
+
+  return {
+    id: firebaseUid || businessAccountId,
+    email: email || 'No email',
+    displayName: getFirstString(
+      user.displayName,
+      user.name,
+      user.fullName,
+      user.createdByName,
+      user.ownerName,
+      user.createdBy?.displayName,
+      user.createdBy?.name,
+      user.owner?.displayName,
+      user.owner?.name,
+      user.businessName
+    ) || 'No name',
+    createdAt: toDate(user.createdAt || user.created_at || user.createdOn),
+    lastActiveAt: toDate(user.lastActiveAt || user.lastLoginAt || user.lastSeenAt || user.updatedAt || user.updated_at),
+    status: disabled ? 'disabled' : 'active',
+    isDisabled: disabled,
+    emailVerified: Boolean(user.emailVerified || user.verified || user.auth?.emailVerified),
+    region: getFirstString(user.region, user.country, user.billingRegion) || 'Unknown',
+    firestoreData: {
+      ...user,
+      businessAccountId,
+      firebaseUid
+    },
+    source: 'MongoDB backend',
+    isSubscribed: subscriptionStatus === 'active' || user.planTier === 'paid' || user.planTier === 'pro',
+    subscriptionId: getFirstString(user.subscriptionId, user.currentSubscriptionId, user.currentSubscription?.id, user.subscription?.id) || null,
+    subscriptionEndDate,
+    planType,
+    businessName: getFirstString(user.businessName, user.companyName, user.name) || undefined
+  }
 }
 
 export default function UsersPage() {
@@ -219,7 +305,7 @@ export default function UsersPage() {
   const { toast } = useToast()
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  const enrichUsersWithBackendSubscriptions = useCallback(async (baseUsers: User[]) => {
+  const enrichUsersWithBackendSubscriptions = useCallback(async (baseUsers: User[], backendAccounts?: Record<string, any>[]) => {
     if (baseUsers.length === 0) return baseUsers
 
     try {
@@ -231,7 +317,7 @@ export default function UsersPage() {
 
       if (usersByEmail.size === 0) return baseUsers
 
-      const businesses = await searchBackendAdminBusinesses()
+      const businesses = backendAccounts || await searchBackendAdminBusinesses()
       const matchingBusinesses = businesses.filter((business) =>
         baseUsers.some((user) => businessMatchesUser(business, user))
       )
@@ -310,6 +396,18 @@ export default function UsersPage() {
     }
   }, [])
 
+  const loadMongoUsers = useCallback(async (term?: string) => {
+    const trimmedTerm = term?.trim()
+    const accounts = await searchBackendAdminUsers(trimmedTerm ? { q: trimmedTerm } : undefined)
+    const mappedUsers = accounts
+      .map(mapBackendUser)
+      .filter((user) => user.id || user.email !== 'No email')
+
+    const enrichedUsers = await enrichUsersWithBackendSubscriptions(mappedUsers, accounts)
+
+    return enrichedUsers.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  }, [enrichUsersWithBackendSubscriptions])
+
   const activateCurrentOwnerSubscription = async (targetUser: User) => {
     const currentUser = auth.currentUser
     if (!currentUser) {
@@ -349,7 +447,7 @@ export default function UsersPage() {
     ) || (exactBusinesses.length === 1 ? exactBusinesses[0] : null)
 
     const exactBusinessAccountId = matchingExactBusiness ? getBusinessAccountId(matchingExactBusiness) : ''
-    if (exactBusinessAccountId) {
+    if (matchingExactBusiness && exactBusinessAccountId) {
       return {
         id: exactBusinessAccountId,
         name: matchingExactBusiness.businessName || matchingExactBusiness.name || targetUser.businessName || targetUser.email
@@ -366,7 +464,7 @@ export default function UsersPage() {
 
     return {
       id: businessAccountId,
-      name: matchingBusiness.businessName || matchingBusiness.name || targetUser.businessName || targetUser.email
+      name: matchingBusiness?.businessName || matchingBusiness?.name || targetUser.businessName || targetUser.email
     }
   }
 
@@ -445,29 +543,8 @@ export default function UsersPage() {
     try {
       setLoading(true)
       
-      // Fetch users from Firebase Auth using the new API endpoint
-      const response = await fetch('/api/admin/firebase-auth-users?includeFirestore=true')
-      const data = await response.json()
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch users')
-      }
-      
-      const usersData = await enrichUsersWithBackendSubscriptions(
-        data.users.map((user: any) => mapApiUser(user, data.source))
-      )
-      
+      const usersData = await loadMongoUsers()
       setUsers(usersData)
-      
-      // Show info about data source
-      if (data.warning) {
-        toast({
-          title: 'Info',
-          description: data.warning,
-          variant: 'default'
-        })
-      }
-      
     } catch (error) {
       console.error('Error fetching users:', error)
       toast({
@@ -479,24 +556,14 @@ export default function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast, enrichUsersWithBackendSubscriptions])
+  }, [toast, loadMongoUsers])
 
   // Separate function for resetting to all users (to avoid circular dependency)
   const resetToAllUsers = useCallback(async () => {
     try {
       setLoading(true)
       
-      const response = await fetch('/api/admin/firebase-auth-users?includeFirestore=true')
-      const data = await response.json()
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch users')
-      }
-      
-      const usersData = await enrichUsersWithBackendSubscriptions(
-        data.users.map((user: any) => mapApiUser(user, data.source))
-      )
-      
+      const usersData = await loadMongoUsers()
       setUsers(usersData)
       
     } catch (error) {
@@ -509,7 +576,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast, enrichUsersWithBackendSubscriptions])
+  }, [toast, loadMongoUsers])
 
   // User action handlers
   const handleUserAction = async (user: User, action: 'reset' | 'disable' | 'delete' | 'activate-subscription' | 'revoke-subscription') => {
@@ -536,24 +603,38 @@ export default function UsersPage() {
           break
           
         case 'disable':
-          const response = await fetch(`/api/admin/users/${selectedUser.id}/disable`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ disabled: selectedUser.status === 'active' })
-          })
-          
-          if (response.ok) {
-            const result = await response.json()
+          const businessAccountId = getUserBusinessAccountId(selectedUser)
+
+          if (businessAccountId) {
+            await setBackendAdminBusinessStatus(
+              businessAccountId,
+              selectedUser.status === 'active' ? 'pause' : 'resume'
+            )
             toast({
               title: 'Success',
-              description: result.message || `User ${selectedUser.status === 'active' ? 'disabled' : 'enabled'} successfully`,
+              description: `User ${selectedUser.status === 'active' ? 'disabled' : 'enabled'} successfully`,
               variant: 'success'
             })
           } else {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-            throw new Error(errorData.error || `Failed to update user status (${response.status})`)
+            const response = await fetch(`/api/admin/users/${selectedUser.id}/disable`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ disabled: selectedUser.status === 'active' })
+            })
+            
+            if (response.ok) {
+              const result = await response.json()
+              toast({
+                title: 'Success',
+                description: result.message || `User ${selectedUser.status === 'active' ? 'disabled' : 'enabled'} successfully`,
+                variant: 'success'
+              })
+            } else {
+              const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+              throw new Error(errorData.error || `Failed to update user status (${response.status})`)
+            }
           }
           break
           
@@ -686,16 +767,25 @@ export default function UsersPage() {
           case 'revoke-subscription':
             throw new Error('The backend does not support subscription revoke yet.')
           case 'disable':
-            const disableResponse = await fetch(`/api/admin/users/${user.id}/disable`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ disabled: user.status === 'active' })
-            })
-            if (!disableResponse.ok) {
-              const errorData = await disableResponse.json().catch(() => ({ error: 'Unknown error' }))
-              throw new Error(`Failed to ${user.status === 'active' ? 'disable' : 'enable'} user ${user.email}: ${errorData.error}`)
+            const businessAccountId = getUserBusinessAccountId(user)
+
+            if (businessAccountId) {
+              await setBackendAdminBusinessStatus(
+                businessAccountId,
+                user.status === 'active' ? 'pause' : 'resume'
+              )
+            } else {
+              const disableResponse = await fetch(`/api/admin/users/${user.id}/disable`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ disabled: user.status === 'active' })
+              })
+              if (!disableResponse.ok) {
+                const errorData = await disableResponse.json().catch(() => ({ error: 'Unknown error' }))
+                throw new Error(`Failed to ${user.status === 'active' ? 'disable' : 'enable'} user ${user.email}: ${errorData.error}`)
+              }
             }
             break
           case 'delete':
@@ -815,38 +905,28 @@ export default function UsersPage() {
       setLoading(true)
       setSearchMode('api')
       
-      // Search using the API endpoint
-      const response = await fetch(`/api/admin/firebase-auth-users?email=${encodeURIComponent(term.trim())}&includeFirestore=true`)
-      const data = await response.json()
+      const usersData = await loadMongoUsers(term)
       
-      if (data.success) {
-        const usersData = await enrichUsersWithBackendSubscriptions(
-          data.users.map((user: any) => mapApiUser(user, data.source))
-        )
-        
-        setUsers(usersData)
-        setSearchResults(usersData.length)
-        setCurrentPage(1) // Reset to first page when searching
-        
-        // Show search feedback (with slight delay to avoid disrupting typing)
-        setTimeout(() => {
-          if (usersData.length === 0) {
-            toast({
-              title: 'No Users Found',
-              description: `No users found matching "${term}". Try a different search term.`,
-              variant: 'default'
-            })
-          } else {
-            toast({
-              title: 'Search Results',
-              description: `Found ${usersData.length} user(s) matching "${term}"`,
-              variant: 'default'
-            })
-          }
-        }, 100)
-      } else {
-        throw new Error(data.error || 'Search failed')
-      }
+      setUsers(usersData)
+      setSearchResults(usersData.length)
+      setCurrentPage(1) // Reset to first page when searching
+      
+      // Show search feedback (with slight delay to avoid disrupting typing)
+      setTimeout(() => {
+        if (usersData.length === 0) {
+          toast({
+            title: 'No Users Found',
+            description: `No users found matching "${term}". Try a different search term.`,
+            variant: 'default'
+          })
+        } else {
+          toast({
+            title: 'Search Results',
+            description: `Found ${usersData.length} user(s) matching "${term}"`,
+            variant: 'default'
+          })
+        }
+      }, 100)
     } catch (error) {
       console.error('Error searching users:', error)
       toast({
@@ -858,7 +938,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast, resetToAllUsers, enrichUsersWithBackendSubscriptions])
+  }, [toast, resetToAllUsers, loadMongoUsers])
 
   // Debounced search function
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null)

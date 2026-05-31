@@ -23,19 +23,14 @@ import {
   DollarSign,
   LineChart,
   PieChart,
-  Filter,
   RefreshCw,
-  ExternalLink,
-  Share2,
   Layers,
   UserCheck
 } from 'lucide-react'
-import { SuperAdminService } from '@/lib/super-admin-service'
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
 import AdvancedAnalyticsDashboard from '@/components/analytics/AdvancedAnalyticsDashboard'
-import FirebaseEventsServiceInstance, { FirebaseEventsService, RealEventData } from '@/lib/firebase-events-service'
+import FirebaseEventsServiceInstance, { FirebaseEventsService } from '@/lib/firebase-events-service'
 import EventAnalysisChart from '@/components/charts/EventAnalysisChart'
+import { searchBackendAdminUsers } from '@/lib/backend-business-api'
 
 // Firebase Analytics-style interfaces
 interface AnalyticsOverview {
@@ -102,6 +97,22 @@ interface ConversionFunnel {
   conversionRate: number
 }
 
+function getAdminUserDate(user: Record<string, any>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = user[key]
+    if (!value) continue
+
+    const date = new Date(value)
+    if (Number.isFinite(date.getTime())) return date
+  }
+
+  return null
+}
+
+function isAdminUserDisabled(user: Record<string, any>) {
+  const status = String(user.status || user.accountStatus || user.userStatus || user.businessStatus || '').toLowerCase()
+  return Boolean(user.disabled) || ['disabled', 'paused', 'suspended', 'inactive', 'revoked'].includes(status)
+}
 
 export default function ReportsExportsPage() {
   const [loading, setLoading] = useState(true)
@@ -117,9 +128,6 @@ export default function ReportsExportsPage() {
   }, [dateRange])
 
   const handleRefresh = async () => {
-    // Force complete refresh to ensure fresh data
-    const UserMetricsService = (await import('@/lib/user-metrics-service')).default
-    await UserMetricsService.forceRefresh()
     await FirebaseEventsServiceInstance.forceRefresh()
     
     fetchAnalyticsData()
@@ -127,16 +135,10 @@ export default function ReportsExportsPage() {
 
   const fetchAnalyticsData = async () => {
     try {
-      // Fetch real user data from Firebase Auth (same as users page)
-      const userResponse = await fetch('/api/admin/firebase-auth-users?includeFirestore=true')
-      const userData = await userResponse.json()
-      
-      const allUsers = userData.success ? userData.users : []
+      // Fetch real user data from the Mongo-backed backend source (same as users page)
+      const allUsers = await searchBackendAdminUsers()
       const activeUsers = allUsers.filter((user: any) => {
-        // A user is considered active if they are not disabled
-        const isDisabled = user.disabled === true || 
-                          (user.displayName && user.displayName.startsWith('[DISABLED]'))
-        return !isDisabled
+        return !isAdminUserDisabled(user)
       })
       
       // Calculate user metrics from the actual data
@@ -144,8 +146,14 @@ export default function ReportsExportsPage() {
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
       
-      const newThisWeek = allUsers.filter((user: any) => new Date(user.createdAt) >= weekAgo).length
-      const newThisMonth = allUsers.filter((user: any) => new Date(user.createdAt) >= monthAgo).length
+      const newThisWeek = allUsers.filter((user: any) => {
+        const createdAt = getAdminUserDate(user, 'createdAt', 'created_at', 'createdOn')
+        return Boolean(createdAt && createdAt >= weekAgo)
+      }).length
+      const newThisMonth = allUsers.filter((user: any) => {
+        const createdAt = getAdminUserDate(user, 'createdAt', 'created_at', 'createdOn')
+        return Boolean(createdAt && createdAt >= monthAgo)
+      }).length
       
       const userMetrics = {
         total: allUsers.length,
@@ -160,24 +168,23 @@ export default function ReportsExportsPage() {
       
       // Calculate returning users (users active this period who joined before this period)
       const returningUsers = allUsers.filter((user: any) => {
-        const isDisabled = user.disabled === true || 
-                          (user.displayName && user.displayName.startsWith('[DISABLED]'))
-        const createdBeforeMonth = user.createdAt && new Date(user.createdAt) < monthAgo
-        const activeRecently = user.lastActiveAt && new Date(user.lastActiveAt) >= monthAgo
+        const createdAt = getAdminUserDate(user, 'createdAt', 'created_at', 'createdOn')
+        const lastActiveAt = getAdminUserDate(user, 'lastActiveAt', 'lastLoginAt', 'lastSeenAt', 'updatedAt', 'updated_at')
+        const createdBeforeMonth = createdAt && createdAt < monthAgo
+        const activeRecently = lastActiveAt && lastActiveAt >= monthAgo
         
-        return !isDisabled && createdBeforeMonth && activeRecently
+        return !isAdminUserDisabled(user) && createdBeforeMonth && activeRecently
       }).length
       
       // Calculate user growth percentage
       const twoMonthsAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
       const usersLastMonth = allUsers.filter((user: any) => {
-        const isDisabled = user.disabled === true || 
-                          (user.displayName && user.displayName.startsWith('[DISABLED]'))
-        const createdInRange = user.createdAt && 
-                              new Date(user.createdAt) >= twoMonthsAgo && 
-                              new Date(user.createdAt) < monthAgo
+        const createdAt = getAdminUserDate(user, 'createdAt', 'created_at', 'createdOn')
+        const createdInRange = createdAt && 
+                              createdAt >= twoMonthsAgo && 
+                              createdAt < monthAgo
         
-        return !isDisabled && createdInRange
+        return !isAdminUserDisabled(user) && createdInRange
       }).length
       const userGrowth = usersLastMonth > 0 ? 
         ((userMetrics.newThisMonth - usersLastMonth) / usersLastMonth) * 100 : 0
