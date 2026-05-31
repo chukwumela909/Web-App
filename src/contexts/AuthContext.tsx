@@ -89,7 +89,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-const MOCK_STRIPE_SESSION_KEY = 'fahampesa:mockStripeSubscription'
 
 function getPlatformRole(session: BackendSession | null): PlatformRole | null {
   const platformRole = String(session?.auth?.platformRole || '').toLowerCase()
@@ -113,63 +112,6 @@ function getUserRoleFromBackendSession(session: BackendSession | null): UserRole
     role,
     createdAt: new Date(),
     permissions: PLATFORM_ROLE_PERMISSIONS[role]
-  }
-}
-
-function applyMockStripeSubscription(session: BackendSession | null, fallbackUser?: User | null): BackendSession | null {
-  if (typeof window === 'undefined') return session
-
-  const rawMockSubscription = window.localStorage.getItem(MOCK_STRIPE_SESSION_KEY)
-  if (!rawMockSubscription) return session
-
-  try {
-    const mockSubscription = JSON.parse(rawMockSubscription) as {
-      planType?: string
-      subscriptionEndsAt?: string
-    }
-    const subscriptionEndDate = mockSubscription.subscriptionEndsAt
-      ? new Date(mockSubscription.subscriptionEndsAt)
-      : null
-
-    if (!subscriptionEndDate || subscriptionEndDate <= new Date()) {
-      window.localStorage.removeItem(MOCK_STRIPE_SESSION_KEY)
-      return session
-    }
-
-    const sessionBase: BackendSession | null = session ?? (fallbackUser ? {
-      auth: {
-        firebaseUid: fallbackUser.uid,
-        email: fallbackUser.email || undefined,
-        phone: fallbackUser.phoneNumber || undefined,
-        name: fallbackUser.displayName || fallbackUser.email || undefined
-      },
-      userId: fallbackUser.uid,
-      assignedBranchIds: [],
-      onboardingStatus: {
-        completed: true,
-        skipped: false,
-        currentStep: 0,
-        completedSteps: [],
-        skippedSteps: [],
-        hasOnboardingData: true,
-        hasBusiness: true,
-        businessAccountId: null,
-        status: 'completed',
-        data: {}
-      }
-    } : null)
-
-    if (!sessionBase) return session
-
-    return {
-      ...sessionBase,
-      planTier: 'paid',
-      subscriptionStatus: 'active',
-      subscriptionEndsAt: subscriptionEndDate.toISOString()
-    }
-  } catch {
-    window.localStorage.removeItem(MOCK_STRIPE_SESSION_KEY)
-    return session
   }
 }
 
@@ -219,11 +161,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setBackendSessionError(error instanceof Error ? error.message : 'Unable to load account session.')
           return null
         })
-        const sessionWithMockSubscription = applyMockStripeSubscription(session, user)
-        const role = getUserRoleFromBackendSession(sessionWithMockSubscription)
+        const role = getUserRoleFromBackendSession(session)
 
         setUserRole(role)
-        setBackendSession(sessionWithMockSubscription)
+        setBackendSession(session)
         setRoleLoading(false)
         setBackendSessionLoading(false)
       } else {
@@ -421,19 +362,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setBackendSessionLoading(true)
     setBackendSessionError(null)
     try {
-      const session = applyMockStripeSubscription(await getMe(currentUser), currentUser)
+      const session = await getMe(currentUser)
       setBackendSession(session)
       setUserRole(getUserRoleFromBackendSession(session))
       return session
     } catch (error) {
       if (isBackendApiError(error) && (error.code === 'missing_auth_token' || error.code === 'invalid_auth_token')) {
         await signOut(auth)
-      }
-      const mockedSession = applyMockStripeSubscription(null, currentUser)
-      if (mockedSession) {
-        setBackendSession(mockedSession)
-        setUserRole(getUserRoleFromBackendSession(mockedSession))
-        return mockedSession
       }
       setBackendSession(null)
       setUserRole(null)

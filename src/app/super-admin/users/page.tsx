@@ -52,6 +52,12 @@ import { userManagementActions, isUserDisabled, getCleanDisplayName } from '@/li
 import { useToast } from '@/hooks/use-toast'
 import UserMetricsService from '@/lib/user-metrics-service'
 import { handleError } from '@/lib/error-handler'
+import {
+  manuallyActivateBackendAdminSubscription,
+  searchBackendAdminBusinesses,
+  type BackendPlanType,
+  type BackendSubscriptionRecord
+} from '@/lib/backend-business-api'
 
 interface User {
   id: string
@@ -71,6 +77,27 @@ interface User {
   subscriptionEndDate?: number | null
   planType?: 'monthly' | 'yearly' | null
   businessName?: string
+}
+
+function userEmailOf(user: User) {
+  return user.email && user.email !== 'No email' ? user.email.trim().toLowerCase() : ''
+}
+
+function getBusinessAccountId(business: Record<string, any>) {
+  return String(business.id || business._id || business.businessAccountId || '')
+}
+
+function getBusinessEmailCandidates(business: Record<string, any>) {
+  return [
+    business.createdByEmail,
+    business.ownerEmail,
+    business.email,
+    business.userEmail,
+    business.createdBy?.email,
+    business.owner?.email
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.trim().toLowerCase())
 }
 
 export default function UsersPage() {
@@ -102,6 +129,63 @@ export default function UsersPage() {
   
   const { toast } = useToast()
   const searchInputRef = useRef<HTMLInputElement>(null)
+
+  const findBusinessAccountForUser = async (targetUser: User) => {
+    const email = userEmailOf(targetUser)
+    if (!email) {
+      throw new Error('This user does not have an email address to match with a backend business account.')
+    }
+
+    const businesses = await searchBackendAdminBusinesses({ q: email })
+    const matchingBusiness = businesses.find((business) =>
+      getBusinessEmailCandidates(business).includes(email)
+    ) || (businesses.length === 1 ? businesses[0] : null)
+
+    const businessAccountId = matchingBusiness ? getBusinessAccountId(matchingBusiness) : ''
+    if (!businessAccountId) {
+      throw new Error(`No backend business account was found for ${targetUser.email}.`)
+    }
+
+    return {
+      id: businessAccountId,
+      name: matchingBusiness.businessName || matchingBusiness.name || targetUser.businessName || targetUser.email
+    }
+  }
+
+  const markUserSubscriptionActive = (
+    userId: string,
+    subscription: BackendSubscriptionRecord | null,
+    planType: BackendPlanType = 'monthly'
+  ) => {
+    const subscriptionEndDate = subscription?.endDate
+      ? new Date(subscription.endDate).getTime()
+      : null
+
+    setUsers((currentUsers) => currentUsers.map((user) => (
+      user.id === userId
+        ? {
+            ...user,
+            isSubscribed: true,
+            subscriptionId: subscription?.id || user.subscriptionId || null,
+            subscriptionEndDate: Number.isFinite(subscriptionEndDate) ? subscriptionEndDate : user.subscriptionEndDate || null,
+            planType
+          }
+        : user
+    )))
+  }
+
+  const activateUserSubscription = async (targetUser: User) => {
+    const businessAccount = await findBusinessAccountForUser(targetUser)
+    const result = await manuallyActivateBackendAdminSubscription(
+      businessAccount.id,
+      'monthly',
+      30,
+      `Manually activated by super admin for ${targetUser.email}`
+    )
+
+    markUserSubscriptionActive(targetUser.id, result.subscription, 'monthly')
+    return businessAccount
+  }
 
   useEffect(() => {
     fetchUsers()
@@ -233,6 +317,7 @@ export default function UsersPage() {
 
     try {
       setActionLoading(true)
+      let shouldRefreshUsers = true
       
       switch (actionType) {
         case 'reset':
@@ -267,7 +352,14 @@ export default function UsersPage() {
           break
           
         case 'activate-subscription':
-          throw new Error('Use Payments & Subscriptions to manually activate backend subscriptions.')
+          const businessAccount = await activateUserSubscription(selectedUser)
+          shouldRefreshUsers = false
+          toast({
+            title: 'Success',
+            description: `Subscription activated for ${selectedUser.email} (${businessAccount.name})`,
+            variant: 'success'
+          })
+          break
           
         case 'revoke-subscription':
           throw new Error('The backend does not support subscription revoke yet.')
@@ -332,7 +424,9 @@ export default function UsersPage() {
       }
       
       // Refresh users list
-      await fetchUsers()
+      if (shouldRefreshUsers) {
+        await fetchUsers()
+      }
       
     } catch (error) {
       const errorResult = handleError(error, 'User action')
@@ -372,6 +466,7 @@ export default function UsersPage() {
     try {
       setActionLoading(true)
       const selectedUserList = users.filter(user => selectedUsers.has(user.id))
+      let shouldRefreshUsers = true
       
       for (const user of selectedUserList) {
         switch (bulkActionType) {
@@ -379,7 +474,9 @@ export default function UsersPage() {
             await userManagementActions.resetPassword(user.email)
             break
           case 'activate-subscription':
-            throw new Error('Use Payments & Subscriptions to manually activate backend subscriptions.')
+            await activateUserSubscription(user)
+            shouldRefreshUsers = false
+            break
           case 'revoke-subscription':
             throw new Error('The backend does not support subscription revoke yet.')
           case 'disable':
@@ -453,7 +550,9 @@ export default function UsersPage() {
       })
       
       setSelectedUsers(new Set())
-      await fetchUsers()
+      if (shouldRefreshUsers) {
+        await fetchUsers()
+      }
       
     } catch (error) {
       const errorResult = handleError(error, 'Bulk user action')
@@ -836,6 +935,14 @@ export default function UsersPage() {
                 >
                   <Mail className="h-4 w-4 mr-2" />
                   Reset Password ({selectedUsers.size})
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleBulkAction('activate-subscription')}
+                >
+                  <Crown className="h-4 w-4 mr-2" />
+                  Activate ({selectedUsers.size})
                 </Button>
                 <Button 
                   variant="outline" 

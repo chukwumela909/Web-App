@@ -20,7 +20,6 @@ import type {
 } from '@/lib/suppliers-types'
 
 const SELECTED_BRANCH_KEY = 'fahampesa:selectedBranchId'
-const MOCK_STRIPE_SESSION_KEY = 'fahampesa:mockStripeSubscription'
 
 type AnyRecord = Record<string, any>
 
@@ -1305,52 +1304,20 @@ export async function startBackendMpesaCheckout(planType: BackendPlanType, phone
 }
 
 export async function startBackendStripeCheckout(planType: BackendPlanType, successUrl?: string, cancelUrl?: string): Promise<BackendStripeCheckoutResponse> {
-  const user = await currentUser()
-  const now = new Date()
-  const endDate = new Date(now)
-  endDate.setMonth(endDate.getMonth() + (planType === 'yearly' ? 12 : 1))
-
-  const subscription: BackendSubscriptionRecord = {
-    id: `mock_stripe_${now.getTime()}`,
-    businessAccountId: null,
-    userId: user.uid,
-    provider: 'stripe',
-    planType,
-    status: 'active',
-    amount: planType === 'yearly' ? 100 : 10,
-    currency: 'USD',
-    checkoutRequestId: null,
-    merchantRequestId: null,
-    stripeCheckoutSessionId: `cs_mock_${now.getTime()}`,
-    transactionId: `txn_mock_${now.getTime()}`,
-    phoneNumber: null,
-    startDate: now.toISOString(),
-    endDate: endDate.toISOString(),
-    receiptNumber: `MOCK-${now.getTime()}`,
-    createdAt: now.toISOString(),
-    updatedAt: now.toISOString()
-  }
-
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(MOCK_STRIPE_SESSION_KEY, JSON.stringify({
-      planType: subscription.planType,
-      subscriptionEndsAt: subscription.endDate,
-      subscriptionId: subscription.id
-    }))
-  }
-
-  const checkoutUrl = successUrl
-    ?? (typeof window !== 'undefined'
-      ? `${window.location.origin}/dashboard/subscription/success?plan=${planType}`
-      : null)
-
+  const result = await api<AnyRecord>('/billing/stripe/checkout-session', {
+    method: 'POST',
+    body: JSON.stringify({
+      planType,
+      ...(successUrl ? { successUrl } : {}),
+      ...(cancelUrl ? { cancelUrl } : {})
+    })
+  })
+  const subscription = normalizeSubscriptionRecord(result.subscription)
+  if (!subscription) throw new Error('Backend did not return a subscription for Stripe checkout.')
   return {
     provider: 'stripe',
     subscription,
-    checkout: {
-      sessionId: subscription.stripeCheckoutSessionId || subscription.id,
-      url: checkoutUrl
-    }
+    checkout: result.checkout ?? {}
   }
 }
 
