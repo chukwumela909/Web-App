@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { ChevronDown } from 'lucide-react'
 import Image from 'next/image'
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { db, auth, RecaptchaVerifier, PhoneAuthProvider, linkWithCredential } from '@/lib/firebase'
 
 // Supported countries
@@ -261,12 +261,18 @@ export default function VerifyPhonePage() {
           console.log('Phone linking skipped:', linkError)
         }
 
-        // Update user profile in Firestore
-        await updateDoc(doc(db, 'userProfiles', user.uid), {
+        // Upsert the user profile because some accounts can reach this page
+        // before an onboarding/profile document has been created.
+        await setDoc(doc(db, 'userProfiles', user.uid), {
+          uid: user.uid,
+          email: user.email || '',
+          fullName: user.displayName || '',
           phoneNumber: fullPhoneNumber,
           phoneVerified: true,
           country: selectedCountry.code,
           lastUpdated: serverTimestamp()
+        }, {
+          merge: true
         })
 
         // Also update userRoles collection if it exists

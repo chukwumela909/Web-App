@@ -211,9 +211,10 @@ function CheckoutContent() {
         setError('')
 
         try {
+            const successUrl = `${window.location.origin}/dashboard/subscription/success?plan=${plan}&amount=${amount}&currency=${currency}`
             const data = await startBackendStripeCheckout(
                 plan,
-                undefined,
+                successUrl,
                 window.location.href
             )
             const checkoutUrl = data.checkout.url
