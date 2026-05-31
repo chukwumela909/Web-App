@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useCallback, useContext, useEffect, useState, useRef } from 'react'
-import { 
+import {
   User, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -10,10 +10,58 @@ import {
   updateProfile,
   sendPasswordResetEmail
 } from 'firebase/auth'
-import { doc, updateDoc } from 'firebase/firestore'
-import { auth, db, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, signInWithCredential } from '@/lib/firebase'
-import { getUserRole, UserRole } from '@/lib/adminUtils'
+import { auth, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, signInWithCredential } from '@/lib/firebase'
 import { BackendSession, getMe, isBackendApiError, phoneExists } from '@/lib/backend-api'
+
+type PlatformRole = 'super_admin' | 'admin' | 'viewer' | 'user'
+
+interface UserRole {
+  id: string
+  email: string
+  displayName: string
+  role: PlatformRole
+  createdAt: Date
+  lastLogin?: Date
+  permissions: string[]
+}
+
+const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, string[]> = {
+  super_admin: [
+    'dashboard:read',
+    'users:read',
+    'users:write',
+    'users:delete',
+    'behavior:read',
+    'alerts:read',
+    'alerts:write',
+    'reports:read',
+    'reports:write',
+    'reports:export',
+    'settings:read',
+    'settings:write',
+    'admin:manage'
+  ],
+  admin: [
+    'dashboard:read',
+    'users:read',
+    'behavior:read',
+    'alerts:read',
+    'alerts:write',
+    'reports:read',
+    'reports:write',
+    'reports:export'
+  ],
+  viewer: [
+    'dashboard:read',
+    'users:read',
+    'behavior:read',
+    'alerts:read',
+    'reports:read'
+  ],
+  user: [
+    'dashboard:read'
+  ]
+}
 
 interface AuthContextType {
   user: User | null
@@ -41,6 +89,31 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+function getPlatformRole(session: BackendSession | null): PlatformRole | null {
+  const platformRole = String(session?.auth?.platformRole || '').toLowerCase()
+  if (platformRole === 'super_admin' || platformRole === 'superadmin' || platformRole === 'platform_admin' || platformRole === 'admin') {
+    return 'super_admin'
+  }
+  if (platformRole === 'viewer') {
+    return platformRole
+  }
+  return null
+}
+
+function getUserRoleFromBackendSession(session: BackendSession | null): UserRole | null {
+  const role = getPlatformRole(session)
+  if (!role || !session) return null
+
+  return {
+    id: session.auth.firebaseUid || session.userId,
+    email: session.auth.email || '',
+    displayName: session.auth.name || session.auth.email || role,
+    role,
+    createdAt: new Date(),
+    permissions: PLATFORM_ROLE_PERMISSIONS[role]
+  }
+}
 
 export function useAuth() {
   const context = useContext(AuthContext)
@@ -78,35 +151,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setBackendSessionLoading(true)
         setBackendSessionError(null)
 
-        const [role, session] = await Promise.all([
-          getUserRole(user.uid),
-          getMe(user).catch(async (error) => {
-            if (isBackendApiError(error) && (error.code === 'missing_auth_token' || error.code === 'invalid_auth_token')) {
-              await signOut(auth)
-              return null
-            }
-
-            console.error('Error bootstrapping backend session:', error)
-            setBackendSessionError(error instanceof Error ? error.message : 'Unable to load account session.')
+        const session = await getMe(user).catch(async (error) => {
+          if (isBackendApiError(error) && (error.code === 'missing_auth_token' || error.code === 'invalid_auth_token')) {
+            await signOut(auth)
             return null
-          })
-        ])
+          }
+
+          console.error('Error bootstrapping backend session:', error)
+          setBackendSessionError(error instanceof Error ? error.message : 'Unable to load account session.')
+          return null
+        })
+        const role = getUserRoleFromBackendSession(session)
 
         setUserRole(role)
         setBackendSession(session)
         setRoleLoading(false)
         setBackendSessionLoading(false)
-        
-        // Update last login time
-        if (role) {
-          try {
-            await updateDoc(doc(db, 'userRoles', user.uid), {
-              lastLogin: new Date()
-            })
-          } catch (error) {
-            console.error('Error updating last login:', error)
-          }
-        }
       } else {
         setUserRole(null)
         setBackendSession(null)
@@ -304,12 +364,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const session = await getMe(currentUser)
       setBackendSession(session)
+      setUserRole(getUserRoleFromBackendSession(session))
       return session
     } catch (error) {
       if (isBackendApiError(error) && (error.code === 'missing_auth_token' || error.code === 'invalid_auth_token')) {
         await signOut(auth)
       }
       setBackendSession(null)
+      setUserRole(null)
       setBackendSessionError(error instanceof Error ? error.message : 'Unable to load account session.')
       throw error
     } finally {
@@ -317,8 +379,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const isSuperAdmin = userRole?.role === 'super_admin'
-  const isAdmin = userRole?.role === 'admin' || userRole?.role === 'super_admin'
+  const platformRole = getPlatformRole(backendSession)
+  const isSuperAdmin = platformRole === 'super_admin'
+  const isAdmin = platformRole === 'admin' || platformRole === 'super_admin'
 
   const value = {
     user,

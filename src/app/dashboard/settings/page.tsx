@@ -86,6 +86,12 @@ const fadeInUp = {
   transition: { duration: 0.6 }
 }
 
+const defaultBackupSettings: DataSyncSettings['backupSettings'] = {
+  autoBackup: false,
+  backupFrequency: 'WEEKLY',
+  cloudStorage: 'GOOGLE_DRIVE'
+}
+
 
 export default function SettingsPage() {
   const { user, logout } = useAuth()
@@ -242,11 +248,7 @@ export default function SettingsPage() {
           uid: user.uid,
           offlineSyncEnabled: false,
           autoSyncInterval: 30,
-          backupSettings: {
-            autoBackup: false,
-            backupFrequency: 'WEEKLY',
-            cloudStorage: 'GOOGLE_DRIVE'
-          }
+          backupSettings: defaultBackupSettings
         })
       } finally {
         setLoading(false)
@@ -2033,10 +2035,14 @@ export default function SettingsPage() {
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={dataSyncSettings?.backupSettings.autoBackup || false}
+                            checked={dataSyncSettings?.backupSettings?.autoBackup || false}
                             onChange={(e) => setDataSyncSettings(prev => prev ? {
                               ...prev,
-                              backupSettings: { ...prev.backupSettings, autoBackup: e.target.checked }
+                              backupSettings: {
+                                ...defaultBackupSettings,
+                                ...(prev.backupSettings || {}),
+                                autoBackup: e.target.checked
+                              }
                             } : null)}
                             className="sr-only peer"
                           />
@@ -2046,10 +2052,14 @@ export default function SettingsPage() {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Backup Frequency</label>
                         <select
-                          value={dataSyncSettings?.backupSettings.backupFrequency || 'WEEKLY'}
+                          value={dataSyncSettings?.backupSettings?.backupFrequency || 'WEEKLY'}
                           onChange={(e) => setDataSyncSettings(prev => prev ? {
                             ...prev,
-                            backupSettings: { ...prev.backupSettings, backupFrequency: e.target.value as any }
+                            backupSettings: {
+                              ...defaultBackupSettings,
+                              ...(prev.backupSettings || {}),
+                              backupFrequency: e.target.value as DataSyncSettings['backupSettings']['backupFrequency']
+                            }
                           } : null)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-transparent"
                         >

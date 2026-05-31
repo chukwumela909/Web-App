@@ -25,8 +25,9 @@ export async function GET(
     if (!staffDoc.exists) {
       return NextResponse.json({
         success: false,
+        notFound: true,
         error: 'Staff member not found'
-      }, { status: 404 })
+      })
     }
     
     const data = staffDoc.data()!

@@ -471,6 +471,27 @@ export interface DataSyncSettings {
   lastUpdated?: number
 }
 
+const DEFAULT_BACKUP_SETTINGS: DataSyncSettings['backupSettings'] = {
+  autoBackup: false,
+  backupFrequency: 'WEEKLY',
+  cloudStorage: 'GOOGLE_DRIVE'
+}
+
+function normalizeDataSyncSettings(userId: string, settings: Partial<DataSyncSettings>): DataSyncSettings {
+  return {
+    uid: userId,
+    offlineSyncEnabled: settings.offlineSyncEnabled ?? false,
+    autoSyncInterval: settings.autoSyncInterval ?? 30,
+    lastSyncTimestamp: settings.lastSyncTimestamp,
+    backupSettings: {
+      ...DEFAULT_BACKUP_SETTINGS,
+      ...(settings.backupSettings || {})
+    },
+    createdAt: settings.createdAt,
+    lastUpdated: settings.lastUpdated
+  }
+}
+
 // Staff Management Types
 export type StaffRole = 'cashier' | 'manager' | 'owner'
 export type StaffStatus = 'active' | 'inactive' | 'suspended'
@@ -1264,7 +1285,7 @@ export async function getDataSyncSettings(userId: string): Promise<DataSyncSetti
     try {
       const settings = await getBackendSettings()
       return settings.syncSettings
-        ? ({ uid: userId, ...settings.syncSettings } as DataSyncSettings)
+        ? normalizeDataSyncSettings(userId, settings.syncSettings)
         : null
     } catch (error) {
       if (!shouldUseFirebaseFallback(error)) throw error
@@ -1274,7 +1295,7 @@ export async function getDataSyncSettings(userId: string): Promise<DataSyncSetti
 
   const ref = doc(db, 'data_sync_settings', userId)
   const snap = await getDoc(ref)
-  return snap.exists() ? ({ uid: userId, ...snap.data() } as DataSyncSettings) : null
+  return snap.exists() ? normalizeDataSyncSettings(userId, snap.data() as Partial<DataSyncSettings>) : null
 }
 
 export async function upsertDataSyncSettings(userId: string, settings: Partial<DataSyncSettings>): Promise<void> {
@@ -1296,10 +1317,10 @@ export async function upsertDataSyncSettings(userId: string, settings: Partial<D
     uid: userId,
     offlineSyncEnabled: settings.offlineSyncEnabled ?? existingData.offlineSyncEnabled ?? false,
     autoSyncInterval: settings.autoSyncInterval ?? existingData.autoSyncInterval ?? 30,
-    backupSettings: settings.backupSettings || existingData.backupSettings || {
-      autoBackup: false,
-      backupFrequency: 'WEEKLY',
-      cloudStorage: 'GOOGLE_DRIVE'
+    backupSettings: {
+      ...DEFAULT_BACKUP_SETTINGS,
+      ...(existingData.backupSettings || {}),
+      ...(settings.backupSettings || {})
     },
     lastUpdated: Date.now(),
     createdAt: existing.exists() ? existingData.createdAt || Date.now() : Date.now()
