@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, X, Menu, ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
+import { useAuth } from '@/contexts/AuthContext'
+import { getBackendBillingPlans, type BackendBillingPlans } from '@/lib/backend-business-api'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DownloadModal } from '@/components/DownloadModal'
 import Footer from '@/components/footer'
@@ -133,8 +135,17 @@ export default function SubscriptionPage() {
     const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
     const [showAllFaqs, setShowAllFaqs] = useState(false)
     const [activeTab, setActiveTab] = useState<'mobile' | 'web' | 'desktop'>('mobile')
+    const [plans, setPlans] = useState<BackendBillingPlans | null>(null)
     const router = useRouter()
     const { currency, isLoading} = useCurrency()
+    const { user } = useAuth()
+
+    useEffect(() => {
+        if (!user) return
+        getBackendBillingPlans()
+            .then(setPlans)
+            .catch((error) => console.warn('Unable to load backend billing plans:', error))
+    }, [user])
 
     const scrollToCompareFeatures = () => {
         const element = document.getElementById('compare-features')
@@ -154,6 +165,10 @@ export default function SubscriptionPage() {
 
     // pricing (display depends on toggle and currency)
     const getProPrice = () => {
+        const region = currency === 'KSH' ? 'kenya' : 'other'
+        const backendAmount = plans?.[isYearly ? 'yearly' : 'monthly']?.[region]?.amount
+        if (typeof backendAmount === 'number') return backendAmount
+
         if (currency === 'KSH') {
             return isYearly ? 20000 : 2000
         } else {

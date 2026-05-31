@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore'
+import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { PLAN_LIMITS, PlanTier, getNumericLimit, FEATURE_NAMES } from '@/lib/plan-limits'
 
@@ -47,14 +47,14 @@ function getTimestampMillis(value: unknown): number {
  * For staff members, this uses the owner's subscription instead of the staff's
  */
 export function usePlanLimits(): UsePlanLimitsReturn {
-  const { user } = useAuth()
+  const { user, backendSession, backendSessionLoading, refreshBackendSession } = useAuth()
   const { staff } = useStaff()
   // Use owner's ID for staff members to inherit subscription
   const effectiveUserId = staff ? staff.userId : user?.uid
   const [planTier, setPlanTier] = useState<PlanTier>('free')
   const [isLoading, setIsLoading] = useState(true)
 
-  // Determine user's plan tier (using owner's subscription for staff)
+  // Determine user's plan tier from the backend business account session.
   useEffect(() => {
     async function checkPlanTier() {
       if (!effectiveUserId) {
@@ -64,54 +64,16 @@ export function usePlanLimits(): UsePlanLimitsReturn {
       }
 
       try {
-        let isPro = false
-
-        // First, check subscription status from subscriptions collection
-        // Uses effectiveUserId so staff inherits owner's subscription
-        const subscriptionsRef = collection(db, 'subscriptions')
-        const q = query(
-          subscriptionsRef,
-          where('userId', '==', effectiveUserId),
-          where('status', '==', 'active')
+        const session = backendSession ?? await refreshBackendSession()
+        const subscriptionEndDate = session?.subscriptionEndsAt ? new Date(session.subscriptionEndsAt) : null
+        const status = String(session?.subscriptionStatus || '').toLowerCase()
+        const planTierValue = String(session?.planTier || '').toLowerCase()
+        const isPro = Boolean(
+          planTierValue === 'paid' &&
+          status === 'active' &&
+          subscriptionEndDate &&
+          subscriptionEndDate > new Date()
         )
-        const snapshot = await getDocs(q)
-
-        if (!snapshot.empty) {
-          // Has active subscription = Pro plan
-          const subscription = snapshot.docs[0].data()
-          const endDate = subscription.endDate
-            ? new Date(
-                subscription.endDate.seconds
-                  ? subscription.endDate.seconds * 1000
-                  : subscription.endDate
-              )
-            : null
-
-          // Verify subscription hasn't expired
-          if (endDate && endDate > new Date()) {
-            isPro = true
-          }
-        }
-
-        // Fallback: Also check userProfiles collection for subscription status
-        // Uses effectiveUserId so staff inherits owner's subscription
-        if (!isPro) {
-          const userProfileRef = doc(db, 'userProfiles', effectiveUserId)
-          const userProfileSnap = await getDoc(userProfileRef)
-
-          if (userProfileSnap.exists()) {
-            const data = userProfileSnap.data()
-            const isSubscribed = data.isSubscribed === true
-            const subscriptionEndDate = data.subscriptionEndDate 
-              ? new Date(data.subscriptionEndDate.seconds ? data.subscriptionEndDate.seconds * 1000 : data.subscriptionEndDate)
-              : null
-
-            // Check if subscription is still valid (not expired)
-            if (isSubscribed && subscriptionEndDate && subscriptionEndDate > new Date()) {
-              isPro = true
-            }
-          }
-        }
 
         setPlanTier(isPro ? 'pro' : 'free')
       } catch (error) {
@@ -122,8 +84,10 @@ export function usePlanLimits(): UsePlanLimitsReturn {
       }
     }
 
-    checkPlanTier()
-  }, [effectiveUserId])
+    if (!backendSessionLoading) {
+      checkPlanTier()
+    }
+  }, [effectiveUserId, backendSession, backendSessionLoading, refreshBackendSession])
 
   /**
    * Get today's date range in user's local timezone
@@ -274,7 +238,6 @@ export function usePlanLimits(): UsePlanLimitsReturn {
 
   const refreshLimits = useCallback(async () => {
     setIsLoading(true)
-    // Re-check plan tier using effectiveUserId (owner's ID for staff)
     if (!effectiveUserId) {
       setPlanTier('free')
       setIsLoading(false)
@@ -282,38 +245,22 @@ export function usePlanLimits(): UsePlanLimitsReturn {
     }
 
     try {
-      const subscriptionsRef = collection(db, 'subscriptions')
-      const q = query(
-        subscriptionsRef,
-        where('userId', '==', effectiveUserId),
-        where('status', '==', 'active')
+      const session = await refreshBackendSession()
+      const subscriptionEndDate = session?.subscriptionEndsAt ? new Date(session.subscriptionEndsAt) : null
+      const isPro = Boolean(
+        session?.planTier === 'paid' &&
+        session?.subscriptionStatus === 'active' &&
+        subscriptionEndDate &&
+        subscriptionEndDate > new Date()
       )
-      const snapshot = await getDocs(q)
-
-      if (!snapshot.empty) {
-        const subscription = snapshot.docs[0].data()
-        const endDate = subscription.endDate
-          ? new Date(
-              subscription.endDate.seconds
-                ? subscription.endDate.seconds * 1000
-                : subscription.endDate
-            )
-          : null
-
-        if (endDate && endDate > new Date()) {
-          setPlanTier('pro')
-        } else {
-          setPlanTier('free')
-        }
-      } else {
-        setPlanTier('free')
-      }
+      setPlanTier(isPro ? 'pro' : 'free')
     } catch (error) {
       console.error('Error refreshing limits:', error)
+      setPlanTier('free')
     } finally {
       setIsLoading(false)
     }
-  }, [effectiveUserId])
+  }, [effectiveUserId, refreshBackendSession])
 
   return {
     planTier,

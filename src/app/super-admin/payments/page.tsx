@@ -6,8 +6,17 @@ import AdminRoute from '@/components/auth/AdminRoute'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
+import {
+  extendBackendAdminSubscription,
+  getBackendAdminBusiness,
+  getBackendAdminPayments,
+  manuallyActivateBackendAdminSubscription,
+  retryBackendAdminPaymentEvent,
+  searchBackendAdminBusinesses,
+  type BackendAdminPaymentEvent,
+  type BackendSubscriptionRecord,
+} from '@/lib/backend-business-api'
 import {
   Area,
   AreaChart,
@@ -21,6 +30,7 @@ import {
 // Types for subscriptions from API
 interface SubscriptionData {
   id: string
+  businessAccountId: string
   email: string
   planName: string
   planType: string
@@ -188,7 +198,6 @@ const CashflowTooltip = ({ active, payload, label }: any) => {
 }
 
 export default function PaymentsPage() {
-  const { user } = useAuth()
   const { toast } = useToast()
   
   const [activeTab, setActiveTab] = useState<ChartTab>('kenya')
@@ -203,22 +212,66 @@ export default function PaymentsPage() {
   
   // Subscription data from API
   const [subscriptions, setSubscriptions] = useState<SubscriptionData[]>([])
+  const [paymentEvents, setPaymentEvents] = useState<BackendAdminPaymentEvent[]>([])
   const [stats, setStats] = useState<SubscriptionStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isActionLoading, setIsActionLoading] = useState(false)
+
+  const mapBackendSubscription = (
+    subscription: BackendSubscriptionRecord,
+    account: any
+  ): SubscriptionData => ({
+    id: subscription.id,
+    businessAccountId: String(subscription.businessAccountId || account?.id || account?._id || ''),
+    email: account?.createdByEmail || account?.ownerEmail || account?.email || account?.businessName || 'Business account',
+    planName: subscription.planType === 'yearly' ? '1 Year Pro Plan' : '1 Month Pro Plan',
+    planType: subscription.planType,
+    amount: subscription.amount,
+    currency: subscription.currency,
+    status: subscription.status,
+    startDate: subscription.startDate || null,
+    endDate: subscription.endDate || null,
+    transactionId: subscription.transactionId || null,
+    phoneNumber: subscription.phoneNumber || '',
+    createdAt: subscription.createdAt || new Date().toISOString()
+  })
+
+  const computeStats = (rows: SubscriptionData[]): SubscriptionStats => ({
+    totalRevenue: rows.filter(row => row.status === 'active' || row.status === 'expired').reduce((sum, row) => sum + row.amount, 0),
+    totalRevenueKSH: rows.filter(row => row.currency === 'KSH' && (row.status === 'active' || row.status === 'expired')).reduce((sum, row) => sum + row.amount, 0),
+    totalRevenueUSD: rows.filter(row => row.currency === 'USD' && (row.status === 'active' || row.status === 'expired')).reduce((sum, row) => sum + row.amount, 0),
+    activeSubscriptions: rows.filter(row => row.status === 'active').length,
+    expiredSubscriptions: rows.filter(row => row.status === 'expired').length,
+    pendingSubscriptions: rows.filter(row => row.status === 'pending').length
+  })
+
+  const loadBillingData = async () => {
+    const [businesses, events] = await Promise.all([
+      searchBackendAdminBusinesses(),
+      getBackendAdminPayments()
+    ])
+
+    const details = await Promise.all(
+      businesses.map((business) => getBackendAdminBusiness(String(business.id || business._id)))
+    )
+
+    const rows = details.flatMap((detail) => {
+      const account = detail.account || {}
+      const subscriptions = Array.isArray(detail.subscriptions) ? detail.subscriptions : []
+      return subscriptions.map((subscription: BackendSubscriptionRecord) => mapBackendSubscription(subscription, account))
+    })
+
+    setSubscriptions(rows)
+    setPaymentEvents(events)
+    setStats(computeStats(rows))
+  }
 
   // Fetch subscriptions from API
   useEffect(() => {
     const fetchSubscriptions = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch('/api/admin/subscriptions?includeStats=true')
-        if (!response.ok) {
-          throw new Error('Failed to fetch subscriptions')
-        }
-        const data = await response.json()
-        setSubscriptions(data.subscriptions || [])
-        setStats(data.stats || null)
+        await loadBillingData()
       } catch (error) {
         console.error('Error fetching subscriptions:', error)
         toast({
@@ -322,20 +375,12 @@ export default function PaymentsPage() {
   const handleActivateSubscription = async (subscription: SubscriptionData) => {
     try {
       setIsActionLoading(true)
-      const response = await fetch('/api/admin/subscriptions/activate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subscriptionId: subscription.id,
-          transactionId: `MANUAL-ADMIN-${Date.now()}`
-        })
-      })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to activate subscription')
-      }
+      await manuallyActivateBackendAdminSubscription(
+        subscription.businessAccountId,
+        subscription.planType === 'yearly' ? 'yearly' : 'monthly',
+        subscription.planType === 'yearly' ? 365 : 30,
+        `Manually activated by admin for ${subscription.email}`
+      )
       
       toast({
         title: 'Success',
@@ -343,13 +388,7 @@ export default function PaymentsPage() {
         variant: 'default'
       })
       
-      // Refresh the subscriptions list
-      const refreshResponse = await fetch('/api/admin/subscriptions?includeStats=true')
-      if (refreshResponse.ok) {
-        const refreshData = await refreshResponse.json()
-        setSubscriptions(refreshData.subscriptions || [])
-        setStats(refreshData.stats || null)
-      }
+      await loadBillingData()
       
       setOpenPopoverId(null)
     } catch (error) {
@@ -371,6 +410,32 @@ export default function PaymentsPage() {
       return matchesEmail && matchesStatus
     })
   }, [searchEmail, statusFilter, subscriptions])
+
+  const failedPaymentEvents = useMemo(
+    () => paymentEvents.filter(event => event.processingStatus === 'failed').slice(0, 10),
+    [paymentEvents]
+  )
+
+  const handleRetryPaymentEvent = async (eventId: string) => {
+    try {
+      setIsActionLoading(true)
+      await retryBackendAdminPaymentEvent(eventId)
+      await loadBillingData()
+      toast({
+        title: 'Retry queued',
+        description: 'The payment event has been marked for retry.'
+      })
+    } catch (error) {
+      console.error('Error retrying payment event:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to retry payment event',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsActionLoading(false)
+    }
+  }
 
   return (
     <AdminRoute requiredPermission="payments_subscriptions">
@@ -625,14 +690,15 @@ export default function PaymentsPage() {
                             </button>
                             <div className=" h-px bg-[#e5e9eb]" />
                             <button 
-                              className="mx-2 mb-1 flex items-center justify-center gap-2.5 rounded-md px-4 py-2 text-base text-black transition-colors hover:bg-[#257dc1] hover:text-white"
+                              className="mx-2 mb-1 flex items-center justify-center gap-2.5 rounded-md px-4 py-2 text-base text-[#717171] cursor-not-allowed"
+                              disabled
                               onClick={() => {
                                 setSelectedSubscription(sub)
                                 setRevokeModalOpen(true)
                                 setOpenPopoverId(null)
                               }}
                             >
-                              Revoke Subscription
+                              Revoke unavailable
                             </button>
                           </div>
                         </PopoverContent>
@@ -662,6 +728,36 @@ export default function PaymentsPage() {
               </button>
             </div>
           </div>
+        </section>
+
+        <section className="rounded-xl border border-[#222222] bg-white p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-[#001223]">Failed Payment Events</h2>
+            <p className="text-sm text-[#717171]">{failedPaymentEvents.length} recent failed event(s)</p>
+          </div>
+
+          {failedPaymentEvents.length === 0 ? (
+            <p className="py-6 text-center text-base text-[#717171]">No failed payment events</p>
+          ) : (
+            <div className="space-y-2">
+              {failedPaymentEvents.map(event => (
+                <div key={event.id} className="flex items-center gap-4 rounded-lg bg-zinc-50 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-[#222222]">{event.eventType}</p>
+                    <p className="truncate text-xs text-[#717171]">{event.provider} · {event.eventId || event.id}</p>
+                    {event.errorMessage && <p className="truncate text-xs text-[#f04438]">{event.errorMessage}</p>}
+                  </div>
+                  <button
+                    onClick={() => handleRetryPaymentEvent(event.id)}
+                    disabled={isActionLoading}
+                    className="rounded-lg bg-[#004AAD] px-4 py-2 text-sm font-semibold text-white hover:bg-[#003a8c] disabled:opacity-50"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-muted-foreground/40 bg-card/30 p-12 text-center">
@@ -737,38 +833,22 @@ export default function PaymentsPage() {
               </button>
               <button
                 onClick={async () => {
-                  if (!selectedSubscription || !extendDuration || !user?.uid) return
+                  if (!selectedSubscription || !extendDuration) return
                   
                   try {
                     setIsActionLoading(true)
-                    const response = await fetch('/api/admin/subscriptions/extend', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        subscriptionId: selectedSubscription.id,
-                        duration: extendDuration,
-                        adminId: user.uid,
-                        reason: `Extended by admin for ${extendDuration}`
-                      })
-                    })
-                    
-                    if (!response.ok) {
-                      const error = await response.json()
-                      throw new Error(error.error || 'Failed to extend subscription')
-                    }
+                    const days = extendDuration === '1-month' ? 30 : 60
+                    await extendBackendAdminSubscription(
+                      selectedSubscription.businessAccountId,
+                      days,
+                      `Extended by admin for ${extendDuration}`
+                    )
                     
                     toast({
                       title: 'Success',
                       description: `Subscription extended by ${extendDuration.replace('-', ' ')}`
                     })
-                    
-                    // Refresh subscriptions
-                    const refreshResponse = await fetch('/api/admin/subscriptions?includeStats=true')
-                    if (refreshResponse.ok) {
-                      const data = await refreshResponse.json()
-                      setSubscriptions(data.subscriptions || [])
-                      setStats(data.stats || null)
-                    }
+                    await loadBillingData()
                     
                     setExtendModalOpen(false)
                     setExtendDuration('')
@@ -801,9 +881,9 @@ export default function PaymentsPage() {
             {/* Header */}
             <div className="flex flex-col gap-3">
               <h2 className="text-xl font-semibold text-[#f04438] uppercase tracking-wide">REVOKE SUBSCRIPTION</h2>
-              <h3 className="text-2xl font-semibold text-black">You&apos;re about to cancel this user&apos;s subscription</h3>
+              <h3 className="text-2xl font-semibold text-black">Subscription revoke is not available</h3>
               <p className="text-base text-[#717171]">
-                Once the subscription is canceled, the user will lose access to the FahampPesa Pro Features
+                The backend billing API does not currently expose a subscription cancel/revoke endpoint. This action is disabled until that endpoint exists.
               </p>
             </div>
 
@@ -865,55 +945,17 @@ export default function PaymentsPage() {
               </button>
               <button
                 onClick={async () => {
-                  if (!selectedSubscription || !user?.uid) return
-                  
-                  try {
-                    setIsActionLoading(true)
-                    const response = await fetch('/api/admin/subscriptions/revoke', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        subscriptionId: selectedSubscription.id,
-                        adminId: user.uid,
-                        reason: 'Revoked by admin'
-                      })
-                    })
-                    
-                    if (!response.ok) {
-                      const error = await response.json()
-                      throw new Error(error.error || 'Failed to revoke subscription')
-                    }
-                    
-                    toast({
-                      title: 'Subscription Revoked',
-                      description: `Subscription for ${selectedSubscription.email} has been cancelled`
-                    })
-                    
-                    // Refresh subscriptions
-                    const refreshResponse = await fetch('/api/admin/subscriptions?includeStats=true')
-                    if (refreshResponse.ok) {
-                      const data = await refreshResponse.json()
-                      setSubscriptions(data.subscriptions || [])
-                      setStats(data.stats || null)
-                    }
-                    
-                    setRevokeModalOpen(false)
-                    setSelectedSubscription(null)
-                  } catch (error) {
-                    console.error('Error revoking subscription:', error)
-                    toast({
-                      title: 'Error',
-                      description: error instanceof Error ? error.message : 'Failed to revoke subscription',
-                      variant: 'destructive'
-                    })
-                  } finally {
-                    setIsActionLoading(false)
-                  }
+                  toast({
+                    title: 'Unavailable',
+                    description: 'The backend does not support subscription revoke yet.',
+                    variant: 'destructive'
+                  })
+                  setRevokeModalOpen(false)
+                  setSelectedSubscription(null)
                 }}
-                disabled={isActionLoading}
-                className="flex h-12 items-center justify-center rounded-lg bg-[#f04438] px-6 py-3 text-base font-bold text-white transition-colors hover:bg-[#d63b2f] disabled:opacity-50"
+                className="flex h-12 items-center justify-center rounded-lg bg-[#717171] px-6 py-3 text-base font-bold text-white"
               >
-                {isActionLoading ? 'Cancelling...' : 'Cancel Subscription'}
+                Action unavailable
               </button>
             </div>
           </div>

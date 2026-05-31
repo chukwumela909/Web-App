@@ -7,12 +7,11 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import Image from 'next/image'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
-import { collection, query, where, getDocs } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
 import {
   getBackendBillingHistory,
+  getBackendBillingReceipt,
   getBackendSubscription,
-  isBackendAvailable,
+  type BackendSubscriptionRecord,
 } from '@/lib/backend-business-api'
 
 interface SubscriptionHistory {
@@ -35,6 +34,7 @@ function PaymentsPageContent() {
   const [subscriptions, setSubscriptions] = useState<SubscriptionHistory[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentPlan, setCurrentPlan] = useState<'free' | 'monthly' | 'yearly'>('free')
+  const [receiptLoadingId, setReceiptLoadingId] = useState<string | null>(null)
 
   const parseDate = (value: any): Date | null => {
     if (!value) return null
@@ -45,64 +45,23 @@ function PaymentsPageContent() {
     return null
   }
 
-  const rowsFrom = (value: any): any[] => {
-    if (Array.isArray(value)) return value
-    if (Array.isArray(value?.history)) return value.history
-    if (Array.isArray(value?.payments)) return value.payments
-    if (Array.isArray(value?.subscriptions)) return value.subscriptions
-    if (Array.isArray(value?.items)) return value.items
-    if (Array.isArray(value?.results)) return value.results
-    if (Array.isArray(value?.data)) return value.data
-    return []
-  }
-
-  const normalizeSubscription = (row: any): SubscriptionHistory => {
-    const planType = row.planType || row.plan || row.subscriptionPlan || 'monthly'
-    const status = String(row.status || row.subscriptionStatus || 'pending').toLowerCase()
+  const normalizeSubscription = (row: BackendSubscriptionRecord): SubscriptionHistory => {
+    const planType = row.planType || 'monthly'
+    const status = String(row.status || 'pending').toLowerCase()
 
     return {
-      id: String(row.id || row._id || row.subscriptionId || row.paymentId || crypto.randomUUID()),
-      planName: row.planName || (planType === 'yearly' ? '1 Year Pro Plan' : '1 Month Pro Plan'),
+      id: row.id,
+      planName: planType === 'yearly' ? '1 Year Pro Plan' : '1 Month Pro Plan',
       planType: planType === 'yearly' ? 'yearly' : 'monthly',
-      amount: Number(row.amount || row.total || row.price || 0),
+      amount: Number(row.amount || 0),
       currency: row.currency || currency,
       status: ['active', 'expired', 'failed', 'pending', 'cancelled'].includes(status)
         ? status as SubscriptionHistory['status']
         : 'pending',
-      startDate: parseDate(row.startDate || row.startedAt || row.paidAt),
-      endDate: parseDate(row.endDate || row.endsAt || row.subscriptionEndsAt || row.expiresAt),
-      createdAt: parseDate(row.createdAt || row.initiatedAt || row.paidAt) || new Date()
+      startDate: parseDate(row.startDate),
+      endDate: parseDate(row.endDate),
+      createdAt: parseDate(row.createdAt) || new Date()
     }
-  }
-
-  const fetchSubscriptionsFromFirestore = async () => {
-    const subscriptionsRef = collection(db, 'subscriptions')
-    // Simple query without orderBy to avoid index requirement
-    const q = query(
-      subscriptionsRef,
-      where('userId', '==', user!.uid)
-    )
-
-    const snapshot = await getDocs(q)
-    const subs: SubscriptionHistory[] = []
-
-    snapshot.forEach((doc) => {
-      const data = doc.data()
-
-      subs.push({
-        id: doc.id,
-        planName: data.planName || (data.planType === 'yearly' ? '1 Year Pro Plan' : '1 Month Pro Plan'),
-        planType: data.planType || 'monthly',
-        amount: data.amount || 0,
-        currency: data.currency || currency,
-        status: data.status || 'pending',
-        startDate: parseDate(data.startDate),
-        endDate: parseDate(data.endDate),
-        createdAt: parseDate(data.createdAt) || new Date()
-      })
-    })
-
-    return subs
   }
 
   // Fetch user's subscription history
@@ -114,26 +73,17 @@ function PaymentsPageContent() {
       }
 
       try {
-        let subs: SubscriptionHistory[] = []
+        const [history, subscription] = await Promise.all([
+          getBackendBillingHistory(),
+          getBackendSubscription(),
+        ])
+        const subs = history.map(normalizeSubscription)
 
-        if (isBackendAvailable()) {
-          try {
-            const [history, subscription] = await Promise.all([
-              getBackendBillingHistory(),
-              getBackendSubscription(),
-            ])
-            subs = rowsFrom(history).map(normalizeSubscription)
-
-            const current = normalizeSubscription(subscription?.subscription || subscription)
-            if (current.id && current.status === 'active' && !subs.some(sub => sub.id === current.id)) {
-              subs.push(current)
-            }
-          } catch (error) {
-            console.warn('Backend billing history unavailable, falling back to Firestore:', error)
-            subs = await fetchSubscriptionsFromFirestore()
+        if (subscription.subscription) {
+          const current = normalizeSubscription(subscription.subscription)
+          if (current.id && !subs.some(sub => sub.id === current.id)) {
+            subs.push(current)
           }
-        } else {
-          subs = await fetchSubscriptionsFromFirestore()
         }
 
         // Sort by createdAt descending (newest first)
@@ -160,6 +110,36 @@ function PaymentsPageContent() {
 
   const handleUpgradePlan = () => {
     router.push('/dashboard/pricing')
+  }
+
+  const handleViewReceipt = async (subscriptionId: string) => {
+    try {
+      setReceiptLoadingId(subscriptionId)
+      const receipt = await getBackendBillingReceipt(subscriptionId)
+      const receiptWindow = window.open('', '_blank', 'noopener,noreferrer')
+      if (!receiptWindow) return
+      receiptWindow.document.write(`
+        <html>
+          <head><title>Receipt ${receipt.receiptNumber || receipt.subscriptionId}</title></head>
+          <body style="font-family: Arial, sans-serif; padding: 32px; color: #111827;">
+            <h1>FahamPesa Subscription Receipt</h1>
+            <p><strong>Receipt:</strong> ${receipt.receiptNumber || '-'}</p>
+            <p><strong>Subscription:</strong> ${receipt.subscriptionId}</p>
+            <p><strong>Plan:</strong> ${receipt.planType}</p>
+            <p><strong>Amount:</strong> ${receipt.currency} ${receipt.amount.toLocaleString()}</p>
+            <p><strong>Status:</strong> ${receipt.status}</p>
+            <p><strong>Transaction:</strong> ${receipt.transactionId || '-'}</p>
+            <p><strong>Start:</strong> ${receipt.startDate ? new Date(receipt.startDate).toLocaleDateString() : '-'}</p>
+            <p><strong>End:</strong> ${receipt.endDate ? new Date(receipt.endDate).toLocaleDateString() : '-'}</p>
+          </body>
+        </html>
+      `)
+      receiptWindow.document.close()
+    } catch (error) {
+      console.error('Error loading receipt:', error)
+    } finally {
+      setReceiptLoadingId(null)
+    }
   }
 
   const formatDate = (date: Date | null) => {
@@ -356,6 +336,11 @@ function PaymentsPageContent() {
                   Status
                 </p>
               </div>
+              <div className="flex flex-1 gap-[10px] items-center p-[10px] rounded-[4px]">
+                <p className="font-dm-sans font-normal text-[16px] text-[#717171]">
+                  Receipt
+                </p>
+              </div>
             </div>
 
             {/* Loading State */}
@@ -413,6 +398,15 @@ function PaymentsPageContent() {
                         </p>
                       </div>
                     </div>
+                  </div>
+                  <div className="flex flex-1 gap-[10px] items-center p-[10px] rounded-[4px]">
+                    <button
+                      onClick={() => handleViewReceipt(sub.id)}
+                      disabled={receiptLoadingId === sub.id}
+                      className="text-[#004AAD] text-sm font-semibold hover:underline disabled:text-[#717171]"
+                    >
+                      {receiptLoadingId === sub.id ? 'Loading...' : 'View'}
+                    </button>
                   </div>
                 </div>
               )

@@ -1,16 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
+import { useAuth } from '@/contexts/AuthContext'
+import { getBackendBillingPlans, type BackendBillingPlans } from '@/lib/backend-business-api'
 
 function PricingPageContent() {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
+    const [plans, setPlans] = useState<BackendBillingPlans | null>(null)
     const { currency, isLoading } = useCurrency()
+    const { user } = useAuth()
     const router = useRouter()
+
+    useEffect(() => {
+        if (!user) return
+        getBackendBillingPlans()
+            .then(setPlans)
+            .catch((error) => console.warn('Unable to load backend billing plans:', error))
+    }, [user])
 
     const handleGetPro = () => {
         router.push(`/dashboard/subscription/checkout?plan=${billingCycle}&currency=${currency}`)
@@ -18,6 +29,10 @@ function PricingPageContent() {
 
     // Get price based on currency and billing cycle
     const getPrice = () => {
+        const region = currency === 'KSH' ? 'kenya' : 'other'
+        const backendAmount = plans?.[billingCycle]?.[region]?.amount
+        if (typeof backendAmount === 'number') return backendAmount.toLocaleString()
+
         if (currency === 'KSH') {
             return billingCycle === 'monthly' ? '2,000' : '20,000'
         } else {

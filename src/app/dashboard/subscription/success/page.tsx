@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getCurrencySymbol } from '@/hooks/useCurrency'
+import { useAuth } from '@/contexts/AuthContext'
 
 // Loading component for Suspense fallback
 function LoadingState() {
@@ -19,6 +20,7 @@ function LoadingState() {
 function SuccessContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
+    const { refreshBackendSession } = useAuth()
     const [countdown, setCountdown] = useState(5)
 
     const plan = searchParams.get('plan') || 'yearly'
@@ -28,6 +30,10 @@ function SuccessContent() {
     const currencySymbol = getCurrencySymbol(currency)
 
     useEffect(() => {
+        refreshBackendSession().catch((error) => {
+            console.warn('Unable to refresh subscription session after checkout:', error)
+        })
+
         const timer = setInterval(() => {
             setCountdown((prev) => {
                 if (prev <= 1) {
@@ -40,7 +46,7 @@ function SuccessContent() {
         }, 1000)
 
         return () => clearInterval(timer)
-    }, [router])
+    }, [router, refreshBackendSession])
 
     return (
         <div className="min-h-screen h-full bg-[#F8F8F9]">

@@ -267,54 +267,10 @@ export default function UsersPage() {
           break
           
         case 'activate-subscription':
-          const activateResponse = await fetch('/api/admin/subscriptions/set-subscribed', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              userId: selectedUser.id,
-              email: selectedUser.email,
-              isSubscribed: true
-            })
-          })
-          
-          if (activateResponse.ok) {
-            toast({
-              title: 'Success',
-              description: `Subscription activated for ${selectedUser.email}`,
-              variant: 'success'
-            })
-          } else {
-            const errorData = await activateResponse.json().catch(() => ({ error: 'Unknown error' }))
-            throw new Error(errorData.error || 'Failed to activate subscription')
-          }
-          break
+          throw new Error('Use Payments & Subscriptions to manually activate backend subscriptions.')
           
         case 'revoke-subscription':
-          const revokeResponse = await fetch('/api/admin/subscriptions/set-subscribed', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              userId: selectedUser.id,
-              email: selectedUser.email,
-              isSubscribed: false
-            })
-          })
-          
-          if (revokeResponse.ok) {
-            toast({
-              title: 'Subscription Revoked',
-              description: `Subscription revoked for ${selectedUser.email}`,
-              variant: 'success'
-            })
-          } else {
-            const errorData = await revokeResponse.json().catch(() => ({ error: 'Unknown error' }))
-            throw new Error(errorData.error || 'Failed to revoke subscription')
-          }
-          break
+          throw new Error('The backend does not support subscription revoke yet.')
           
         case 'delete':
           console.log('Attempting to delete user:', selectedUser.id, selectedUser.email)
@@ -423,27 +379,9 @@ export default function UsersPage() {
             await userManagementActions.resetPassword(user.email)
             break
           case 'activate-subscription':
-            const bulkActivateResponse = await fetch('/api/admin/subscriptions/set-subscribed', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: user.id, email: user.email, isSubscribed: true })
-            })
-            if (!bulkActivateResponse.ok) {
-              const errorData = await bulkActivateResponse.json().catch(() => ({ error: 'Unknown error' }))
-              throw new Error(`Failed to activate subscription for ${user.email}: ${errorData.error}`)
-            }
-            break
+            throw new Error('Use Payments & Subscriptions to manually activate backend subscriptions.')
           case 'revoke-subscription':
-            const bulkRevokeResponse = await fetch('/api/admin/subscriptions/set-subscribed', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: user.id, email: user.email, isSubscribed: false })
-            })
-            if (!bulkRevokeResponse.ok) {
-              const errorData = await bulkRevokeResponse.json().catch(() => ({ error: 'Unknown error' }))
-              throw new Error(`Failed to revoke subscription for ${user.email}: ${errorData.error}`)
-            }
-            break
+            throw new Error('The backend does not support subscription revoke yet.')
           case 'disable':
             const disableResponse = await fetch(`/api/admin/users/${user.id}/disable`, {
               method: 'POST',

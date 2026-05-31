@@ -23,6 +23,115 @@ const SELECTED_BRANCH_KEY = 'fahampesa:selectedBranchId'
 
 type AnyRecord = Record<string, any>
 
+export type BackendPlanType = 'monthly' | 'yearly'
+export type BackendSubscriptionStatus = 'pending' | 'active' | 'expired' | 'failed' | 'cancelled'
+export type BackendBillingCurrency = 'KSH' | 'USD'
+
+export interface BackendPlanPrice {
+  amount: number
+  currency: BackendBillingCurrency
+}
+
+export interface BackendBillingPlans {
+  monthly: {
+    kenya: BackendPlanPrice
+    other: BackendPlanPrice
+  }
+  yearly: {
+    kenya: BackendPlanPrice
+    other: BackendPlanPrice
+  }
+}
+
+export interface BackendSubscriptionRecord {
+  id: string
+  businessAccountId?: string | null
+  userId?: string | null
+  provider?: 'mpesa' | 'stripe' | 'manual' | string
+  planType: BackendPlanType
+  status: BackendSubscriptionStatus
+  amount: number
+  currency: BackendBillingCurrency
+  checkoutRequestId?: string | null
+  merchantRequestId?: string | null
+  stripeCheckoutSessionId?: string | null
+  transactionId?: string | null
+  phoneNumber?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  receiptNumber?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export interface BackendCurrentSubscription {
+  account: {
+    planTier?: 'free' | 'paid' | string
+    planType?: BackendPlanType | 'manual' | null
+    subscriptionStatus?: BackendSubscriptionStatus | 'none' | string
+    subscriptionEndsAt?: string | null
+    billingRegion?: 'KENYA' | 'OTHER' | string | null
+  }
+  subscription: BackendSubscriptionRecord | null
+}
+
+export interface BackendCheckoutStatus {
+  subscriptionId: string
+  status: BackendSubscriptionStatus
+  transactionId: string | null
+  planType: BackendPlanType
+  amount: number
+  currency: BackendBillingCurrency
+}
+
+export interface BackendBillingReceipt {
+  receiptNumber?: string | null
+  subscriptionId: string
+  provider?: string
+  planType: BackendPlanType
+  amount: number
+  currency: BackendBillingCurrency
+  transactionId?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  status: BackendSubscriptionStatus
+}
+
+export interface BackendMpesaCheckoutResponse {
+  provider: 'mpesa'
+  subscription: BackendSubscriptionRecord
+  checkout: {
+    checkoutRequestId: string
+    merchantRequestId: string
+    responseCode?: string
+    responseDescription?: string
+    customerMessage?: string
+  }
+}
+
+export interface BackendStripeCheckoutResponse {
+  provider: 'stripe'
+  subscription: BackendSubscriptionRecord
+  checkout: {
+    sessionId: string
+    url: string | null
+  }
+}
+
+export interface BackendAdminPaymentEvent {
+  id: string
+  provider: 'mpesa' | 'stripe' | 'manual' | string
+  eventId?: string | null
+  businessAccountId?: string | null
+  subscriptionId?: string | null
+  eventType: string
+  rawPayload?: unknown
+  processingStatus: 'received' | 'processed' | 'failed' | 'ignored' | string
+  errorMessage?: string | null
+  processedAt?: string | null
+  createdAt?: string | null
+}
+
 export function isBackendAvailable() {
   return Boolean(auth.currentUser)
 }
@@ -56,6 +165,60 @@ function listFrom<T = AnyRecord>(value: any, keys: string[] = []): T[] {
 
 function idOf(value: AnyRecord) {
   return String(value.id || value._id || value.productId || value.branchId || value.saleId || value.debtorId || '')
+}
+
+function statusOf(value: unknown): BackendSubscriptionStatus {
+  const status = String(value || 'pending').toLowerCase()
+  if (['pending', 'active', 'expired', 'failed', 'cancelled'].includes(status)) return status as BackendSubscriptionStatus
+  return 'pending'
+}
+
+function planTypeOf(value: unknown): BackendPlanType {
+  return value === 'yearly' ? 'yearly' : 'monthly'
+}
+
+function currencyOf(value: unknown): BackendBillingCurrency {
+  return value === 'USD' ? 'USD' : 'KSH'
+}
+
+function normalizeSubscriptionRecord(value: AnyRecord | null | undefined): BackendSubscriptionRecord | null {
+  if (!value) return null
+  return {
+    ...value,
+    id: String(value.id || value._id || value.subscriptionId || ''),
+    businessAccountId: value.businessAccountId ? String(value.businessAccountId) : null,
+    userId: value.userId ? String(value.userId) : null,
+    planType: planTypeOf(value.planType),
+    status: statusOf(value.status || value.subscriptionStatus),
+    amount: Number(value.amount || 0),
+    currency: currencyOf(value.currency),
+    checkoutRequestId: value.checkoutRequestId ?? null,
+    merchantRequestId: value.merchantRequestId ?? null,
+    stripeCheckoutSessionId: value.stripeCheckoutSessionId ?? null,
+    transactionId: value.transactionId ?? null,
+    phoneNumber: value.phoneNumber ?? null,
+    startDate: value.startDate ?? value.startedAt ?? null,
+    endDate: value.endDate ?? value.endsAt ?? value.subscriptionEndsAt ?? null,
+    receiptNumber: value.receiptNumber ?? null,
+    createdAt: value.createdAt ?? null,
+    updatedAt: value.updatedAt ?? null
+  }
+}
+
+function normalizeAdminPaymentEvent(value: AnyRecord): BackendAdminPaymentEvent {
+  return {
+    ...value,
+    id: String(value.id || value._id || value.eventObjectId || ''),
+    provider: value.provider || 'manual',
+    eventId: value.eventId ?? null,
+    businessAccountId: value.businessAccountId ? String(value.businessAccountId) : null,
+    subscriptionId: value.subscriptionId ? String(value.subscriptionId) : null,
+    eventType: value.eventType || value.type || 'payment.event',
+    processingStatus: value.processingStatus || value.status || 'received',
+    errorMessage: value.errorMessage ?? null,
+    processedAt: value.processedAt ?? null,
+    createdAt: value.createdAt ?? null
+  }
 }
 
 function normalizeProductImages(images: unknown, legacyImageUrl?: string | null): ProductImage[] {
@@ -1082,34 +1245,80 @@ export async function updateBackendSettings(settings: AnyRecord) {
   })
 }
 
-export async function getBackendSubscription() {
-  return api<AnyRecord>('/billing/subscription')
+export async function getBackendSubscription(): Promise<BackendCurrentSubscription> {
+  const result = await api<AnyRecord>('/billing/subscription')
+  return {
+    account: result.account ?? {},
+    subscription: normalizeSubscriptionRecord(result.subscription)
+  }
 }
 
-export async function getBackendBillingPlans() {
-  return api<AnyRecord>('/billing/plans')
+export async function getBackendBillingPlans(): Promise<BackendBillingPlans> {
+  return api<BackendBillingPlans>('/billing/plans')
 }
 
-export async function getBackendBillingHistory() {
-  return api<AnyRecord>('/billing/history')
+export async function getBackendBillingHistory(): Promise<BackendSubscriptionRecord[]> {
+  return listFrom<AnyRecord>(await api('/billing/history')).map(normalizeSubscriptionRecord).filter(Boolean) as BackendSubscriptionRecord[]
 }
 
-export async function getBackendBillingReceipt(subscriptionId: string) {
-  return api<AnyRecord>(`/billing/receipts/${subscriptionId}`)
+export async function getBackendBillingReceipt(subscriptionId: string): Promise<BackendBillingReceipt> {
+  const result = await api<AnyRecord>(`/billing/receipts/${subscriptionId}`)
+  return {
+    receiptNumber: result.receiptNumber ?? null,
+    subscriptionId: String(result.subscriptionId || result.id || subscriptionId),
+    provider: result.provider,
+    planType: planTypeOf(result.planType),
+    amount: Number(result.amount || 0),
+    currency: currencyOf(result.currency),
+    transactionId: result.transactionId ?? null,
+    startDate: result.startDate ?? null,
+    endDate: result.endDate ?? null,
+    status: statusOf(result.status)
+  }
 }
 
-export async function startBackendMpesaCheckout(planType: 'monthly' | 'yearly', phoneNumber: string) {
-  return api<AnyRecord>('/billing/mpesa/stk-push', {
+export async function getBackendCheckoutStatus(subscriptionId: string): Promise<BackendCheckoutStatus> {
+  const result = await api<AnyRecord>(`/billing/checkout-status/${subscriptionId}`)
+  return {
+    subscriptionId: String(result.subscriptionId || subscriptionId),
+    status: statusOf(result.status),
+    transactionId: result.transactionId ?? null,
+    planType: planTypeOf(result.planType),
+    amount: Number(result.amount || 0),
+    currency: currencyOf(result.currency)
+  }
+}
+
+export async function startBackendMpesaCheckout(planType: BackendPlanType, phoneNumber: string): Promise<BackendMpesaCheckoutResponse> {
+  const result = await api<AnyRecord>('/billing/mpesa/stk-push', {
     method: 'POST',
     body: JSON.stringify({ planType, phoneNumber })
   })
+  const subscription = normalizeSubscriptionRecord(result.subscription)
+  if (!subscription) throw new Error('Backend did not return a subscription for M-Pesa checkout.')
+  return {
+    provider: 'mpesa',
+    subscription,
+    checkout: result.checkout ?? {}
+  }
 }
 
-export async function startBackendStripeCheckout(planType: 'monthly' | 'yearly', successUrl: string, cancelUrl: string) {
-  return api<AnyRecord>('/billing/stripe/checkout-session', {
+export async function startBackendStripeCheckout(planType: BackendPlanType, successUrl?: string, cancelUrl?: string): Promise<BackendStripeCheckoutResponse> {
+  const result = await api<AnyRecord>('/billing/stripe/checkout-session', {
     method: 'POST',
-    body: JSON.stringify({ planType, successUrl, cancelUrl })
+    body: JSON.stringify({
+      planType,
+      ...(successUrl ? { successUrl } : {}),
+      ...(cancelUrl ? { cancelUrl } : {})
+    })
   })
+  const subscription = normalizeSubscriptionRecord(result.subscription)
+  if (!subscription) throw new Error('Backend did not return a subscription for Stripe checkout.')
+  return {
+    provider: 'stripe',
+    subscription,
+    checkout: result.checkout ?? {}
+  }
 }
 
 export async function searchBackendAdminBusinesses(params?: { q?: string; status?: string }) {
@@ -1144,18 +1353,22 @@ export async function extendBackendAdminSubscription(businessAccountId: string, 
 
 export async function manuallyActivateBackendAdminSubscription(
   businessAccountId: string,
-  planType: 'monthly' | 'yearly',
+  planType: BackendPlanType,
   days?: number,
   reason?: string
 ) {
-  return api<AnyRecord>(`/admin/businesses/${businessAccountId}/subscriptions/manual-activate`, {
+  const result = await api<AnyRecord>(`/admin/businesses/${businessAccountId}/subscriptions/manual-activate`, {
     method: 'POST',
     body: JSON.stringify({ planType, days, reason })
   })
+  return {
+    account: result.account ?? null,
+    subscription: normalizeSubscriptionRecord(result.subscription)
+  }
 }
 
 export async function retryBackendAdminPaymentEvent(eventId: string) {
-  return api<AnyRecord>(`/admin/payment-events/${eventId}/retry`, { method: 'POST' })
+  return normalizeAdminPaymentEvent(await api<AnyRecord>(`/admin/payment-events/${eventId}/retry`, { method: 'POST' }))
 }
 
 export async function getBackendAdminAuditLogs() {
@@ -1163,5 +1376,5 @@ export async function getBackendAdminAuditLogs() {
 }
 
 export async function getBackendAdminPayments() {
-  return listFrom<AnyRecord>(await api('/admin/payments'), ['payments', 'events'])
+  return listFrom<AnyRecord>(await api('/admin/payments'), ['payments', 'events']).map(normalizeAdminPaymentEvent)
 }

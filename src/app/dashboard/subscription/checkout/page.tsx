@@ -1,15 +1,16 @@
 'use client'
 
-import { useState, Suspense, useEffect } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/contexts/AuthContext'
 import { getCurrencySymbol, useCurrency } from '@/hooks/useCurrency'
 import {
-    getBackendSubscription,
+    getBackendCheckoutStatus,
     startBackendMpesaCheckout,
     startBackendStripeCheckout,
 } from '@/lib/backend-business-api'
+import { isBackendApiError } from '@/lib/backend-api'
 
 // Loading component for Suspense fallback
 function LoadingState() {
@@ -24,7 +25,7 @@ function LoadingState() {
 function CheckoutContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const { user } = useAuth()
+    const { user, refreshBackendSession } = useAuth()
     const { country, isLoading: isCurrencyLoading } = useCurrency()
 
     // Determine if user is in Kenya
@@ -40,7 +41,8 @@ function CheckoutContent() {
     const MAX_POLL_ATTEMPTS = 30 // Poll for up to 60 seconds (30 attempts * 2 seconds)
 
     // Get plan details from URL params
-    const plan = searchParams.get('plan') || 'yearly' // monthly or yearly
+    const requestedPlan = searchParams.get('plan')
+    const plan = requestedPlan === 'monthly' || requestedPlan === 'yearly' ? requestedPlan : 'yearly'
     const currency = searchParams.get('currency') || 'USD' // Default to USD
 
     // Calculate amount based on plan and currency
@@ -122,26 +124,23 @@ function CheckoutContent() {
         setError('')
 
         try {
-            const data = await startBackendMpesaCheckout(plan as 'monthly' | 'yearly', phoneNumber)
-            const initiated =
-                data.ResponseCode === '0' ||
-                data.success === true ||
-                Boolean(data.checkoutRequestId || data.subscriptionId || data.paymentId)
+            const data = await startBackendMpesaCheckout(plan, phoneNumber)
+            const initiated = data.checkout.responseCode === '0' || Boolean(data.checkout.checkoutRequestId)
 
-            if (initiated) {
+            if (initiated && data.subscription.id) {
                 // STK push sent successfully - now poll for payment confirmation
-                const subscriptionId = data.subscriptionId || data.paymentId || data.checkoutRequestId || 'pending'
+                const subscriptionId = data.subscription.id
 
                 setIsWaitingConfirmation(true)
                 setPollCount(0)
                 pollPaymentStatus(subscriptionId)
             } else {
-                setError(data.errorMessage || data.ResponseDescription || 'Payment failed. Please try again.')
+                setError(data.checkout.responseDescription || 'Payment failed. Please try again.')
                 setIsProcessing(false)
             }
         } catch (error) {
             console.error('Payment error:', error)
-            setError('An error occurred. Please try again.')
+            setError(isBackendApiError(error) ? error.message : 'An error occurred. Please try again.')
             setIsProcessing(false)
         }
     }
@@ -151,10 +150,11 @@ function CheckoutContent() {
 
         const poll = async () => {
             try {
-                const data = await getBackendSubscription()
-                const status = String(data.status || data.subscriptionStatus || data.subscription?.status || '').toLowerCase()
+                const data = await getBackendCheckoutStatus(subscriptionId)
+                const status = data.status
 
-                if (status === 'active' || status === 'paid') {
+                if (status === 'active') {
+                    await refreshBackendSession()
                     // Payment successful - redirect to success page
                     router.push(`/dashboard/subscription/success?plan=${plan}&amount=${amount}&currency=${currency}&subscriptionId=${subscriptionId}`)
                     return
@@ -211,24 +211,23 @@ function CheckoutContent() {
         setError('')
 
         try {
-            const origin = window.location.origin
             const data = await startBackendStripeCheckout(
-                plan as 'monthly' | 'yearly',
-                `${origin}/dashboard/subscription/success?plan=${plan}&amount=${amount}&currency=USD`,
+                plan,
+                undefined,
                 window.location.href
             )
-            const checkoutUrl = data.url || data.sessionUrl || data.checkoutUrl
+            const checkoutUrl = data.checkout.url
 
             if (checkoutUrl) {
                 // Redirect to Stripe Checkout
                 window.location.href = checkoutUrl
             } else {
-                setError(data.error || 'Failed to create checkout session. Please try again.')
+                setError('Failed to create checkout session. Please try again.')
                 setIsProcessing(false)
             }
         } catch (error) {
             console.error('Stripe checkout error:', error)
-            setError('An error occurred. Please try again.')
+            setError(isBackendApiError(error) ? error.message : 'An error occurred. Please try again.')
             setIsProcessing(false)
         }
     }
