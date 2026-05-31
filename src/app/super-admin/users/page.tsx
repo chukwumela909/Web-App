@@ -47,12 +47,14 @@ import {
   Crown
 } from 'lucide-react'
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
 import { userManagementActions, isUserDisabled, getCleanDisplayName } from '@/lib/firebase-admin'
 import { useToast } from '@/hooks/use-toast'
 import UserMetricsService from '@/lib/user-metrics-service'
 import { handleError } from '@/lib/error-handler'
+import { request } from '@/lib/backend-api'
 import {
+  getBackendAdminBusiness,
   manuallyActivateBackendAdminSubscription,
   searchBackendAdminBusinesses,
   type BackendPlanType,
@@ -83,8 +85,23 @@ function userEmailOf(user: User) {
   return user.email && user.email !== 'No email' ? user.email.trim().toLowerCase() : ''
 }
 
+function stringValue(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : ''
+}
+
 function getBusinessAccountId(business: Record<string, any>) {
   return String(business.id || business._id || business.businessAccountId || '')
+}
+
+function getUserBusinessAccountId(user: User) {
+  const data = user.firestoreData || {}
+  return stringValue(data.businessAccountId)
+    || stringValue(data.backendBusinessAccountId)
+    || stringValue(data.businessId)
+    || stringValue(data.accountId)
+    || stringValue(data.business?.id)
+    || stringValue(data.business?._id)
+    || stringValue(data.business?.businessAccountId)
 }
 
 function getBusinessEmailCandidates(business: Record<string, any>) {
@@ -98,6 +115,78 @@ function getBusinessEmailCandidates(business: Record<string, any>) {
   ]
     .filter((value): value is string => typeof value === 'string')
     .map((value) => value.trim().toLowerCase())
+}
+
+function getBusinessUidCandidates(business: Record<string, any>) {
+  return [
+    business.firebaseUid,
+    business.ownerFirebaseUid,
+    business.createdByFirebaseUid,
+    business.createdByUid,
+    business.ownerUid,
+    business.userId,
+    business.ownerId,
+    business.createdById,
+    business.createdByUserId,
+    business.auth?.firebaseUid,
+    business.createdBy?.firebaseUid,
+    business.createdBy?.uid,
+    business.createdBy?.id,
+    business.owner?.firebaseUid,
+    business.owner?.uid,
+    business.owner?.id
+  ]
+    .map(stringValue)
+    .filter(Boolean)
+}
+
+function businessMatchesUser(business: Record<string, any>, user: User) {
+  const email = userEmailOf(user)
+  const businessAccountId = getUserBusinessAccountId(user)
+  const businessId = getBusinessAccountId(business)
+
+  return (
+    (email && getBusinessEmailCandidates(business).includes(email)) ||
+    (businessAccountId && businessId === businessAccountId) ||
+    getBusinessUidCandidates(business).includes(user.id)
+  )
+}
+
+function mapApiUser(user: any, source?: string): User {
+  return {
+    id: user.uid,
+    email: user.email || 'No email',
+    displayName: user.displayName || 'No name',
+    createdAt: user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date(),
+    lastActiveAt: user.lastActiveAt ? new Date(user.lastActiveAt) : user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime) : new Date(),
+    status: user.disabled ? 'disabled' : 'active',
+    isDisabled: user.disabled,
+    emailVerified: user.emailVerified || false,
+    region: user.region || 'Unknown',
+    firestoreData: user.firestoreData,
+    source: user.source || source,
+    isSubscribed: user.isSubscribed || false,
+    subscriptionId: user.subscriptionId || null,
+    subscriptionEndDate: user.subscriptionEndDate || null,
+    planType: user.planType || null,
+    businessName: user.businessName || null
+  }
+}
+
+function getSubscriptionEndDate(subscription?: Record<string, any> | null, account?: Record<string, any>) {
+  const value = subscription?.endDate
+    || subscription?.endsAt
+    || subscription?.subscriptionEndsAt
+    || account?.subscriptionEndsAt
+    || null
+
+  if (!value) return null
+  const time = new Date(value).getTime()
+  return Number.isFinite(time) ? time : null
+}
+
+function getPlanType(value: unknown): BackendPlanType | null {
+  return value === 'yearly' || value === 'monthly' ? value : null
 }
 
 export default function UsersPage() {
@@ -130,16 +219,145 @@ export default function UsersPage() {
   const { toast } = useToast()
   const searchInputRef = useRef<HTMLInputElement>(null)
 
+  const enrichUsersWithBackendSubscriptions = useCallback(async (baseUsers: User[]) => {
+    if (baseUsers.length === 0) return baseUsers
+
+    try {
+      const usersByEmail = new Map(
+        baseUsers
+          .map((user) => [userEmailOf(user), user] as const)
+          .filter(([email]) => Boolean(email))
+      )
+
+      if (usersByEmail.size === 0) return baseUsers
+
+      const businesses = await searchBackendAdminBusinesses()
+      const matchingBusinesses = businesses.filter((business) =>
+        baseUsers.some((user) => businessMatchesUser(business, user))
+      )
+
+      if (matchingBusinesses.length === 0) return baseUsers
+
+      const details = await Promise.all(
+        matchingBusinesses.map(async (business) => {
+          const id = getBusinessAccountId(business)
+          if (!id) return { business, detail: null }
+
+          try {
+            return { business, detail: await getBackendAdminBusiness(id) }
+          } catch (error) {
+            console.warn(`Unable to load backend subscription details for business ${id}:`, error)
+            return { business, detail: null }
+          }
+        })
+      )
+
+      const backendSubscriptionsByEmail = new Map<string, Partial<User>>()
+
+      details.forEach(({ business, detail }) => {
+        const account = detail?.account || business
+        const subscriptions = Array.isArray(detail?.subscriptions) ? detail.subscriptions : []
+        const activeSubscription = subscriptions.find((subscription: Record<string, any>) =>
+          String(subscription.status || subscription.subscriptionStatus || '').toLowerCase() === 'active'
+        )
+        const accountIsActive = String(account?.subscriptionStatus || '').toLowerCase() === 'active'
+
+        if (!activeSubscription && !accountIsActive) return
+
+        const subscriptionId = activeSubscription
+          ? String(activeSubscription.id || activeSubscription._id || activeSubscription.subscriptionId || '')
+          : null
+        const planType = getPlanType(activeSubscription?.planType) || getPlanType(account?.planType) || 'monthly'
+        const subscriptionEndDate = getSubscriptionEndDate(activeSubscription, account)
+
+        getBusinessEmailCandidates({
+          ...business,
+          ...account,
+          createdBy: account?.createdBy || business.createdBy,
+          owner: account?.owner || business.owner
+        }).forEach((email) => {
+          if (!usersByEmail.has(email)) return
+
+          backendSubscriptionsByEmail.set(email, {
+            isSubscribed: true,
+            subscriptionId,
+            subscriptionEndDate,
+            planType,
+            businessName: account?.businessName || account?.name || business.businessName || business.name || null
+          })
+        })
+
+        baseUsers.forEach((user) => {
+          if (!businessMatchesUser({ ...business, ...account }, user)) return
+
+          backendSubscriptionsByEmail.set(userEmailOf(user), {
+            isSubscribed: true,
+            subscriptionId,
+            subscriptionEndDate,
+            planType,
+            businessName: account?.businessName || account?.name || business.businessName || business.name || null
+          })
+        })
+      })
+
+      return baseUsers.map((user) => {
+        const backendSubscription = backendSubscriptionsByEmail.get(userEmailOf(user))
+        return backendSubscription ? { ...user, ...backendSubscription } : user
+      })
+    } catch (error) {
+      console.warn('Unable to enrich users with backend subscription status:', error)
+      return baseUsers
+    }
+  }, [])
+
+  const activateCurrentOwnerSubscription = async (targetUser: User) => {
+    const currentUser = auth.currentUser
+    if (!currentUser) {
+      throw new Error('No authenticated user is available for backend activation.')
+    }
+
+    const result = await request<Record<string, any>>('/billing/subscription/activate', {
+      user: currentUser,
+      method: 'POST'
+    })
+    const subscription = (result.subscription || result) as BackendSubscriptionRecord | null
+
+    markUserSubscriptionActive(targetUser.id, subscription, 'monthly')
+    return {
+      id: String(result.account?.id || result.account?._id || subscription?.businessAccountId || ''),
+      name: result.account?.businessName || result.account?.name || targetUser.businessName || targetUser.email
+    }
+  }
+
   const findBusinessAccountForUser = async (targetUser: User) => {
     const email = userEmailOf(targetUser)
     if (!email) {
       throw new Error('This user does not have an email address to match with a backend business account.')
     }
 
-    const businesses = await searchBackendAdminBusinesses({ q: email })
-    const matchingBusiness = businesses.find((business) =>
-      getBusinessEmailCandidates(business).includes(email)
-    ) || (businesses.length === 1 ? businesses[0] : null)
+    const knownBusinessAccountId = getUserBusinessAccountId(targetUser)
+    if (knownBusinessAccountId) {
+      return {
+        id: knownBusinessAccountId,
+        name: targetUser.businessName || targetUser.email
+      }
+    }
+
+    const exactBusinesses = await searchBackendAdminBusinesses({ q: email })
+    const matchingExactBusiness = exactBusinesses.find((business) =>
+      businessMatchesUser(business, targetUser)
+    ) || (exactBusinesses.length === 1 ? exactBusinesses[0] : null)
+
+    const exactBusinessAccountId = matchingExactBusiness ? getBusinessAccountId(matchingExactBusiness) : ''
+    if (exactBusinessAccountId) {
+      return {
+        id: exactBusinessAccountId,
+        name: matchingExactBusiness.businessName || matchingExactBusiness.name || targetUser.businessName || targetUser.email
+      }
+    }
+
+    const businesses = await searchBackendAdminBusinesses()
+    const matchingBusiness = businesses.find((business) => businessMatchesUser(business, targetUser))
 
     const businessAccountId = matchingBusiness ? getBusinessAccountId(matchingBusiness) : ''
     if (!businessAccountId) {
@@ -175,7 +393,27 @@ export default function UsersPage() {
   }
 
   const activateUserSubscription = async (targetUser: User) => {
+    const currentUser = auth.currentUser
+    const isCurrentOwner = currentUser && (
+      currentUser.uid === targetUser.id ||
+      currentUser.email?.trim().toLowerCase() === userEmailOf(targetUser)
+    )
+
+    let activatedWithOwnerEndpoint = false
     const businessAccount = await findBusinessAccountForUser(targetUser)
+      .catch((error) => {
+        if (isCurrentOwner) {
+          activatedWithOwnerEndpoint = true
+          return activateCurrentOwnerSubscription(targetUser)
+        }
+
+        throw error
+      })
+
+    if (activatedWithOwnerEndpoint) {
+      return businessAccount
+    }
+
     const result = await manuallyActivateBackendAdminSubscription(
       businessAccount.id,
       'monthly',
@@ -215,25 +453,9 @@ export default function UsersPage() {
         throw new Error(data.error || 'Failed to fetch users')
       }
       
-      const usersData: User[] = data.users.map((user: any) => ({
-        id: user.uid,
-        email: user.email || 'No email',
-        displayName: user.displayName || 'No name',
-        createdAt: user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date(),
-        lastActiveAt: user.lastActiveAt ? new Date(user.lastActiveAt) : user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime) : new Date(),
-        status: user.disabled ? 'disabled' : 'active',
-        isDisabled: user.disabled,
-        emailVerified: user.emailVerified || false,
-        region: user.region || 'Unknown',
-        firestoreData: user.firestoreData,
-        source: user.source || data.source,
-        // Subscription fields
-        isSubscribed: user.isSubscribed || false,
-        subscriptionId: user.subscriptionId || null,
-        subscriptionEndDate: user.subscriptionEndDate || null,
-        planType: user.planType || null,
-        businessName: user.businessName || null
-      }))
+      const usersData = await enrichUsersWithBackendSubscriptions(
+        data.users.map((user: any) => mapApiUser(user, data.source))
+      )
       
       setUsers(usersData)
       
@@ -257,7 +479,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, enrichUsersWithBackendSubscriptions])
 
   // Separate function for resetting to all users (to avoid circular dependency)
   const resetToAllUsers = useCallback(async () => {
@@ -271,25 +493,9 @@ export default function UsersPage() {
         throw new Error(data.error || 'Failed to fetch users')
       }
       
-      const usersData: User[] = data.users.map((user: any) => ({
-        id: user.uid,
-        email: user.email || 'No email',
-        displayName: user.displayName || 'No name',
-        createdAt: user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date(),
-        lastActiveAt: user.lastActiveAt ? new Date(user.lastActiveAt) : user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime) : new Date(),
-        status: user.disabled ? 'disabled' : 'active',
-        isDisabled: user.disabled,
-        emailVerified: user.emailVerified || false,
-        region: user.region || 'Unknown',
-        firestoreData: user.firestoreData,
-        source: user.source || data.source,
-        // Subscription fields
-        isSubscribed: user.isSubscribed || false,
-        subscriptionId: user.subscriptionId || null,
-        subscriptionEndDate: user.subscriptionEndDate || null,
-        planType: user.planType || null,
-        businessName: user.businessName || null
-      }))
+      const usersData = await enrichUsersWithBackendSubscriptions(
+        data.users.map((user: any) => mapApiUser(user, data.source))
+      )
       
       setUsers(usersData)
       
@@ -303,7 +509,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, enrichUsersWithBackendSubscriptions])
 
   // User action handlers
   const handleUserAction = async (user: User, action: 'reset' | 'disable' | 'delete' | 'activate-subscription' | 'revoke-subscription') => {
@@ -614,25 +820,9 @@ export default function UsersPage() {
       const data = await response.json()
       
       if (data.success) {
-        const usersData: User[] = data.users.map((user: any) => ({
-          id: user.uid,
-          email: user.email || 'No email',
-          displayName: user.displayName || 'No name',
-          createdAt: user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date(),
-          lastActiveAt: user.lastActiveAt ? new Date(user.lastActiveAt) : user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime) : new Date(),
-          status: user.disabled ? 'disabled' : 'active',
-          isDisabled: user.disabled,
-          emailVerified: user.emailVerified || false,
-          region: user.region || 'Unknown',
-          firestoreData: user.firestoreData,
-          source: user.source || data.source,
-          // Subscription fields
-          isSubscribed: user.isSubscribed || false,
-          subscriptionId: user.subscriptionId || null,
-          subscriptionEndDate: user.subscriptionEndDate || null,
-          planType: user.planType || null,
-          businessName: user.businessName || null
-        }))
+        const usersData = await enrichUsersWithBackendSubscriptions(
+          data.users.map((user: any) => mapApiUser(user, data.source))
+        )
         
         setUsers(usersData)
         setSearchResults(usersData.length)
@@ -668,7 +858,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast, resetToAllUsers])
+  }, [toast, resetToAllUsers, enrichUsersWithBackendSubscriptions])
 
   // Debounced search function
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null)
