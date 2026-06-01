@@ -170,6 +170,7 @@ function getBusinessUidCandidates(business: Record<string, any>) {
     business.createdByUid,
     business.ownerUid,
     business.userId,
+    business.createdBy,
     business.ownerId,
     business.createdById,
     business.createdByUserId,
@@ -295,9 +296,12 @@ function mapBackendUser(user: Record<string, any>): User {
     user.createdByUid,
     user.ownerUid,
     user.userId,
+    user.createdBy,
     user.ownerId,
+    user.owner,
     user.createdById,
     user.createdByUserId,
+    user.user,
     user.auth?.firebaseUid,
     user.createdBy?.firebaseUid,
     user.createdBy?.uid,
@@ -345,6 +349,71 @@ function mapBackendUser(user: Record<string, any>): User {
     subscriptionEndDate,
     planType,
     businessName: getFirstString(user.businessName, user.companyName, user.name) || undefined
+  }
+}
+
+async function fillMissingEmailsFromAuth(users: User[]) {
+  if (!users.some((user) => !userEmailOf(user))) return users
+
+  try {
+    const response = await fetch('/api/admin/firebase-auth-users?includeFirestore=true')
+    const data = await response.json()
+
+    if (!data.success || !Array.isArray(data.users)) return users
+
+    const authUsersById = new Map<string, any>(
+      data.users
+        .filter((authUser: any) => authUser?.uid)
+        .map((authUser: any) => [String(authUser.uid), authUser])
+    )
+    const authUsersByBusinessId = new Map<string, any>()
+
+    data.users.forEach((authUser: any) => {
+      const firestoreData = authUser?.firestoreData || {}
+      const businessIds = [
+        firestoreData.businessAccountId,
+        firestoreData.backendBusinessAccountId,
+        firestoreData.businessId,
+        firestoreData.accountId,
+        firestoreData.business?.id,
+        firestoreData.business?._id,
+        firestoreData.business?.businessAccountId
+      ]
+        .map(stringValue)
+        .filter(Boolean)
+
+      businessIds.forEach((businessId) => authUsersByBusinessId.set(businessId, authUser))
+    })
+
+    return users.map((user) => {
+      if (userEmailOf(user)) return user
+
+      const businessAccountId = getUserBusinessAccountId(user)
+      const firebaseUid = stringValue(user.firestoreData?.firebaseUid)
+        || stringValue(user.firestoreData?.uid)
+        || stringValue(user.firestoreData?.userId)
+        || stringValue(user.firestoreData?.createdBy)
+        || stringValue(user.firestoreData?.ownerId)
+        || user.id
+      const authUser = authUsersById.get(firebaseUid)
+        || (businessAccountId ? authUsersByBusinessId.get(businessAccountId) : null)
+      const email = normalizeEmail(authUser?.email)
+
+      if (!email) return user
+
+      return {
+        ...user,
+        id: authUser.uid || user.id,
+        email,
+        displayName: user.displayName && user.displayName !== 'No name'
+          ? user.displayName
+          : authUser.displayName || user.displayName,
+        emailVerified: authUser.emailVerified || user.emailVerified
+      }
+    })
+  } catch (error) {
+    console.warn('Unable to fill missing emails from Firebase Auth:', error)
+    return users
   }
 }
 
@@ -500,7 +569,8 @@ export default function UsersPage() {
       .map(mapBackendUser)
       .filter((user) => user.id || user.email !== 'No email')
 
-    const enrichedUsers = await enrichUsersWithBackendSubscriptions(mappedUsers, accountsWithDetails)
+    const usersWithEmails = await fillMissingEmailsFromAuth(mappedUsers)
+    const enrichedUsers = await enrichUsersWithBackendSubscriptions(usersWithEmails, accountsWithDetails)
 
     return enrichedUsers.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   }, [enrichUsersWithBackendSubscriptions])
