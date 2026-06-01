@@ -408,6 +408,15 @@ function ProductsPageContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!effectiveUserId) return
+    if (!editingProduct && productForm.images.length === 0) {
+      alert('Please upload at least one product image before adding this product.')
+      setCurrentStep('basic')
+      return
+    }
+    if (isUploading) {
+      alert('Please wait for product image upload to finish.')
+      return
+    }
 
     // Check product limit for new products only (not when editing)
     if (!editingProduct) {
@@ -567,6 +576,7 @@ function ProductsPageContent() {
     || branches.find(branch => branch.status === 'ACTIVE')?.currency
     || branches[0]?.currency
   const currencySymbol = getCurrencySymbol(selectedBranchCurrency || currency)
+  const hasRequiredProductImage = Boolean(editingProduct) || productForm.images.length > 0
 
   const nextStep = () => {
     if (currentStep === 'basic') setCurrentStep('pricing')
@@ -580,7 +590,7 @@ function ProductsPageContent() {
 
   const canProceedToNext = () => {
     if (currentStep === 'basic') {
-      return productForm.name.trim() !== '' && productForm.category !== ''
+      return productForm.name.trim() !== '' && productForm.category !== '' && hasRequiredProductImage && !isUploading
     }
     if (currentStep === 'pricing') {
       return productForm.sellingPrice !== '' && Number(productForm.sellingPrice) > 0
@@ -864,7 +874,7 @@ function ProductsPageContent() {
                             {/* Enhanced Product Images Upload */}
                             <div className="mb-6">
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Product Images <span className="text-gray-500">(Max 3 images)</span>
+                                Product Images <span className="text-red-500">*</span> <span className="text-gray-500">(Max 3 images)</span>
                               </label>
 
                               {/* Image Gallery */}
@@ -971,6 +981,11 @@ function ProductsPageContent() {
                               <p className="text-xs text-gray-500">
                                 Uploaded to Firebase Storage. First image will be used as the primary display image.
                               </p>
+                              {!editingProduct && !hasRequiredProductImage && !isUploading && (
+                                <p className="mt-2 text-xs font-medium text-red-600">
+                                  Upload at least one product image before continuing.
+                                </p>
+                              )}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1332,9 +1347,9 @@ function ProductsPageContent() {
                           ) : (
                             <button
                               type="submit"
-                              disabled={isUploading}
+                              disabled={isUploading || !hasRequiredProductImage}
                               className={`flex items-center px-6 py-2 rounded-lg transition-colors font-medium shadow-md ${
-                                isUploading
+                                isUploading || !hasRequiredProductImage
                                   ? 'bg-gray-400 text-white cursor-not-allowed'
                                   : 'bg-[#004AAD] text-white hover:bg-[#003a8c]'
                               }`}

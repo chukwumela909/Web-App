@@ -354,7 +354,12 @@ function SalesPOSContent() {
     }))
 
     return [...heldEntries, ...multiEntries, ...singleEntries]
-      .sort((a, b) => b.timestamp - a.timestamp)
+      .sort((a, b) => {
+        if (a.kind !== b.kind) {
+          return a.kind === 'held' ? -1 : 1
+        }
+        return b.timestamp - a.timestamp
+      })
       .slice(0, 6)
   }, [heldSales, multiItemSales, receiptFromMultiSale, receiptFromSingleSale, singleSales])
 

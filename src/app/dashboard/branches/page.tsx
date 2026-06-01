@@ -4,7 +4,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
-import { useCurrency, formatCurrency } from '@/hooks/useCurrency'
+import { useCurrency } from '@/hooks/useCurrency'
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -20,8 +20,6 @@ import {
   ClockIcon,
   ArrowPathIcon,
   CheckCircleIcon,
-  XCircleIcon,
-  TruckIcon,
   CubeIcon
 } from '@heroicons/react/24/outline'
 import { Card } from '@/components/ui/card'
@@ -32,7 +30,6 @@ import {
   createBranch as createBranchRecord,
   getBranchDashboard,
   getBranches as getBranchRecords,
-  getBranchTransfers,
   updateBranch as updateBranchRecord
 } from '@/lib/branches-service'
 
@@ -68,31 +65,12 @@ interface Branch {
   lastActivityAt?: Date
 }
 
-interface BranchTransfer {
-  id: string
-  transferNumber: string
-  fromBranchId: string
-  fromBranchName?: string
-  toBranchId: string
-  toBranchName?: string
-  status: 'REQUESTED' | 'APPROVED' | 'IN_TRANSIT' | 'RECEIVED' | 'CANCELLED' | 'REJECTED'
-  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
-  totalItems: number
-  totalValue: number
-  transferType: string
-  requestedAt: Date
-  requestedBy: string
-}
-
 interface BranchDashboard {
   totalBranches: number
   activeBranches: number
   totalProducts: number
   totalInventoryValue: number
   lowStockAlerts: number
-  pendingTransfers: number
-  inTransitTransfers: number
-  recentTransfers: BranchTransfer[]
   topPerformingBranches: {
     branchId: string
     branchName: string
@@ -125,13 +103,11 @@ function BranchesContent() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [branches, setBranches] = useState<Branch[]>([])
-  const [transfers, setTransfers] = useState<BranchTransfer[]>([])
   const [dashboard, setDashboard] = useState<BranchDashboard | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState<Branch | null>(null)
-  const [showTransferModal, setShowTransferModal] = useState(false)
 
   // Load dashboard data
   const loadDashboard = async () => {
@@ -171,18 +147,6 @@ function BranchesContent() {
       setBranches(data as any)
     } catch (error) {
       console.error('Error loading branches:', error)
-    }
-  }
-
-  // Load transfers
-  const loadTransfers = async () => {
-    if (!user) return
-
-    try {
-      const data = await getBranchTransfers(user.uid, undefined, 'requestedAt', 'desc', 20)
-      setTransfers(data as any)
-    } catch (error) {
-      console.error('Error loading transfers:', error)
     }
   }
 
@@ -231,8 +195,7 @@ function BranchesContent() {
       setLoading(true)
       Promise.all([
         loadDashboard(),
-        loadBranches(),
-        loadTransfers()
+        loadBranches()
       ]).finally(() => setLoading(false))
     }
   }, [user])
@@ -257,22 +220,10 @@ function BranchesContent() {
     }
   }
 
-  const getTransferStatusColor = (status: string) => {
-    switch (status) {
-      case 'REQUESTED': return 'bg-blue-100 text-blue-800'
-      case 'APPROVED': return 'bg-green-100 text-green-800'
-      case 'IN_TRANSIT': return 'bg-yellow-100 text-yellow-800'
-      case 'RECEIVED': return 'bg-green-100 text-green-800'
-      case 'CANCELLED': return 'bg-gray-100 text-gray-800'
-      case 'REJECTED': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, targetCurrency = 'KES') => {
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
-      currency: 'KES'
+      currency: targetCurrency
     }).format(amount)
   }
 
@@ -305,7 +256,7 @@ function BranchesContent() {
               <div>
                 <h1 className="dashboard-page-title">Branch Management</h1>
                 <p className="dashboard-page-subtitle mt-1">
-                  Manage your locations and track inventory transfers
+                  Manage your locations and branch inventory overview
                 </p>
               </div>
             </div>
@@ -313,7 +264,6 @@ function BranchesContent() {
             <div className="flex items-center gap-8 text-sm text-gray-500">
               <span>{dashboard?.totalBranches || 0} Total Locations</span>
               <span>{dashboard?.activeBranches || 0} Active</span>
-              <span>{dashboard?.pendingTransfers || 0} Pending Transfers</span>
             </div>
           </div>
 
@@ -322,7 +272,6 @@ function BranchesContent() {
               onClick={() => {
                 loadDashboard()
                 loadBranches()
-                loadTransfers()
               }}
               variant="outline"
               size="sm"
@@ -367,7 +316,7 @@ function BranchesContent() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <Card className="border-0 shadow-lg mb-6">
             <div className="p-2">
-              <TabsList className="grid w-full grid-cols-4 bg-gray-50 rounded-xl p-1">
+              <TabsList className="grid w-full grid-cols-3 bg-gray-50 rounded-xl p-1">
                 <TabsTrigger
                   value="dashboard"
                   className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
@@ -379,12 +328,6 @@ function BranchesContent() {
                   className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
                 >
                   🏢 Branches
-                </TabsTrigger>
-                <TabsTrigger
-                  value="transfers"
-                  className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
-                >
-                  🚚 Transfers
                 </TabsTrigger>
                 <TabsTrigger
                   value="reports"
@@ -399,7 +342,7 @@ function BranchesContent() {
           <TabsContent value="dashboard" className="space-y-8">
             {/* Key Metrics */}
             <motion.div
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+              className="grid grid-cols-1 md:grid-cols-3 gap-6"
               variants={staggerChildren}
               initial="initial"
               animate="animate"
@@ -455,25 +398,6 @@ function BranchesContent() {
                   <div className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-gray-500 text-sm font-medium">Pending Transfers</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{dashboard?.pendingTransfers || 0}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {(dashboard?.pendingTransfers || 0) > 0 ? 'Needs Attention' : 'All Clear'}
-                        </p>
-                      </div>
-                      <div className="bg-amber-50 rounded-lg p-3">
-                        <ClockIcon className="h-6 w-6 text-amber-600" />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-
-              <motion.div variants={fadeInUp}>
-                <Card className="dashboard-panel transition-all duration-200">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
                         <p className="text-gray-500 text-sm font-medium">Total Inventory</p>
                         <p className="text-2xl font-bold text-gray-900 mt-1">
                           {formatCurrency(dashboard?.totalInventoryValue || 0)}
@@ -490,7 +414,7 @@ function BranchesContent() {
             </motion.div>
 
             {/* Performance Overview Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               {/* Top Branches */}
               <motion.div variants={fadeInUp}>
                 <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow duration-300">
@@ -523,19 +447,11 @@ function BranchesContent() {
                                     <CubeIcon className="h-3 w-3" />
                                     {branch.productsCount} products
                                   </span>
-                                  <span className="flex items-center gap-1">
-                                    <TruckIcon className="h-3 w-3" />
-                                    {branch.transfersIn + branch.transfersOut} transfers
-                                  </span>
                                 </div>
                               </div>
                             </div>
                             <div className="text-right">
                               <p className="font-bold text-lg text-gray-900">{formatCurrency(branch.inventoryValue)}</p>
-                              <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                                <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">↓{branch.transfersIn}</span>
-                                <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full">↑{branch.transfersOut}</span>
-                              </div>
                             </div>
                           </div>
                         </div>
@@ -553,58 +469,6 @@ function BranchesContent() {
                 </Card>
               </motion.div>
 
-              {/* Recent Activity */}
-              <motion.div variants={fadeInUp}>
-                <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow duration-300">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-xl font-semibold text-gray-900">Recent Transfers</h2>
-                      <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-full p-2">
-                        <TruckIcon className="h-5 w-5 text-white" />
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      {dashboard?.recentTransfers?.slice(0, 5).map((transfer) => (
-                        <div key={transfer.id} className="relative group">
-                          <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 hover:from-green-50 hover:to-emerald-50 transition-all duration-200 cursor-pointer">
-                            <div className="flex items-center gap-4">
-                              <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-full p-2">
-                                <TruckIcon className="h-4 w-4 text-white" />
-                              </div>
-                              <div>
-                                <p className="font-semibold text-gray-900 group-hover:text-green-700 transition-colors">
-                                  {transfer.transferNumber}
-                                </p>
-                                <p className="text-sm text-gray-600">
-                                  <span className="font-medium">{transfer.fromBranchName}</span>
-                                  <span className="mx-2 text-gray-400">→</span>
-                                  <span className="font-medium">{transfer.toBranchName}</span>
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <Badge className={`${getTransferStatusColor(transfer.status)} border-0 font-medium`}>
-                                {transfer.status}
-                              </Badge>
-                              <p className="text-sm text-gray-600 mt-1">
-                                {transfer.totalItems} items
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )) || (
-                        <div className="text-center py-12">
-                          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                            <TruckIcon className="h-8 w-8 text-gray-400" />
-                          </div>
-                          <p className="text-gray-500 font-medium">No recent transfers</p>
-                          <p className="text-gray-400 text-sm mt-1">Transfer activity will appear here</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
             </div>
 
 
@@ -876,70 +740,6 @@ function BranchesContent() {
             )}
           </TabsContent>
 
-          <TabsContent value="transfers" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Branch Transfers</h2>
-              <Button onClick={() => setShowTransferModal(true)}>
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Create Transfer
-              </Button>
-            </div>
-
-            <Card className="p-6">
-              <div className="space-y-4">
-                {transfers.map((transfer) => (
-                  <div key={transfer.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold">{transfer.transferNumber}</h3>
-                        <p className="text-sm text-gray-600">
-                          {transfer.fromBranchName} → {transfer.toBranchName}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getTransferStatusColor(transfer.status)}>
-                          {transfer.status}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {transfer.priority}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <span className="font-medium">Items: </span>
-                        <span>{transfer.totalItems}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Value: </span>
-                        <span>{formatCurrency(transfer.totalValue)}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Type: </span>
-                        <span>{transfer.transferType.replace(/_/g, ' ')}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {transfers.length === 0 && (
-                  <div className="text-center py-12">
-                    <TruckIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-700 mb-2">No Transfers Found</h3>
-                    <p className="text-gray-600 mb-6">
-                      Start by creating your first branch transfer.
-                    </p>
-                    <Button onClick={() => setShowTransferModal(true)}>
-                      <PlusIcon className="h-5 w-5 mr-2" />
-                      Create First Transfer
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="reports" className="space-y-6">
             <Card className="p-6">
               <div className="text-center py-12">
@@ -1006,9 +806,17 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
     ]
   })
   const [saving, setSaving] = useState(false)
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contact.email.trim())
+  const isFormValid =
+    formData.name.trim() !== '' &&
+    formData.location.address.trim() !== '' &&
+    formData.contact.phone.trim() !== '' &&
+    isEmailValid
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isFormValid) return
+
     setSaving(true)
 
     const success = await onSave(formData)
@@ -1149,7 +957,7 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
             <h4 className="text-lg font-medium mb-4">Contact Information</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Phone</label>
+                <label className="block text-sm font-medium mb-2">Phone *</label>
                 <input
                   type="tel"
                   value={formData.contact.phone}
@@ -1158,11 +966,12 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
                     contact: { ...prev.contact, phone: e.target.value }
                   }))}
                   className="w-full px-3 py-2 border rounded-md"
+                  required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Email</label>
+                <label className="block text-sm font-medium mb-2">Email *</label>
                 <input
                   type="email"
                   value={formData.contact.email}
@@ -1171,6 +980,7 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
                     contact: { ...prev.contact, email: e.target.value }
                   }))}
                   className="w-full px-3 py-2 border rounded-md"
+                  required
                 />
               </div>
             </div>
@@ -1179,8 +989,8 @@ function AddBranchModal({ onSave, onCancel }: AddBranchModalProps) {
           <div className="flex gap-3 pt-4">
             <Button
               type="submit"
-              className="flex-1"
-              disabled={saving}
+              className="flex-1 disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none"
+              disabled={saving || !isFormValid}
             >
               {saving ? 'Creating...' : 'Create Branch'}
             </Button>
