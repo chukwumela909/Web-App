@@ -15,6 +15,7 @@ import {
   QrCodeIcon,
   XMarkIcon,
   CheckIcon,
+  PencilIcon,
   TagIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -113,7 +114,6 @@ interface ProductFormData {
   description: string
   costPrice: string
   sellingPrice: string
-  quantity: string
   minStockLevel: string
   unitOfMeasure: string
   supplier: string // LEGACY: Keep for backward compatibility
@@ -178,7 +178,6 @@ function ProductsPageContent() {
     description: '',
     costPrice: '',
     sellingPrice: '',
-    quantity: '',
     minStockLevel: '',
     unitOfMeasure: 'pcs',
     supplier: '', // LEGACY: Keep for backward compatibility
@@ -303,7 +302,6 @@ function ProductsPageContent() {
       description: '',
       costPrice: '',
       sellingPrice: '',
-      quantity: '',
       minStockLevel: '',
       unitOfMeasure: 'pcs',
       supplier: '', // LEGACY: Keep for backward compatibility
@@ -452,7 +450,7 @@ function ProductsPageContent() {
       description: productForm.description,
       costPrice: Number(productForm.costPrice || 0),
       sellingPrice: Number(productForm.sellingPrice || 0),
-      quantity: Number(productForm.quantity || 0),
+      quantity: editingProduct ? Number(editingProduct.quantity || 0) : 0,
       minStockLevel: Number(productForm.minStockLevel || 0),
       unitOfMeasure: productForm.unitOfMeasure,
       supplier: productForm.supplier || '', // LEGACY: Keep for backward compatibility
@@ -544,7 +542,6 @@ function ProductsPageContent() {
       description: product.description || '',
       costPrice: product.costPrice.toString(),
       sellingPrice: product.sellingPrice.toString(),
-      quantity: product.quantity.toString(),
       minStockLevel: product.minStockLevel.toString(),
       unitOfMeasure: product.unitOfMeasure || 'pcs',
       supplier: product.supplier || '', // LEGACY: Keep for backward compatibility
@@ -736,10 +733,10 @@ function ProductsPageContent() {
             </div>
           </motion.div>
 
-          {/* Recently Added Section - Mobile App Style */}
+          {/* Products Section - Mobile App Style */}
           {products.length > 0 && (
             <motion.div variants={fadeInUp}>
-              <h2 className="dashboard-section-title mb-6">Recently Added</h2>
+              <h2 className="dashboard-section-title mb-6">Products</h2>
               <div className="space-y-4">
                 {[...products]
                   .sort((a, b) => {
@@ -747,7 +744,6 @@ function ProductsPageContent() {
                     const bTime = typeof b.createdAt === 'number' ? b.createdAt : 0
                     return bTime - aTime
                   })
-                  .slice(0, 3)
                   .map((product) => {
                     const primaryImageUrl = getProductImageUrl(product)
 
@@ -782,12 +778,21 @@ function ProductsPageContent() {
                               <span className="text-[#66BB6A]">In Stock</span>
                             )}
                           </p>
-                          <button
-                            onClick={() => router.push(`/dashboard/products/${product.id}`)}
-                            className="text-xs font-semibold text-[#004aad] transition-colors hover:text-[#003d8f]"
-                          >
-                            View details
-                          </button>
+                          <div className="flex items-center justify-end gap-3">
+                            <button
+                              onClick={() => handleEdit(product)}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-[#004aad] transition-colors hover:text-[#003d8f]"
+                            >
+                              <PencilIcon className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => router.push(`/dashboard/products/${product.id}`)}
+                              className="text-xs font-semibold text-[#004aad] transition-colors hover:text-[#003d8f]"
+                            >
+                              View details
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1130,21 +1135,6 @@ function ProductsPageContent() {
                                   className="dashboard-field w-full px-3 py-2"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">Price you sell to customers</p>
-                              </div>
-
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Current Quantity <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                  type="number"
-                                  required
-                                  min="0"
-                                  value={productForm.quantity}
-                                  onChange={(e) => setProductForm(prev => ({ ...prev, quantity: e.target.value }))}
-                                  placeholder="0"
-                                  className="dashboard-field w-full px-3 py-2"
-                                />
                               </div>
 
                               <div>

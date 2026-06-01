@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   BuildingOfficeIcon,
+  ChartBarIcon,
   MapPinIcon,
   PlusIcon,
   PencilIcon,
@@ -240,6 +241,19 @@ function BranchesContent() {
 
     return `${openDays.length} days/week`
   }
+
+  const activeBranchRate = dashboard?.totalBranches
+    ? Math.round((dashboard.activeBranches / dashboard.totalBranches) * 100)
+    : 0
+  const averageProductsPerBranch = dashboard?.totalBranches
+    ? Math.round((dashboard.totalProducts / dashboard.totalBranches) * 10) / 10
+    : 0
+  const averageInventoryPerBranch = dashboard?.totalBranches
+    ? dashboard.totalInventoryValue / dashboard.totalBranches
+    : 0
+  const branchInventoryTotal = branches.reduce((sum, branch) => sum + Number(branch.totalInventoryValue || 0), 0)
+  const highestInventoryBranch = [...branches].sort((a, b) => Number(b.totalInventoryValue || 0) - Number(a.totalInventoryValue || 0))[0]
+  const mostStockAlertsBranch = [...branches].sort((a, b) => Number(b.lowStockItemsCount || 0) - Number(a.lowStockItemsCount || 0))[0]
 
   if (!user) return null
 
@@ -741,15 +755,136 @@ function BranchesContent() {
           </TabsContent>
 
           <TabsContent value="reports" className="space-y-6">
-            <Card className="p-6">
-              <div className="text-center py-12">
-                <BuildingOfficeIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-xl font-semibold text-gray-700 mb-2">Branch Reports</h3>
-                <p className="text-gray-600 mb-6">
-                  Detailed branch performance reports and analytics coming soon.
-                </p>
-              </div>
-            </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+              <Card className="dashboard-panel p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Active Branch Rate</p>
+                    <p className="mt-2 text-3xl font-bold text-gray-900">{activeBranchRate}%</p>
+                    <p className="mt-1 text-xs text-gray-400">{dashboard?.activeBranches || 0} of {dashboard?.totalBranches || 0} locations active</p>
+                  </div>
+                  <div className="rounded-lg bg-green-50 p-3">
+                    <CheckCircleIcon className="h-6 w-6 text-green-600" />
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="dashboard-panel p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Products Per Branch</p>
+                    <p className="mt-2 text-3xl font-bold text-gray-900">{averageProductsPerBranch}</p>
+                    <p className="mt-1 text-xs text-gray-400">{dashboard?.totalProducts || 0} products across all branches</p>
+                  </div>
+                  <div className="rounded-lg bg-blue-50 p-3">
+                    <CubeIcon className="h-6 w-6 text-blue-600" />
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="dashboard-panel p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Average Inventory</p>
+                    <p className="mt-2 text-3xl font-bold text-gray-900">{formatCurrency(averageInventoryPerBranch, currency)}</p>
+                    <p className="mt-1 text-xs text-gray-400">per branch</p>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <ChartBarIcon className="h-6 w-6 text-slate-600" />
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="dashboard-panel p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Low Stock Alerts</p>
+                    <p className="mt-2 text-3xl font-bold text-gray-900">{dashboard?.lowStockAlerts || 0}</p>
+                    <p className="mt-1 text-xs text-gray-400">items need attention</p>
+                  </div>
+                  <div className="rounded-lg bg-orange-50 p-3">
+                    <ClockIcon className="h-6 w-6 text-orange-600" />
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="dashboard-panel p-6 lg:col-span-2">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">All Branch Performance</h2>
+                    <p className="mt-1 text-sm text-gray-500">Inventory value, products, and alerts by location</p>
+                  </div>
+                  <Badge variant="outline">{branches.length} branches</Badge>
+                </div>
+
+                {branches.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <BuildingOfficeIcon className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+                    <p className="font-medium text-gray-500">No branch analytics available</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {[...branches]
+                      .sort((a, b) => Number(b.totalInventoryValue || 0) - Number(a.totalInventoryValue || 0))
+                      .map((branch) => {
+                        const inventoryValue = Number(branch.totalInventoryValue || 0)
+                        const inventoryShare = branchInventoryTotal > 0
+                          ? Math.round((inventoryValue / branchInventoryTotal) * 100)
+                          : 0
+
+                        return (
+                          <div key={branch.id} className="rounded-lg border border-gray-200 p-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold text-gray-900">{branch.name}</h3>
+                                  <Badge className={`${getStatusColor(branch.status)} border-0`}>{branch.status}</Badge>
+                                </div>
+                                <p className="mt-1 text-sm text-gray-500">
+                                  {branch.totalProducts || 0} products - {branch.lowStockItemsCount || 0} low stock alerts
+                                </p>
+                              </div>
+                              <div className="text-left sm:text-right">
+                                <p className="font-semibold text-gray-900">{formatCurrency(inventoryValue, currency)}</p>
+                                <p className="text-xs text-gray-500">{inventoryShare}% of total inventory value</p>
+                              </div>
+                            </div>
+                            <div className="mt-4 h-2 overflow-hidden rounded-full bg-gray-100">
+                              <div
+                                className="h-full rounded-full bg-blue-600 transition-all duration-500"
+                                style={{ width: `${inventoryShare}%` }}
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
+                  </div>
+                )}
+              </Card>
+
+              <Card className="dashboard-panel p-6">
+                <h2 className="text-xl font-semibold text-gray-900">Highlights</h2>
+                <div className="mt-6 space-y-5">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Highest Inventory Value</p>
+                    <p className="mt-1 text-lg font-semibold text-gray-900">{highestInventoryBranch?.name || 'No branch yet'}</p>
+                    <p className="text-sm text-gray-500">{formatCurrency(Number(highestInventoryBranch?.totalInventoryValue || 0), currency)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Most Stock Alerts</p>
+                    <p className="mt-1 text-lg font-semibold text-gray-900">{mostStockAlertsBranch?.name || 'No branch yet'}</p>
+                    <p className="text-sm text-gray-500">{mostStockAlertsBranch?.lowStockItemsCount || 0} low stock items</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Total Inventory Value</p>
+                    <p className="mt-1 text-lg font-semibold text-gray-900">{formatCurrency(dashboard?.totalInventoryValue || branchInventoryTotal, currency)}</p>
+                    <p className="text-sm text-gray-500">across all branches</p>
+                  </div>
+                </div>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       )}
