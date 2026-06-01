@@ -85,8 +85,43 @@ function stringValue(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : ''
 }
 
+function normalizeEmail(value: unknown) {
+  if (typeof value !== 'string') return ''
+  const candidate = value.trim().toLowerCase()
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate) ? candidate : ''
+}
+
+function findEmailInValue(value: unknown, depth = 0): string {
+  if (!value || depth > 4) return ''
+
+  const directEmail = normalizeEmail(value)
+  if (directEmail) return directEmail
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const email = findEmailInValue(item, depth + 1)
+      if (email) return email
+    }
+
+    return ''
+  }
+
+  if (typeof value !== 'object') return ''
+
+  const record = value as Record<string, unknown>
+  const emailLikeEntries = Object.entries(record).filter(([key]) => key.toLowerCase().includes('email'))
+  const otherEntries = Object.entries(record).filter(([key]) => !key.toLowerCase().includes('email'))
+
+  for (const [, nestedValue] of [...emailLikeEntries, ...otherEntries]) {
+    const email = findEmailInValue(nestedValue, depth + 1)
+    if (email) return email
+  }
+
+  return ''
+}
+
 function getBusinessAccountId(business: Record<string, any>) {
-  return String(business.id || business._id || business.businessAccountId || '')
+  return String(business.id || business._id || business.businessAccountId || business.accountId || '')
 }
 
 function getUserBusinessAccountId(user: User) {
@@ -101,16 +136,30 @@ function getUserBusinessAccountId(user: User) {
 }
 
 function getBusinessEmailCandidates(business: Record<string, any>) {
-  return [
+  const explicitEmails = [
     business.createdByEmail,
     business.ownerEmail,
+    business.contactEmail,
+    business.businessEmail,
+    business.primaryEmail,
+    business.emailAddress,
     business.email,
     business.userEmail,
     business.createdBy?.email,
-    business.owner?.email
+    business.owner?.email,
+    business.contact?.email,
+    business.profile?.email,
+    business.user?.email,
+    business.auth?.email
   ]
     .filter((value): value is string => typeof value === 'string')
-    .map((value) => value.trim().toLowerCase())
+    .map(normalizeEmail)
+    .filter(Boolean)
+
+  return Array.from(new Set([
+    ...explicitEmails,
+    findEmailInValue(business)
+  ].filter(Boolean)))
 }
 
 function getBusinessUidCandidates(business: Record<string, any>) {
@@ -173,6 +222,15 @@ function getFirstString(...values: unknown[]) {
   return ''
 }
 
+function getBestEmail(...values: unknown[]) {
+  for (const value of values) {
+    const email = findEmailInValue(value)
+    if (email) return email
+  }
+
+  return ''
+}
+
 function toDate(value: unknown, fallback = new Date()) {
   if (!value) return fallback
 
@@ -205,14 +263,29 @@ function getBackendAccountId(account: Record<string, any>) {
 
 function mapBackendUser(user: Record<string, any>): User {
   const businessAccountId = getBackendAccountId(user)
-  const email = getFirstString(
+  const email = getBestEmail(
     user.email,
     user.createdByEmail,
     user.ownerEmail,
+    user.contactEmail,
+    user.businessEmail,
+    user.primaryEmail,
+    user.emailAddress,
     user.userEmail,
     user.createdBy?.email,
     user.owner?.email,
-    user.auth?.email
+    user.contact?.email,
+    user.profile?.email,
+    user.user?.email,
+    user.auth?.email,
+    user.account,
+    user.createdBy,
+    user.owner,
+    user.contact,
+    user.profile,
+    user.user,
+    user.auth,
+    user
   )
   const firebaseUid = getFirstString(
     user.firebaseUid,
@@ -315,8 +388,6 @@ export default function UsersPage() {
           .filter(([email]) => Boolean(email))
       )
 
-      if (usersByEmail.size === 0) return baseUsers
-
       const businesses = backendAccounts || await searchBackendAdminBusinesses()
       const matchingBusinesses = businesses.filter((business) =>
         baseUsers.some((user) => businessMatchesUser(business, user))
@@ -399,11 +470,37 @@ export default function UsersPage() {
   const loadMongoUsers = useCallback(async (term?: string) => {
     const trimmedTerm = term?.trim()
     const accounts = await searchBackendAdminUsers(trimmedTerm ? { q: trimmedTerm } : undefined)
-    const mappedUsers = accounts
+
+    const accountsWithDetails = await Promise.all(
+      accounts.map(async (account) => {
+        const id = getBusinessAccountId(account)
+        if (!id) return account
+
+        try {
+          const detail = await getBackendAdminBusiness(id)
+          return {
+            ...account,
+            ...(detail?.account || {}),
+            currentSubscription: detail?.currentSubscription || account.currentSubscription,
+            subscription: detail?.subscription || account.subscription,
+            subscriptions: detail?.subscriptions || account.subscriptions,
+            owner: detail?.account?.owner || account.owner,
+            createdBy: detail?.account?.createdBy || account.createdBy,
+            contact: detail?.account?.contact || account.contact,
+            profile: detail?.account?.profile || account.profile
+          }
+        } catch (error) {
+          console.warn(`Unable to load backend user details for business ${id}:`, error)
+          return account
+        }
+      })
+    )
+
+    const mappedUsers = accountsWithDetails
       .map(mapBackendUser)
       .filter((user) => user.id || user.email !== 'No email')
 
-    const enrichedUsers = await enrichUsersWithBackendSubscriptions(mappedUsers, accounts)
+    const enrichedUsers = await enrichUsersWithBackendSubscriptions(mappedUsers, accountsWithDetails)
 
     return enrichedUsers.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   }, [enrichUsersWithBackendSubscriptions])
