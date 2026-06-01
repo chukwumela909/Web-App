@@ -1327,13 +1327,15 @@ export async function searchBackendAdminBusinesses(params?: { q?: string; status
 }
 
 export async function searchBackendAdminUsers(params?: { q?: string; status?: string }) {
-  const query = params ? `?${new URLSearchParams(Object.entries(params).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}` : ''
+  const searchParams = new URLSearchParams({ includeFirestore: 'true' })
+  if (params?.q) searchParams.set('email', params.q)
+  if (params?.status) searchParams.set('status', params.status)
 
   try {
-    return listFrom<AnyRecord>(await api(`/admin/users${query}`), ['users', 'accounts'])
+    return listFrom<AnyRecord>(await api(`/admin/firebase-auth-users?${searchParams.toString()}`), ['users'])
   } catch (error) {
     if (isBackendApiError(error) && error.status === 404) {
-      return searchBackendAdminBusinesses(params)
+      return listFrom<AnyRecord>(await api('/admin/auth-users'), ['users'])
     }
 
     throw error

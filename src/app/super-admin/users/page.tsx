@@ -48,7 +48,6 @@ import { useToast } from '@/hooks/use-toast'
 import { handleError } from '@/lib/error-handler'
 import { request } from '@/lib/backend-api'
 import {
-  getBackendAdminBusiness,
   manuallyActivateBackendAdminSubscription,
   searchBackendAdminBusinesses,
   searchBackendAdminUsers,
@@ -259,10 +258,20 @@ function isBackendAccountDisabled(account: Record<string, any>) {
 }
 
 function getBackendAccountId(account: Record<string, any>) {
-  return getFirstString(account.businessAccountId, account.accountId, account.id, account._id)
+  return getFirstString(
+    account.businessAccountId,
+    account.accountId,
+    account.firestoreData?.businessAccountId,
+    account.firestoreData?.backendBusinessAccountId,
+    account.firestoreData?.businessId,
+    account.firestoreData?.accountId,
+    account.id,
+    account._id
+  )
 }
 
 function mapBackendUser(user: Record<string, any>): User {
+  const firestoreData = user.firestoreData || {}
   const businessAccountId = getBackendAccountId(user)
   const email = getBestEmail(
     user.email,
@@ -286,6 +295,7 @@ function mapBackendUser(user: Record<string, any>): User {
     user.profile,
     user.user,
     user.auth,
+    firestoreData,
     user
   )
   const firebaseUid = getFirstString(
@@ -308,14 +318,18 @@ function mapBackendUser(user: Record<string, any>): User {
     user.createdBy?.id,
     user.owner?.firebaseUid,
     user.owner?.uid,
-    user.owner?.id
+    user.owner?.id,
+    firestoreData.firebaseUid,
+    firestoreData.uid
   )
   const subscriptionStatus = String(user.subscriptionStatus || user.currentSubscription?.status || user.subscription?.status || '').toLowerCase()
   const planType = getPlanType(user.planType)
     || getPlanType(user.currentSubscription?.planType)
     || getPlanType(user.subscription?.planType)
   const disabled = isBackendAccountDisabled(user)
-  const subscriptionEndDate = getSubscriptionEndDate(user.currentSubscription || user.subscription, user)
+  const subscriptionEndDate = typeof user.subscriptionEndDate === 'number'
+    ? user.subscriptionEndDate
+    : getSubscriptionEndDate(user.currentSubscription || user.subscription, user)
 
   return {
     id: firebaseUid || businessAccountId,
@@ -332,19 +346,19 @@ function mapBackendUser(user: Record<string, any>): User {
       user.owner?.name,
       user.businessName
     ) || 'No name',
-    createdAt: toDate(user.createdAt || user.created_at || user.createdOn),
-    lastActiveAt: toDate(user.lastActiveAt || user.lastLoginAt || user.lastSeenAt || user.updatedAt || user.updated_at),
+    createdAt: toDate(user.metadata?.creationTime || user.createdAt || user.created_at || user.createdOn || firestoreData.createdAt),
+    lastActiveAt: toDate(user.lastActiveAt || user.metadata?.lastSignInTime || user.lastLoginAt || user.lastSeenAt || user.updatedAt || user.updated_at || firestoreData.lastActiveAt),
     status: disabled ? 'disabled' : 'active',
     isDisabled: disabled,
     emailVerified: Boolean(user.emailVerified || user.verified || user.auth?.emailVerified),
     region: getFirstString(user.region, user.country, user.billingRegion) || 'Unknown',
     firestoreData: {
-      ...user,
+      ...firestoreData,
       businessAccountId,
       firebaseUid
     },
     source: 'MongoDB backend',
-    isSubscribed: subscriptionStatus === 'active' || user.planTier === 'paid' || user.planTier === 'pro',
+    isSubscribed: Boolean(user.isSubscribed) || subscriptionStatus === 'active' || user.planTier === 'paid' || user.planTier === 'pro',
     subscriptionId: getFirstString(user.subscriptionId, user.currentSubscriptionId, user.currentSubscription?.id, user.subscription?.id) || null,
     subscriptionEndDate,
     planType,
@@ -447,133 +461,17 @@ export default function UsersPage() {
   const { toast } = useToast()
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  const enrichUsersWithBackendSubscriptions = useCallback(async (baseUsers: User[], backendAccounts?: Record<string, any>[]) => {
-    if (baseUsers.length === 0) return baseUsers
-
-    try {
-      const usersByEmail = new Map(
-        baseUsers
-          .map((user) => [userEmailOf(user), user] as const)
-          .filter(([email]) => Boolean(email))
-      )
-
-      const businesses = backendAccounts || await searchBackendAdminBusinesses()
-      const matchingBusinesses = businesses.filter((business) =>
-        baseUsers.some((user) => businessMatchesUser(business, user))
-      )
-
-      if (matchingBusinesses.length === 0) return baseUsers
-
-      const details = await Promise.all(
-        matchingBusinesses.map(async (business) => {
-          const id = getBusinessAccountId(business)
-          if (!id) return { business, detail: null }
-
-          try {
-            return { business, detail: await getBackendAdminBusiness(id) }
-          } catch (error) {
-            console.warn(`Unable to load backend subscription details for business ${id}:`, error)
-            return { business, detail: null }
-          }
-        })
-      )
-
-      const backendSubscriptionsByEmail = new Map<string, Partial<User>>()
-
-      details.forEach(({ business, detail }) => {
-        const account = detail?.account || business
-        const subscriptions = Array.isArray(detail?.subscriptions) ? detail.subscriptions : []
-        const activeSubscription = subscriptions.find((subscription: Record<string, any>) =>
-          String(subscription.status || subscription.subscriptionStatus || '').toLowerCase() === 'active'
-        )
-        const accountIsActive = String(account?.subscriptionStatus || '').toLowerCase() === 'active'
-
-        if (!activeSubscription && !accountIsActive) return
-
-        const subscriptionId = activeSubscription
-          ? String(activeSubscription.id || activeSubscription._id || activeSubscription.subscriptionId || '')
-          : null
-        const planType = getPlanType(activeSubscription?.planType) || getPlanType(account?.planType) || 'monthly'
-        const subscriptionEndDate = getSubscriptionEndDate(activeSubscription, account)
-
-        getBusinessEmailCandidates({
-          ...business,
-          ...account,
-          createdBy: account?.createdBy || business.createdBy,
-          owner: account?.owner || business.owner
-        }).forEach((email) => {
-          if (!usersByEmail.has(email)) return
-
-          backendSubscriptionsByEmail.set(email, {
-            isSubscribed: true,
-            subscriptionId,
-            subscriptionEndDate,
-            planType,
-            businessName: account?.businessName || account?.name || business.businessName || business.name || null
-          })
-        })
-
-        baseUsers.forEach((user) => {
-          if (!businessMatchesUser({ ...business, ...account }, user)) return
-
-          backendSubscriptionsByEmail.set(userEmailOf(user), {
-            isSubscribed: true,
-            subscriptionId,
-            subscriptionEndDate,
-            planType,
-            businessName: account?.businessName || account?.name || business.businessName || business.name || null
-          })
-        })
-      })
-
-      return baseUsers.map((user) => {
-        const backendSubscription = backendSubscriptionsByEmail.get(userEmailOf(user))
-        return backendSubscription ? { ...user, ...backendSubscription } : user
-      })
-    } catch (error) {
-      console.warn('Unable to enrich users with backend subscription status:', error)
-      return baseUsers
-    }
-  }, [])
-
   const loadMongoUsers = useCallback(async (term?: string) => {
     const trimmedTerm = term?.trim()
     const accounts = await searchBackendAdminUsers(trimmedTerm ? { q: trimmedTerm } : undefined)
-
-    const accountsWithDetails = await Promise.all(
-      accounts.map(async (account) => {
-        const id = getBusinessAccountId(account)
-        if (!id) return account
-
-        try {
-          const detail = await getBackendAdminBusiness(id)
-          return {
-            ...account,
-            ...(detail?.account || {}),
-            currentSubscription: detail?.currentSubscription || account.currentSubscription,
-            subscription: detail?.subscription || account.subscription,
-            subscriptions: detail?.subscriptions || account.subscriptions,
-            owner: detail?.account?.owner || account.owner,
-            createdBy: detail?.account?.createdBy || account.createdBy,
-            contact: detail?.account?.contact || account.contact,
-            profile: detail?.account?.profile || account.profile
-          }
-        } catch (error) {
-          console.warn(`Unable to load backend user details for business ${id}:`, error)
-          return account
-        }
-      })
-    )
-
-    const mappedUsers = accountsWithDetails
+    const mappedUsers = accounts
       .map(mapBackendUser)
       .filter((user) => user.id || user.email !== 'No email')
 
     const usersWithEmails = await fillMissingEmailsFromAuth(mappedUsers)
-    const enrichedUsers = await enrichUsersWithBackendSubscriptions(usersWithEmails, accountsWithDetails)
 
-    return enrichedUsers.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-  }, [enrichUsersWithBackendSubscriptions])
+    return usersWithEmails.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  }, [])
 
   const activateCurrentOwnerSubscription = async (targetUser: User) => {
     const currentUser = auth.currentUser
