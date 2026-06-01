@@ -218,6 +218,7 @@ export interface Sale {
   isDeleted?: boolean
   deletedAt?: number | null
   lastModifiedAt?: number
+  branchId?: string | null
   userId: string
 }
 
@@ -705,10 +706,10 @@ export async function softDeleteProduct(productId: string): Promise<void> {
   await updateDoc(doc(db, 'products', productId), updateData)
 }
 
-export async function getSales(userId: string, max: number = 2000): Promise<Sale[]> {
+export async function getSales(userId: string, max: number = 2000, branchId?: string): Promise<Sale[]> {
   if (isBackendAvailable()) {
     try {
-      return (await getBackendSingleItemSales()).slice(0, max)
+      return (await getBackendSingleItemSales(branchId)).slice(0, max)
     } catch (error) {
       if (!shouldUseFirebaseFallback(error)) throw error
       console.warn('Backend sales unavailable, falling back to Firestore:', error)
@@ -726,7 +727,9 @@ export async function getSales(userId: string, max: number = 2000): Promise<Sale
   // Filter out explicitly deleted sales (isDeleted === true) but keep sales without the field
   const filteredList = list.filter(sale => sale.isDeleted !== true)
   
-  return filteredList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+  return filteredList
+    .filter(sale => !branchId || !sale.branchId || sale.branchId === branchId)
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
 }
 
 export async function createSale(userId: string, data: Partial<Sale>): Promise<void> {
@@ -761,6 +764,7 @@ export async function createSale(userId: string, data: Partial<Sale>): Promise<v
     isDeleted: false,
     deletedAt: null,
     lastModifiedAt: Date.now(),
+    branchId: data.branchId ?? null,
     userId
   }
   await setDoc(doc(db, 'sales', id), { ...sale, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
@@ -825,10 +829,10 @@ export async function deleteSale(saleId: string): Promise<void> {
   })
 }
 
-export async function getDebtors(userId: string): Promise<Debtor[]> {
+export async function getDebtors(userId: string, branchId?: string): Promise<Debtor[]> {
   if (isBackendAvailable()) {
     try {
-      return await getBackendDebtors()
+      return await getBackendDebtors(branchId)
     } catch (error) {
       if (!shouldUseFirebaseFallback(error)) throw error
       console.warn('Backend debtors unavailable, falling back to Firestore:', error)
@@ -848,7 +852,9 @@ export async function getDebtors(userId: string): Promise<Debtor[]> {
     if (typeof active === 'boolean') return active
     return true
   }) as Debtor[]
-  return list.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+  return list
+    .filter(debtor => !branchId || !(debtor as Debtor & { branchId?: string | null }).branchId || (debtor as Debtor & { branchId?: string | null }).branchId === branchId)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
 }
 
 export async function deleteDebtor(debtorId: string): Promise<void> {
@@ -1733,10 +1739,10 @@ export async function createMultiItemSale(userId: string, data: {
 }
 
 // Get multi-item sales
-export async function getMultiItemSales(userId: string, max: number = 2000): Promise<MultiItemSale[]> {
+export async function getMultiItemSales(userId: string, max: number = 2000, branchId?: string): Promise<MultiItemSale[]> {
   if (isBackendAvailable()) {
     try {
-      return (await getBackendMultiItemSales()).slice(0, max)
+      return (await getBackendMultiItemSales(branchId)).slice(0, max)
     } catch (error) {
       if (!shouldUseFirebaseFallback(error)) throw error
       console.warn('Backend multi-item sales unavailable, falling back to Firestore:', error)
@@ -1754,7 +1760,9 @@ export async function getMultiItemSales(userId: string, max: number = 2000): Pro
   // Filter out explicitly deleted sales
   const filteredList = list.filter(sale => sale.isDeleted !== true)
   
-  return filteredList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+  return filteredList
+    .filter(sale => !branchId || !sale.branchId || sale.branchId === branchId)
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
 }
 
 // Update multi-item sale

@@ -4,7 +4,9 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
-import { useEffect, useState } from 'react'
+import { useBranch } from '@/contexts/BranchContext'
+import { useStaff } from '@/contexts/StaffContext'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import {
   TruckIcon,
@@ -86,6 +88,8 @@ const staggerChildren = {
 
 function SuppliersContent() {
   const { user } = useAuth()
+  const { staff } = useStaff()
+  const { selectedBranchId, selectedBranch } = useBranch()
   const currency = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
   const [loading, setLoading] = useState(true)
@@ -96,6 +100,7 @@ function SuppliersContent() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState<Supplier | null>(null)
+  const [showDetailsModal, setShowDetailsModal] = useState<Supplier | null>(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [upgradeModalData, setUpgradeModalData] = useState<{
     feature: 'suppliers'
@@ -104,13 +109,15 @@ function SuppliersContent() {
     message: string
   } | null>(null)
   const { canAddSupplier } = usePlanLimits()
+  const effectiveUserId = staff ? staff.userId : user?.uid
+  const activeBranchId = selectedBranchId || undefined
 
   // Load dashboard data
   const loadDashboard = async () => {
-    if (!user) return
+    if (!effectiveUserId) return
 
     try {
-      const data = await getSupplierDashboard(user.uid)
+      const data = await getSupplierDashboard(effectiveUserId, activeBranchId)
       setDashboard(data as any)
     } catch (error) {
       console.error('Error loading suppliers dashboard:', error)
@@ -119,13 +126,20 @@ function SuppliersContent() {
 
   // Load suppliers
   const loadSuppliers = async () => {
-    if (!user) return
+    if (!effectiveUserId) return
 
     try {
-      const data = await getSuppliers(user.uid, {
-        status: statusFilter && statusFilter !== 'ALL' ? [statusFilter as any] : undefined,
-        searchTerm: searchTerm.trim() || undefined
-      })
+      const data = await getSuppliers(
+        effectiveUserId,
+        {
+          status: statusFilter && statusFilter !== 'ALL' ? [statusFilter as any] : undefined,
+          searchTerm: searchTerm.trim() || undefined
+        },
+        'name',
+        'asc',
+        undefined,
+        activeBranchId
+      )
       setSuppliers(data as any)
     } catch (error) {
       console.error('Error loading suppliers:', error)
@@ -134,10 +148,10 @@ function SuppliersContent() {
 
   // Create supplier
   const createSupplier = async (supplierData: any) => {
-    if (!user) return false
+    if (!effectiveUserId) return false
 
     try {
-      await createSupplierRecord(user.uid, supplierData)
+      await createSupplierRecord(effectiveUserId, supplierData, activeBranchId)
       await loadSuppliers()
       await loadDashboard()
       setShowAddModal(false)
@@ -150,24 +164,26 @@ function SuppliersContent() {
   }
 
   useEffect(() => {
-    if (user) {
+    if (effectiveUserId) {
       setLoading(true)
+      setDashboard(null)
+      setSuppliers([])
       Promise.all([
         loadDashboard(),
         loadSuppliers()
       ]).finally(() => setLoading(false))
     }
-  }, [user])
+  }, [effectiveUserId, activeBranchId])
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (user) {
+      if (effectiveUserId) {
         loadSuppliers()
       }
     }, 300)
 
     return () => clearTimeout(timeoutId)
-  }, [searchTerm, statusFilter])
+  }, [searchTerm, statusFilter, effectiveUserId, activeBranchId])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -663,6 +679,7 @@ function SuppliersContent() {
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => setShowDetailsModal(supplier)}
                           className="flex-1 hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition-colors"
                         >
                           <EyeIcon className="h-4 w-4 mr-2" />
@@ -776,6 +793,159 @@ function SuppliersContent() {
           onCancel={() => setShowAddModal(false)}
         />
       )}
+
+      {showDetailsModal && (
+        <SupplierDetailsModal
+          supplier={showDetailsModal}
+          branchName={selectedBranch?.name}
+          onClose={() => setShowDetailsModal(null)}
+          formatPaymentTerms={formatPaymentTerms}
+          renderStars={renderStars}
+        />
+      )}
+    </div>
+  )
+}
+
+interface SupplierDetailsModalProps {
+  supplier: Supplier
+  branchName?: string
+  onClose: () => void
+  formatPaymentTerms: (terms: string) => string
+  renderStars: (rating: number) => ReactNode
+}
+
+function SupplierDetailsModal({
+  supplier,
+  branchName,
+  onClose,
+  formatPaymentTerms,
+  renderStars
+}: SupplierDetailsModalProps) {
+  const averageRating = [
+    supplier.qualityRating,
+    supplier.serviceRating,
+    supplier.pricingRating
+  ].filter((rating): rating is number => typeof rating === 'number')
+
+  const overallRating = averageRating.length > 0
+    ? averageRating.reduce((sum, rating) => sum + rating, 0) / averageRating.length
+    : null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-lg max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-start justify-between border-b px-6 py-5">
+          <div>
+            <h3 className="text-2xl font-semibold text-gray-900">{supplier.name}</h3>
+            <p className="text-sm text-gray-500">
+              {supplier.contactPerson || 'No contact person listed'}
+              {branchName ? ` - ${branchName}` : ''}
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+
+        <div className="grid gap-6 p-6 md:grid-cols-2">
+          <Card className="p-4">
+            <h4 className="font-semibold text-gray-900 mb-4">Contact</h4>
+            <div className="space-y-3 text-sm text-gray-700">
+              <div className="flex items-center gap-2">
+                <PhoneIcon className="h-4 w-4 text-gray-400" />
+                <span>{supplier.phone || 'Not provided'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <EnvelopeIcon className="h-4 w-4 text-gray-400" />
+                <span>{supplier.email || 'Not provided'}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <MapPinIcon className="h-4 w-4 text-gray-400 mt-0.5" />
+                <span>{supplier.address || 'Not provided'}</span>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <h4 className="font-semibold text-gray-900 mb-4">Performance</h4>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg bg-blue-50 p-3">
+                <p className="text-blue-600">Orders</p>
+                <p className="text-2xl font-bold text-blue-800">{supplier.totalOrders}</p>
+              </div>
+              <div className="rounded-lg bg-green-50 p-3">
+                <p className="text-green-600">On-time</p>
+                <p className="text-2xl font-bold text-green-800">{supplier.onTimeDeliveryRate}%</p>
+              </div>
+              <div className="rounded-lg bg-gray-50 p-3">
+                <p className="text-gray-600">Completed</p>
+                <p className="text-2xl font-bold text-gray-900">{supplier.completedOrders}</p>
+              </div>
+              <div className="rounded-lg bg-gray-50 p-3">
+                <p className="text-gray-600">Terms</p>
+                <p className="font-semibold text-gray-900">{formatPaymentTerms(supplier.paymentTerms)}</p>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <h4 className="font-semibold text-gray-900 mb-4">Categories</h4>
+            <div className="flex flex-wrap gap-2">
+              {supplier.categories.length > 0 ? supplier.categories.map((category) => (
+                <span key={category} className="rounded-lg bg-green-50 px-3 py-1 text-sm font-medium text-green-700">
+                  {category}
+                </span>
+              )) : (
+                <span className="text-sm text-gray-500">No categories listed</span>
+              )}
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <h4 className="font-semibold text-gray-900 mb-4">Ratings</h4>
+            {overallRating ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Overall</span>
+                  <div className="flex">{renderStars(overallRating)}</div>
+                </div>
+                {supplier.qualityRating && <RatingRow label="Quality" rating={supplier.qualityRating} renderStars={renderStars} />}
+                {supplier.serviceRating && <RatingRow label="Service" rating={supplier.serviceRating} renderStars={renderStars} />}
+                {supplier.pricingRating && <RatingRow label="Pricing" rating={supplier.pricingRating} renderStars={renderStars} />}
+              </div>
+            ) : (
+              <span className="text-sm text-gray-500">No ratings recorded</span>
+            )}
+          </Card>
+
+          <Card className="p-4 md:col-span-2">
+            <h4 className="font-semibold text-gray-900 mb-2">Notes</h4>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{supplier.notes || 'No notes recorded for this supplier.'}</p>
+          </Card>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+function RatingRow({
+  label,
+  rating,
+  renderStars
+}: {
+  label: string
+  rating: number
+  renderStars: (rating: number) => ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-gray-600">{label}</span>
+      <div className="flex">{renderStars(rating)}</div>
     </div>
   )
 }

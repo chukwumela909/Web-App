@@ -101,11 +101,20 @@ export async function getSuppliers(
   filters?: SupplierFilters,
   sortField: SupplierSortField = 'name',
   sortDirection: SortDirection = 'asc',
-  limitCount?: number
+  limitCount?: number,
+  branchId?: string
 ): Promise<Supplier[]> {
   if (isBackendAvailable()) {
     try {
-      let suppliers = await getBackendSuppliers()
+      let suppliers = await getBackendSuppliers(branchId)
+      if (filters?.status && filters.status.length > 0) {
+        suppliers = suppliers.filter((supplier) => filters.status!.includes(supplier.status))
+      }
+      if (filters?.categories && filters.categories.length > 0) {
+        suppliers = suppliers.filter((supplier) =>
+          supplier.categories?.some((category) => filters.categories!.includes(category))
+        )
+      }
       if (filters?.searchTerm) {
         const term = filters.searchTerm.toLowerCase()
         suppliers = suppliers.filter((supplier) =>
@@ -179,12 +188,13 @@ export async function getSuppliers(
   }
   
   return filteredSuppliers
+    .filter(supplier => !branchId || !(supplier as Supplier & { branchId?: string | null }).branchId || (supplier as Supplier & { branchId?: string | null }).branchId === branchId)
 }
 
-export async function getSupplier(supplierId: string): Promise<Supplier | null> {
+export async function getSupplier(supplierId: string, branchId?: string): Promise<Supplier | null> {
   if (isBackendAvailable()) {
     try {
-      const row = await getBackendSupplier(supplierId)
+      const row = await getBackendSupplier(supplierId, branchId)
       return mapBackendSupplier(row)
     } catch (error) {
       if (!shouldUseFirebaseFallback(error)) throw error
@@ -201,11 +211,12 @@ export async function getSupplier(supplierId: string): Promise<Supplier | null> 
 
 export async function createSupplier(
   userId: string,
-  data: CreateSupplierRequest
+  data: CreateSupplierRequest,
+  branchId?: string
 ): Promise<string> {
   if (isBackendAvailable()) {
     try {
-      return await createBackendSupplier(data as Partial<Supplier>)
+      return await createBackendSupplier(data as Partial<Supplier>, branchId)
     } catch (error) {
       if (!shouldUseFirebaseFallback(error)) throw error
       console.warn('Backend supplier create unavailable, falling back to Firestore:', error)
@@ -236,8 +247,9 @@ export async function createSupplier(
     
     // Audit fields
     createdBy: userId,
+    ...(branchId ? { branchId } : {}),
     userId
-  }
+  } as Supplier & { branchId?: string }
   
   // Clean the supplier data to remove undefined values before saving to Firestore
   const cleanSupplierData = removeUndefinedValues({
@@ -864,10 +876,10 @@ export async function getPriceHistory(
 // DASHBOARD AND ANALYTICS
 // ============================================================================
 
-export async function getSupplierDashboard(userId: string): Promise<SupplierDashboard> {
+export async function getSupplierDashboard(userId: string, branchId?: string): Promise<SupplierDashboard> {
   if (isBackendAvailable()) {
     try {
-      return await getBackendSupplierDashboard()
+      return await getBackendSupplierDashboard(branchId)
     } catch (error) {
       if (!shouldUseFirebaseFallback(error)) throw error
       console.warn('Backend supplier dashboard unavailable, falling back to Firestore:', error)
@@ -878,7 +890,9 @@ export async function getSupplierDashboard(userId: string): Promise<SupplierDash
   const suppliersSnap = await getDocs(
     query(collection(db, 'suppliers'), where('userId', '==', userId))
   )
-  const suppliers = suppliersSnap.docs.map(doc => doc.data() as Supplier)
+  const suppliers = suppliersSnap.docs
+    .map(doc => ({ id: doc.id, ...doc.data() } as Supplier))
+    .filter(supplier => !branchId || !(supplier as Supplier & { branchId?: string | null }).branchId || (supplier as Supplier & { branchId?: string | null }).branchId === branchId)
   
   const totalSuppliers = suppliers.length
   const activeSuppliers = suppliers.filter(s => s.status === 'ACTIVE').length
@@ -890,7 +904,9 @@ export async function getSupplierDashboard(userId: string): Promise<SupplierDash
       where('userId', '==', userId)
     )
   )
-  let recentOrders = recentOrdersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PurchaseOrder))
+  let recentOrders = recentOrdersSnap.docs
+    .map(doc => ({ id: doc.id, ...doc.data() } as PurchaseOrder))
+    .filter(order => !branchId || !order.branchId || order.branchId === branchId)
   
   // Sort client-side and limit to 10
   recentOrders = recentOrders

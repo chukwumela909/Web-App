@@ -45,7 +45,7 @@ export function useProductsQuery({ userId, branchId }: BusinessQueryArgs) {
 export function useSalesQuery({ userId, branchId, max = 2000 }: BusinessQueryArgs & { max?: number }) {
   return useQuery<Sale[]>({
     queryKey: businessQueryKeys.sales(userId, branchId, max),
-    queryFn: () => getSales(userId!, max),
+    queryFn: () => getSales(userId!, max, branchId),
     enabled: Boolean(userId),
     staleTime: 45 * 1000,
     placeholderData: previous => previous
@@ -55,7 +55,7 @@ export function useSalesQuery({ userId, branchId, max = 2000 }: BusinessQueryArg
 export function useMultiItemSalesQuery({ userId, branchId, max = 2000 }: BusinessQueryArgs & { max?: number }) {
   return useQuery<MultiItemSale[]>({
     queryKey: businessQueryKeys.multiItemSales(userId, branchId, max),
-    queryFn: () => getMultiItemSales(userId!, max),
+    queryFn: () => getMultiItemSales(userId!, max, branchId),
     enabled: Boolean(userId),
     staleTime: 45 * 1000,
     placeholderData: previous => previous
@@ -85,7 +85,7 @@ export function useExpensesQuery({ userId, branchId, max = 500 }: BusinessQueryA
 export function useDebtorsQuery({ userId, branchId }: BusinessQueryArgs) {
   return useQuery<Debtor[]>({
     queryKey: businessQueryKeys.debtors(userId, branchId),
-    queryFn: () => getDebtors(userId!),
+    queryFn: () => getDebtors(userId!, branchId),
     enabled: Boolean(userId),
     staleTime: 2 * 60 * 1000,
     placeholderData: previous => previous
@@ -98,10 +98,10 @@ export function useDashboardDataQuery({ userId, branchId }: BusinessQueryArgs) {
     queryFn: async () => {
       const [products, sales, multiItemSales, expenses, debtors] = await Promise.all([
         getProducts(userId!, branchId),
-        getSales(userId!, 2000),
-        getMultiItemSales(userId!, 2000),
+        getSales(userId!, 2000, branchId),
+        getMultiItemSales(userId!, 2000, branchId),
         getExpenses(userId!, 500),
-        getDebtors(userId!)
+        getDebtors(userId!, branchId)
       ])
 
       return { products, sales, multiItemSales, expenses, debtors }
@@ -118,8 +118,8 @@ export function usePOSDataQuery({ userId, branchId }: BusinessQueryArgs) {
     queryFn: async () => {
       const [products, singleSales, multiItemSales, heldSales] = await Promise.all([
         getProducts(userId!, branchId),
-        getSales(userId!, 2000),
-        getMultiItemSales(userId!, 2000),
+        getSales(userId!, 2000, branchId),
+        getMultiItemSales(userId!, 2000, branchId),
         getHeldSales(userId!, 50).catch((error) => {
           console.warn('Unable to load held sales:', error)
           return [] as HeldSale[]

@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
+import { useBranch } from '@/contexts/BranchContext'
 import { useEffect, useMemo, useState } from 'react'
 import {
   DailySummary,
@@ -217,6 +218,7 @@ function BranchIcon() {
 export default function ReportsPage() {
   const { user } = useAuth()
   const { staff } = useStaff()
+  const { selectedBranchId } = useBranch()
   const currency = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
   const [loading, setLoading] = useState(true)
@@ -235,6 +237,7 @@ export default function ReportsPage() {
 
   // Determine the effective user ID for data loading
   const effectiveUserId = staff ? staff.userId : user?.uid
+  const activeBranchId = selectedBranchId || undefined
 
   useEffect(() => {
     const load = async () => {
@@ -243,12 +246,12 @@ export default function ReportsPage() {
       try {
         const [s, rs, mis, prods, br, st, dbt] = await Promise.all([
           getDailySummaries(effectiveUserId, 90),
-          getSales(effectiveUserId, 2000),
-          getMultiItemSales(effectiveUserId, 2000),
-          getProducts(effectiveUserId),
+          getSales(effectiveUserId, 2000, activeBranchId),
+          getMultiItemSales(effectiveUserId, 2000, activeBranchId),
+          getProducts(effectiveUserId, activeBranchId),
           getBranches(effectiveUserId),
           getStaff(effectiveUserId),
-          getDebtors(effectiveUserId)
+          getDebtors(effectiveUserId, activeBranchId)
         ])
         console.log('Reports fetch - Summaries:', s.length, 'Sales:', rs.length, 'Multi-item Sales:', mis.length, 'Products:', prods.length)
         setSummaries(s)
@@ -263,11 +266,14 @@ export default function ReportsPage() {
       }
     }
     load()
-  }, [effectiveUserId])
+  }, [effectiveUserId, activeBranchId])
 
   useEffect(() => {
     const loadBackendReports = async () => {
       if (!effectiveUserId || !isBackendAvailable()) return
+
+      setBackendDashboardReport(null)
+      setBackendBranchPerformanceReport([])
 
       const days = periodToDays(selectedPeriod)
       const params: Record<string, string> = {
@@ -275,8 +281,8 @@ export default function ReportsPage() {
         to: new Date().toISOString()
       }
 
-      if (!staff) {
-        params.branchId = 'all'
+      if (activeBranchId) {
+        params.branchId = activeBranchId
       }
 
       const [dashboardResult, branchResult] = await Promise.allSettled([
@@ -302,7 +308,7 @@ export default function ReportsPage() {
     }
 
     loadBackendReports()
-  }, [effectiveUserId, selectedPeriod, staff])
+  }, [effectiveUserId, selectedPeriod, activeBranchId])
 
   // Combine single-item and multi-item sales for calculations
   const allSalesData = useMemo(() => {
@@ -666,7 +672,9 @@ export default function ReportsPage() {
   // Branch performance data from real branches and sales
   const branchPerformance = useMemo(() => {
     if (backendBranchPerformanceReport.length > 0) {
-      return backendBranchPerformanceReport.map((report) => {
+      return backendBranchPerformanceReport
+        .filter((report) => !activeBranchId || report.branchId === activeBranchId)
+        .map((report) => {
         const branch = branches.find((item) => item.id === report.branchId)
         const branchStaff = staffList.filter((staffMember) => staffMember.branchIds?.includes(report.branchId))
 
@@ -702,7 +710,9 @@ export default function ReportsPage() {
       return sum + Math.max(0, (sale.totalAmount || 0) - cost)
     }, 0)
 
-    return branches.map((branch, idx) => {
+    return branches
+      .filter((branch) => !activeBranchId || branch.id === activeBranchId)
+      .map((branch, idx) => {
       const branchStaff = staffList.filter(s => s.branchIds?.includes(branch.id))
       const branchProducts = branch.totalProducts || 0
       const costValue = branch.totalInventoryValue || 0
@@ -736,7 +746,7 @@ export default function ReportsPage() {
         profit: Math.max(0, branchProfitTotal)
       }
     })
-  }, [backendBranchPerformanceReport, branches, staffList, multiItemSales, recentSales])
+  }, [backendBranchPerformanceReport, branches, staffList, multiItemSales, recentSales, activeBranchId])
 
   // Staff performance data from real staff and sales
   const staffPerformance = useMemo(() => {
@@ -749,7 +759,10 @@ export default function ReportsPage() {
     const allSalesTotal = recentSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0) +
                           multiItemSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0)
 
-    return staffList.slice(0, 10).map((staffMember, idx) => {
+    return staffList
+      .filter((staffMember) => !activeBranchId || staffMember.branchIds?.includes(activeBranchId))
+      .slice(0, 10)
+      .map((staffMember, idx) => {
       // Find the branch name for this staff member
       const staffBranch = branches.find(b => staffMember.branchIds?.includes(b.id))
 
@@ -777,7 +790,7 @@ export default function ReportsPage() {
         sales: totalSalesAmount
       }
     })
-  }, [staffList, branches, multiItemSales, recentSales])
+  }, [staffList, branches, multiItemSales, recentSales, activeBranchId])
 
   // Calculate total product stats
   const productStats = useMemo(() => {

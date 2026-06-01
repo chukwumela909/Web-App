@@ -641,6 +641,7 @@ export function mapSale(row: AnyRecord): Sale {
     customerPhone: row.customer?.phone || row.customerPhone || null,
     notes: row.notes || null,
     isDeleted: false,
+    branchId: row.branchId || null,
     userId: row.userId || ''
   }
 }
