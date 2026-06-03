@@ -11,7 +11,7 @@ import type {
   ProductImage,
   Sale
 } from '@/lib/firestore'
-import type { MultiItemSale, SaleItem } from '@/lib/multi-item-sales-types'
+import type { DiscountType, MultiItemSale, SaleItem } from '@/lib/multi-item-sales-types'
 import type { Branch, BranchDashboard, BranchTransfer } from '@/lib/branches-types'
 import type {
   PurchaseOrder,
@@ -620,6 +620,10 @@ function saleItems(row: AnyRecord): AnyRecord[] {
   return Array.isArray(row.items) ? row.items : row.productId ? [row] : []
 }
 
+function discountTypeOf(value: unknown): DiscountType {
+  return String(value || 'fixed').toLowerCase() === 'percentage' ? 'percentage' : 'fixed'
+}
+
 export function mapSale(row: AnyRecord): Sale {
   const item = saleItems(row)[0] || {}
   const timestamp = toMillis(row.createdAt || row.date || row.timestamp)
@@ -652,6 +656,9 @@ export function mapMultiItemSale(row: AnyRecord): MultiItemSale {
     const quantity = Number(item.quantity || 1)
     const unitPrice = Number(item.unitPrice || 0)
     const costPrice = Number(item.costPrice || 0)
+    const lineGross = Number(item.lineTotal ?? item.grossTotal ?? quantity * unitPrice)
+    const lineDiscountAmount = Number(item.discountAmount ?? 0)
+    const lineSubtotal = Number(item.lineSubtotal ?? Math.max(0, lineGross - lineDiscountAmount))
     return {
       id: `${idOf(row)}_${index}`,
       productId: item.productId || null,
@@ -660,12 +667,17 @@ export function mapMultiItemSale(row: AnyRecord): MultiItemSale {
       quantity,
       unitPrice,
       costPrice,
-      lineTotal: Number(item.lineTotal ?? quantity * unitPrice),
-      profit: Number(item.profit ?? Math.max(0, (unitPrice - costPrice) * quantity)),
+      discount: Number(item.discount || 0),
+      discountType: discountTypeOf(item.discountType),
+      discountAmount: lineDiscountAmount,
+      lineSubtotal,
+      lineTotal: lineGross,
+      profit: Number(item.profit ?? Math.max(0, lineSubtotal - costPrice * quantity)),
       notes: item.notes || null
     } as SaleItem
   })
   const paymentName = fromBackendPaymentMethod(row.paymentMethod)
+  const saleDiscountAmount = Number(row.discountAmount ?? 0)
   return {
     id: idOf(row),
     saleNumber: row.saleNumber || idOf(row),
@@ -678,7 +690,8 @@ export function mapMultiItemSale(row: AnyRecord): MultiItemSale {
     tax: Number(row.tax || 0) || null,
     taxRate: row.taxRate || null,
     discount: Number(row.discount || 0) || null,
-    discountType: row.discountType || null,
+    discountType: row.discountType ? discountTypeOf(row.discountType) : null,
+    discountAmount: saleDiscountAmount || null,
     totalAmount: Number(row.totalAmount ?? row.total ?? 0),
     timestamp,
     date: dateString(timestamp),
@@ -722,7 +735,8 @@ export async function createBackendSale(data: Partial<Sale> | AnyRecord, branchI
         productId: saleData.productId,
         quantity: saleData.quantitySold || saleData.quantity || 1,
         unitPrice: saleData.unitPrice || 0,
-        discount: 0
+        discount: 0,
+        discountType: 'fixed'
       }]
 
   if (items.some((item: AnyRecord) => !item.productId)) {
@@ -736,7 +750,8 @@ export async function createBackendSale(data: Partial<Sale> | AnyRecord, branchI
         productId: item.productId,
         quantity: Number(item.quantity || item.quantitySold || 1),
         unitPrice: Number(item.unitPrice || 0),
-        discount: Number(item.discount || 0)
+        discount: Number(item.discount || 0),
+        discountType: discountTypeOf(item.discountType)
       })),
       customer: {
         name: saleData.customerName || undefined,
@@ -747,10 +762,47 @@ export async function createBackendSale(data: Partial<Sale> | AnyRecord, branchI
       paymentMethod: toBackendPaymentMethod(saleData.paymentMethod),
       tax: Number(saleData.tax || 0),
       discount: Number(saleData.discount || 0),
+      discountType: discountTypeOf(saleData.discountType),
       notes: saleData.notes || undefined
     })
   })
   return idOf(created) || idOf(created.sale || {})
+}
+
+export async function createBackendSaleAndReturn(data: AnyRecord, branchId?: string): Promise<MultiItemSale> {
+  const saleData = data as AnyRecord
+  const targetBranch = branchId || String(saleData.branchId || '') || await getSelectedBackendBranchId()
+  const items = Array.isArray(saleData.items) ? saleData.items : []
+
+  if (items.length === 0 || items.some((item: AnyRecord) => !item.productId)) {
+    throw new Error('Backend sales require product items.')
+  }
+
+  const created = await api<AnyRecord>(`/branches/${targetBranch}/sales`, {
+    method: 'POST',
+    body: JSON.stringify({
+      items: items.map((item: AnyRecord) => ({
+        productId: item.productId,
+        quantity: Number(item.quantity || item.quantitySold || 1),
+        unitPrice: Number(item.unitPrice || 0),
+        discount: Number(item.discount || 0),
+        discountType: discountTypeOf(item.discountType)
+      })),
+      customer: {
+        name: saleData.customerName || undefined,
+        phone: saleData.customerPhone || undefined,
+        email: saleData.customerEmail || undefined,
+        debtorId: saleData.debtorId || undefined
+      },
+      paymentMethod: toBackendPaymentMethod(saleData.paymentMethod),
+      tax: Number(saleData.tax || 0),
+      discount: Number(saleData.discount || 0),
+      discountType: discountTypeOf(saleData.discountType),
+      notes: saleData.notes || undefined
+    })
+  })
+
+  return mapMultiItemSale(created.sale || created)
 }
 
 export async function updateBackendSale(saleId: string, data: Partial<Sale>, branchId?: string) {

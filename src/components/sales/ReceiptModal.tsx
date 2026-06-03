@@ -18,15 +18,23 @@ interface ReceiptModalProps {
   businessName?: string
   businessPhone?: string
   businessAddress?: string
+  receiptHeaderText?: string
+  receiptThankYouMessage?: string
+}
+
+function isMultiItemSaleRecord(sale: Sale | MultiItemSale): sale is MultiItemSale {
+  return 'items' in sale && Array.isArray(sale.items)
 }
 
 export default function ReceiptModal({ 
   isOpen, 
   onClose, 
   sale,
-  businessName = "FahamPesa Business",
-  businessPhone = "+254 XXX XXX XXX",
-  businessAddress = "Nairobi, Kenya"
+  businessName = "Business",
+  businessPhone = "",
+  businessAddress = "",
+  receiptHeaderText = "",
+  receiptThankYouMessage = "Thank you for your business!"
 }: ReceiptModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null)
   const { currency } = useCurrency()
@@ -34,8 +42,8 @@ export default function ReceiptModal({
 
   if (!isOpen || !sale) return null
 
-  const isMultiItemSale = 'items' in sale && sale.items
-  const saleDate = new Date(sale.createdAt).toLocaleString('en-KE', {
+  const isMultiItemSale = isMultiItemSaleRecord(sale)
+  const saleDate = new Date(sale.timestamp || Date.now()).toLocaleString('en-KE', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -54,6 +62,10 @@ export default function ReceiptModal({
       default: return 'Cash'
     }
   }
+
+  const paymentMethodLabel = typeof sale.paymentMethod === 'string'
+    ? formatPaymentMethod(sale.paymentMethod)
+    : sale.paymentMethod.displayName
 
   const printReceipt = () => {
     if (receiptRef.current) {
@@ -166,8 +178,9 @@ export default function ReceiptModal({
             {/* Business Header */}
             <div className="header text-center border-b border-dashed border-gray-400 pb-4 mb-4">
               <div className="business-name text-lg font-bold">{businessName}</div>
-              <div className="text-sm text-gray-600">{businessPhone}</div>
-              <div className="text-sm text-gray-600">{businessAddress}</div>
+              {receiptHeaderText ? <div className="text-sm text-gray-600">{receiptHeaderText}</div> : null}
+              {businessPhone ? <div className="text-sm text-gray-600">{businessPhone}</div> : null}
+              {businessAddress ? <div className="text-sm text-gray-600">{businessAddress}</div> : null}
             </div>
 
             {/* Sale Details */}
@@ -194,7 +207,7 @@ export default function ReceiptModal({
               )}
               <div className="flex justify-between">
                 <span>Payment:</span>
-                <span>{formatPaymentMethod(sale.paymentMethod)}</span>
+                <span>{paymentMethodLabel}</span>
               </div>
             </div>
 
@@ -203,17 +216,33 @@ export default function ReceiptModal({
               <div className="space-y-2">
                 {isMultiItemSale ? (
                   // Multi-item sale
-                  sale.items.map((item, index) => (
+                  sale.items.map((item, index) => {
+                    const gross = item.lineTotal ?? item.quantity * item.unitPrice
+                    const discountAmount = item.discountAmount || 0
+                    const lineSubtotal = item.lineSubtotal ?? Math.max(0, gross - discountAmount)
+
+                    return (
                     <div key={index} className="space-y-1">
                       <div className="item-row flex justify-between">
                         <span className="item-name font-medium">{item.productName}</span>
                       </div>
                       <div className="item-row flex justify-between text-sm text-gray-600">
                         <span>{item.quantity} x {formatCurrency(item.unitPrice)}</span>
-                        <span className="item-price">{formatCurrency(item.quantity * item.unitPrice)}</span>
+                        <span className="item-price">{formatCurrency(gross)}</span>
+                      </div>
+                      {discountAmount > 0 && (
+                        <div className="item-row flex justify-between text-sm text-red-600">
+                          <span>Line discount</span>
+                          <span className="item-price">-{formatCurrency(discountAmount)}</span>
+                        </div>
+                      )}
+                      <div className="item-row flex justify-between text-sm font-medium">
+                        <span>Line subtotal</span>
+                        <span className="item-price">{formatCurrency(lineSubtotal)}</span>
                       </div>
                     </div>
-                  ))
+                    )
+                  })
                 ) : (
                   // Single-item sale
                   <div className="space-y-1">
@@ -231,6 +260,26 @@ export default function ReceiptModal({
 
             {/* Total */}
             <div className="total-row border-t border-dashed border-gray-400 pt-4">
+              {isMultiItemSale && (
+                <div className="mb-3 space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>{formatCurrency(sale.subtotal)}</span>
+                  </div>
+                  {sale.tax ? (
+                    <div className="flex justify-between">
+                      <span>Tax:</span>
+                      <span>{formatCurrency(sale.tax)}</span>
+                    </div>
+                  ) : null}
+                  {sale.discountAmount || sale.discount ? (
+                    <div className="flex justify-between text-red-600">
+                      <span>Cart discount:</span>
+                      <span>-{formatCurrency(sale.discountAmount || sale.discount || 0)}</span>
+                    </div>
+                  ) : null}
+                </div>
+              )}
               <div className="flex justify-between font-bold text-lg">
                 <span>TOTAL:</span>
                 <span>{formatCurrency(sale.totalAmount)}</span>
@@ -249,8 +298,7 @@ export default function ReceiptModal({
 
             {/* Footer */}
             <div className="footer border-t border-dashed border-gray-400 pt-4 text-center text-xs text-gray-500">
-              <p>Thank you for your business!</p>
-              <p>Powered by FahamPesa</p>
+              <p>{receiptThankYouMessage}</p>
             </div>
           </div>
         </div>

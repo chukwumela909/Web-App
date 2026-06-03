@@ -4,10 +4,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getDebtors,
   getExpenses,
+  getBusinessProfile,
   getHeldSales,
   getMultiItemSales,
   getProducts,
   getSales,
+  type BusinessProfile,
   type Debtor,
   type Expense,
   type Product,
@@ -116,17 +118,21 @@ export function usePOSDataQuery({ userId, branchId }: BusinessQueryArgs) {
   return useQuery({
     queryKey: businessQueryKeys.pos(userId, branchId),
     queryFn: async () => {
-      const [products, singleSales, multiItemSales, heldSales] = await Promise.all([
+      const [products, singleSales, multiItemSales, heldSales, businessProfile] = await Promise.all([
         getProducts(userId!, branchId),
         getSales(userId!, 2000, branchId),
         getMultiItemSales(userId!, 2000, branchId),
         getHeldSales(userId!, 50).catch((error) => {
           console.warn('Unable to load held sales:', error)
           return [] as HeldSale[]
+        }),
+        getBusinessProfile(userId!).catch((error) => {
+          console.warn('Unable to load business profile:', error)
+          return null as BusinessProfile | null
         })
       ])
 
-      return { products, singleSales, multiItemSales, heldSales }
+      return { products, singleSales, multiItemSales, heldSales, businessProfile }
     },
     enabled: Boolean(userId),
     staleTime: 30 * 1000,

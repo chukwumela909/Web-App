@@ -19,11 +19,13 @@ import {
   SaleCalculations,
   PAYMENT_METHODS 
 } from './multi-item-sales-types'
+import type { DiscountType, LegacyDiscountType } from './multi-item-sales-types'
 import {
   createBackendDebtor,
   createBackendExpense,
   createBackendProduct,
   createBackendSale,
+  createBackendSaleAndReturn,
   deleteBackendExpense,
   deleteBackendProduct,
   deleteBackendSale,
@@ -1086,50 +1088,50 @@ function backendSettingsProfile(userId: string, settings: Record<string, any>): 
 
   return {
     uid: userId,
-    businessName: businessProfile.businessName || '',
-    businessType: businessProfile.businessType || '',
-    businessAddress: businessProfile.businessAddress || businessProfile.address || '',
-    businessPhone: businessProfile.businessPhone || businessProfile.phone || '',
-    businessEmail: businessProfile.businessEmail || businessProfile.email || '',
-    currency: businessProfile.currency || 'KES',
-    taxRate: Number(businessProfile.taxRate || 0),
-    lowStockThreshold: Number(businessProfile.lowStockThreshold || 5),
-    companyLegalName: businessProfile.companyLegalName || businessProfile.legalCompanyName || '',
-    companyRegistrationNumber: businessProfile.companyRegistrationNumber || businessProfile.registrationNumber || '',
-    companyLogoUrl: businessProfile.companyLogoUrl || '',
-    receiptHeaderText: receiptSettings.receiptHeaderText || receiptSettings.headerText || '',
-    receiptFooterText: receiptSettings.receiptFooterText || receiptSettings.footerText || '',
-    receiptThankYouMessage: receiptSettings.receiptThankYouMessage || receiptSettings.thankYouMessage || '',
-    receiptLogoUrl: receiptSettings.receiptLogoUrl || receiptSettings.logoUrl || ''
+    businessName: businessProfile.businessName ?? '',
+    businessType: businessProfile.businessType ?? '',
+    businessAddress: businessProfile.businessAddress ?? businessProfile.address ?? '',
+    businessPhone: businessProfile.businessPhone ?? businessProfile.phone ?? '',
+    businessEmail: businessProfile.businessEmail ?? businessProfile.email ?? '',
+    currency: businessProfile.currency ?? 'KES',
+    taxRate: Number(businessProfile.taxRate ?? 0),
+    lowStockThreshold: Number(businessProfile.lowStockThreshold ?? 5),
+    companyLegalName: businessProfile.companyLegalName ?? businessProfile.legalCompanyName ?? '',
+    companyRegistrationNumber: businessProfile.companyRegistrationNumber ?? businessProfile.registrationNumber ?? '',
+    companyLogoUrl: businessProfile.companyLogoUrl ?? '',
+    receiptHeaderText: receiptSettings.receiptHeaderText ?? receiptSettings.headerText ?? '',
+    receiptFooterText: receiptSettings.receiptFooterText ?? receiptSettings.footerText ?? '',
+    receiptThankYouMessage: receiptSettings.receiptThankYouMessage ?? receiptSettings.thankYouMessage ?? '',
+    receiptLogoUrl: receiptSettings.receiptLogoUrl ?? receiptSettings.logoUrl ?? ''
   }
 }
 
 function backendBusinessSettingsPayload(profile: Partial<BusinessProfile>) {
   return {
     businessProfile: {
-      businessName: profile.businessName || '',
-      businessType: profile.businessType || '',
-      businessAddress: profile.businessAddress || '',
-      businessPhone: profile.businessPhone || '',
-      businessEmail: profile.businessEmail || '',
-      currency: profile.currency || 'KES',
-      taxRate: Number(profile.taxRate || 0),
-      lowStockThreshold: Number(profile.lowStockThreshold || 5),
-      companyLegalName: profile.companyLegalName || '',
-      legalCompanyName: profile.companyLegalName || '',
-      companyRegistrationNumber: profile.companyRegistrationNumber || '',
-      registrationNumber: profile.companyRegistrationNumber || '',
-      companyLogoUrl: profile.companyLogoUrl || ''
+      businessName: profile.businessName ?? '',
+      businessType: profile.businessType ?? '',
+      businessAddress: profile.businessAddress ?? '',
+      businessPhone: profile.businessPhone ?? '',
+      businessEmail: profile.businessEmail ?? '',
+      currency: profile.currency ?? 'KES',
+      taxRate: Number(profile.taxRate ?? 0),
+      lowStockThreshold: Number(profile.lowStockThreshold ?? 5),
+      companyLegalName: profile.companyLegalName ?? '',
+      legalCompanyName: profile.companyLegalName ?? '',
+      companyRegistrationNumber: profile.companyRegistrationNumber ?? '',
+      registrationNumber: profile.companyRegistrationNumber ?? '',
+      companyLogoUrl: profile.companyLogoUrl ?? ''
     },
     receiptSettings: {
-      receiptHeaderText: profile.receiptHeaderText || '',
-      headerText: profile.receiptHeaderText || '',
-      receiptFooterText: profile.receiptFooterText || '',
-      footerText: profile.receiptFooterText || '',
-      receiptThankYouMessage: profile.receiptThankYouMessage || '',
-      thankYouMessage: profile.receiptThankYouMessage || '',
-      receiptLogoUrl: profile.receiptLogoUrl || '',
-      logoUrl: profile.receiptLogoUrl || ''
+      receiptHeaderText: profile.receiptHeaderText ?? '',
+      headerText: profile.receiptHeaderText ?? '',
+      receiptFooterText: profile.receiptFooterText ?? '',
+      footerText: profile.receiptFooterText ?? '',
+      receiptThankYouMessage: profile.receiptThankYouMessage ?? '',
+      thankYouMessage: profile.receiptThankYouMessage ?? '',
+      receiptLogoUrl: profile.receiptLogoUrl ?? '',
+      logoUrl: profile.receiptLogoUrl ?? ''
     }
   }
 }
@@ -1166,21 +1168,21 @@ export async function upsertBusinessProfile(userId: string, profile: Partial<Bus
   
   const payload: BusinessProfile = {
     uid: userId,
-    businessName: profile.businessName || '',
-    businessType: profile.businessType || '',
-    businessAddress: profile.businessAddress || '',
-    businessPhone: profile.businessPhone || '',
-    businessEmail: profile.businessEmail || '',
-    currency: profile.currency || 'KES',
-    taxRate: Number(profile.taxRate || 0),
-    lowStockThreshold: Number(profile.lowStockThreshold || 5),
-    companyLegalName: profile.companyLegalName || existingData.companyLegalName || '',
-    companyRegistrationNumber: profile.companyRegistrationNumber || existingData.companyRegistrationNumber || '',
-    companyLogoUrl: profile.companyLogoUrl || existingData.companyLogoUrl || '',
-    receiptHeaderText: profile.receiptHeaderText || existingData.receiptHeaderText || '',
-    receiptFooterText: profile.receiptFooterText || existingData.receiptFooterText || '',
-    receiptThankYouMessage: profile.receiptThankYouMessage || existingData.receiptThankYouMessage || '',
-    receiptLogoUrl: profile.receiptLogoUrl || existingData.receiptLogoUrl || '',
+    businessName: profile.businessName ?? '',
+    businessType: profile.businessType ?? '',
+    businessAddress: profile.businessAddress ?? '',
+    businessPhone: profile.businessPhone ?? '',
+    businessEmail: profile.businessEmail ?? '',
+    currency: profile.currency ?? 'KES',
+    taxRate: Number(profile.taxRate ?? 0),
+    lowStockThreshold: Number(profile.lowStockThreshold ?? 5),
+    companyLegalName: profile.companyLegalName ?? existingData.companyLegalName ?? '',
+    companyRegistrationNumber: profile.companyRegistrationNumber ?? existingData.companyRegistrationNumber ?? '',
+    companyLogoUrl: profile.companyLogoUrl ?? existingData.companyLogoUrl ?? '',
+    receiptHeaderText: profile.receiptHeaderText ?? existingData.receiptHeaderText ?? '',
+    receiptFooterText: profile.receiptFooterText ?? existingData.receiptFooterText ?? '',
+    receiptThankYouMessage: profile.receiptThankYouMessage ?? existingData.receiptThankYouMessage ?? '',
+    receiptLogoUrl: profile.receiptLogoUrl ?? existingData.receiptLogoUrl ?? '',
     lastUpdated: Date.now(),
     createdAt: existing.exists() ? existingData.createdAt || Date.now() : Date.now()
   }
@@ -1632,7 +1634,11 @@ function buildSaleItems(transactionId: string, dataItems: Partial<SaleItem>[]): 
     const unitPrice = Number(item.unitPrice || 0)
     const costPrice = Number(item.costPrice || 0)
     const lineTotal = SaleCalculations.calculateLineTotal(quantity, unitPrice)
-    const profit = SaleCalculations.calculateProfit(quantity, unitPrice, costPrice)
+    const discountType = SaleCalculations.normalizeDiscountType(item.discountType)
+    const discount = Number(item.discount || 0)
+    const discountAmount = SaleCalculations.calculateLineDiscount(quantity, unitPrice, discount, discountType)
+    const lineSubtotal = SaleCalculations.calculateLineSubtotal(quantity, unitPrice, discount, discountType)
+    const profit = Number((lineSubtotal - costPrice * quantity).toFixed(2))
     
     return {
       id: item.id || `item_${transactionId}_${index + 1}`,
@@ -1645,6 +1651,10 @@ function buildSaleItems(transactionId: string, dataItems: Partial<SaleItem>[]): 
       originalPrice: item.originalPrice || null,
       isPriceOverridden: Boolean(item.isPriceOverridden),
       costPrice,
+      discount,
+      discountType,
+      discountAmount,
+      lineSubtotal,
       lineTotal,
       profit,
       notes: item.notes || null
@@ -1662,7 +1672,7 @@ export async function createMultiItemSale(userId: string, data: {
   tax?: number
   taxRate?: number
   discount?: number
-  discountType?: 'PERCENTAGE' | 'FIXED'
+  discountType?: LegacyDiscountType
   notes?: string
   branchId?: string
 }): Promise<string> {
@@ -1684,9 +1694,13 @@ export async function createMultiItemSale(userId: string, data: {
   // Calculate totals
   const subtotal = SaleCalculations.calculateSubtotal(items)
   const taxAmount = data.taxRate ? SaleCalculations.calculateTax(subtotal, data.taxRate) : (data.tax || 0)
-  const discountAmount = data.discount && data.discountType 
-    ? SaleCalculations.calculateDiscount(subtotal, data.discount, data.discountType)
-    : (data.discount || 0)
+  const discountType = SaleCalculations.normalizeDiscountType(data.discountType)
+  const discount = Number(data.discount || 0)
+  const discountBase = subtotal + taxAmount
+  const discountAmount = Math.min(
+    discountBase,
+    SaleCalculations.calculateDiscount(discountBase, discount, discountType)
+  )
   const totalAmount = SaleCalculations.calculateTotal(subtotal, taxAmount, discountAmount)
   
   const multiItemSale: MultiItemSale = {
@@ -1700,8 +1714,9 @@ export async function createMultiItemSale(userId: string, data: {
     subtotal,
     tax: taxAmount > 0 ? taxAmount : null,
     taxRate: data.taxRate || null,
-    discount: discountAmount > 0 ? discountAmount : null,
-    discountType: data.discountType || null,
+    discount: discount > 0 ? discount : null,
+    discountType,
+    discountAmount: discountAmount > 0 ? discountAmount : null,
     totalAmount,
     timestamp,
     date: new Date(timestamp).toISOString().split('T')[0],
@@ -1736,6 +1751,70 @@ export async function createMultiItemSale(userId: string, data: {
   }
   
   return saleId
+}
+
+export async function createMultiItemSaleAndReturn(userId: string, data: {
+  items: Partial<SaleItem>[]
+  customerName?: string
+  customerPhone?: string
+  customerEmail?: string
+  paymentMethod: string
+  tax?: number
+  taxRate?: number
+  discount?: number
+  discountType?: LegacyDiscountType
+  notes?: string
+  branchId?: string
+}): Promise<MultiItemSale> {
+  if (isBackendAvailable()) {
+    try {
+      return await createBackendSaleAndReturn(data)
+    } catch (error) {
+      if (!shouldUseFirebaseFallback(error)) throw error
+      console.warn('Backend multi-item sale create unavailable, falling back to Firestore:', error)
+    }
+  }
+
+  const saleId = await createMultiItemSale(userId, data)
+  const timestamp = Date.now()
+  const items = buildSaleItems(saleId, data.items)
+  const subtotal = SaleCalculations.calculateSubtotal(items)
+  const taxAmount = data.taxRate ? SaleCalculations.calculateTax(subtotal, data.taxRate) : Number(data.tax || 0)
+  const discountType = SaleCalculations.normalizeDiscountType(data.discountType)
+  const discount = Number(data.discount || 0)
+  const discountBase = subtotal + taxAmount
+  const discountAmount = Math.min(
+    discountBase,
+    SaleCalculations.calculateDiscount(discountBase, discount, discountType)
+  )
+
+  return {
+    id: saleId,
+    saleNumber: generateSaleNumber(),
+    items,
+    customerName: data.customerName || null,
+    customerPhone: data.customerPhone || null,
+    customerEmail: data.customerEmail || null,
+    paymentMethod: PAYMENT_METHODS.find(pm => pm.name === data.paymentMethod) || PAYMENT_METHODS[0],
+    subtotal,
+    tax: taxAmount > 0 ? taxAmount : null,
+    taxRate: data.taxRate || null,
+    discount: discount > 0 ? discount : null,
+    discountType,
+    discountAmount: discountAmount > 0 ? discountAmount : null,
+    totalAmount: SaleCalculations.calculateTotal(subtotal, taxAmount, discountAmount),
+    timestamp,
+    date: new Date(timestamp).toISOString().split('T')[0],
+    notes: data.notes || null,
+    createdBy: null,
+    isDeleted: false,
+    deletedAt: null,
+    lastModifiedAt: timestamp,
+    userId,
+    branchId: data.branchId || null,
+    isSynced: false,
+    lastSyncedAt: 0
+  }
 }
 
 // Get multi-item sales
@@ -1792,6 +1871,8 @@ export async function createHeldSale(userId: string, data: {
   customerEmail?: string
   paymentMethod: string
   discount?: number
+  discountType?: LegacyDiscountType
+  tax?: number
   notes?: string
   branchId?: string
   createdBy?: string | null
@@ -1800,8 +1881,15 @@ export async function createHeldSale(userId: string, data: {
   const timestamp = Date.now()
   const items = buildSaleItems(heldSaleId, data.items)
   const subtotal = SaleCalculations.calculateSubtotal(items)
-  const discountAmount = Math.min(subtotal, Math.max(0, Number(data.discount || 0)))
-  const totalAmount = Math.max(0, SaleCalculations.calculateTotal(subtotal, 0, discountAmount))
+  const taxAmount = Number(data.tax || 0)
+  const discountType = SaleCalculations.normalizeDiscountType(data.discountType)
+  const discount = Number(data.discount || 0)
+  const discountBase = subtotal + taxAmount
+  const discountAmount = Math.min(
+    discountBase,
+    SaleCalculations.calculateDiscount(discountBase, discount, discountType)
+  )
+  const totalAmount = Math.max(0, SaleCalculations.calculateTotal(subtotal, taxAmount, discountAmount))
 
   const heldSale: HeldSale = {
     id: heldSaleId,
@@ -1812,8 +1900,10 @@ export async function createHeldSale(userId: string, data: {
     customerEmail: data.customerEmail || null,
     paymentMethod: PAYMENT_METHODS.find(pm => pm.name === data.paymentMethod) || PAYMENT_METHODS[0],
     subtotal,
-    discount: discountAmount > 0 ? discountAmount : null,
-    discountType: discountAmount > 0 ? 'FIXED' : null,
+    tax: taxAmount > 0 ? taxAmount : null,
+    discount: discount > 0 ? discount : null,
+    discountType,
+    discountAmount: discountAmount > 0 ? discountAmount : null,
     totalAmount,
     timestamp,
     lastModifiedAt: timestamp,
@@ -1876,6 +1966,8 @@ export async function completeHeldSale(
     customerEmail?: string
     paymentMethod?: string
     discount?: number
+    discountType?: LegacyDiscountType
+    tax?: number
     notes?: string
     branchId?: string
   } = {}
@@ -1896,7 +1988,8 @@ export async function completeHeldSale(
     customerEmail: overrides.customerEmail ?? heldSale.customerEmail ?? undefined,
     paymentMethod: overrides.paymentMethod || paymentMethod || 'CASH',
     discount: overrides.discount ?? heldSale.discount ?? undefined,
-    discountType: 'FIXED',
+    discountType: overrides.discountType ?? heldSale.discountType ?? 'fixed',
+    tax: overrides.tax ?? heldSale.tax ?? undefined,
     notes: overrides.notes ?? heldSale.notes ?? undefined,
     branchId: overrides.branchId || heldSale.branchId || undefined
   })
@@ -1907,6 +2000,52 @@ export async function completeHeldSale(
   })
 
   return saleId
+}
+
+export async function completeHeldSaleAndReturn(
+  userId: string,
+  heldSaleId: string,
+  overrides: {
+    items?: Partial<SaleItem>[]
+    customerName?: string
+    customerPhone?: string
+    customerEmail?: string
+    paymentMethod?: string
+    discount?: number
+    discountType?: LegacyDiscountType
+    tax?: number
+    notes?: string
+    branchId?: string
+  } = {}
+): Promise<MultiItemSale> {
+  const heldSaleSnap = await getDoc(doc(db, 'held_sales', heldSaleId))
+  if (!heldSaleSnap.exists()) {
+    throw new Error('Held sale not found')
+  }
+
+  const heldSale = { id: heldSaleSnap.id, ...heldSaleSnap.data() } as HeldSale
+  const paymentMethod = typeof heldSale.paymentMethod === 'string'
+    ? heldSale.paymentMethod
+    : heldSale.paymentMethod.name
+  const sale = await createMultiItemSaleAndReturn(userId, {
+    items: overrides.items || heldSale.items,
+    customerName: overrides.customerName ?? heldSale.customerName ?? undefined,
+    customerPhone: overrides.customerPhone ?? heldSale.customerPhone ?? undefined,
+    customerEmail: overrides.customerEmail ?? heldSale.customerEmail ?? undefined,
+    paymentMethod: overrides.paymentMethod || paymentMethod || 'CASH',
+    discount: overrides.discount ?? heldSale.discount ?? undefined,
+    discountType: overrides.discountType ?? heldSale.discountType ?? 'fixed',
+    tax: overrides.tax ?? heldSale.tax ?? undefined,
+    notes: overrides.notes ?? heldSale.notes ?? undefined,
+    branchId: overrides.branchId || heldSale.branchId || undefined
+  })
+
+  await updateHeldSale(heldSaleId, {
+    status: 'COMPLETED',
+    completedSaleId: sale.id
+  })
+
+  return sale
 }
 
 

@@ -11,12 +11,12 @@ import {
   ShoppingCartIcon 
 } from '@heroicons/react/24/outline'
 import type { Product, SaleType } from '@/lib/firestore'
-import { createMultiItemSale } from '@/lib/firestore'
+import { createMultiItemSaleAndReturn } from '@/lib/firestore'
 import { 
-  SaleItem, 
   SaleCalculations,
   PAYMENT_METHODS 
 } from '@/lib/multi-item-sales-types'
+import type { DiscountType, MultiItemSale, SaleItem } from '@/lib/multi-item-sales-types'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 
 interface MultiItemSalesFormProps {
@@ -32,6 +32,8 @@ interface FormSaleItem extends Partial<SaleItem> {
   quantity: number
   unitPrice: number
   costPrice: number
+  discount: number
+  discountType: DiscountType
 }
 
 const defaultItem: FormSaleItem = {
@@ -43,7 +45,28 @@ const defaultItem: FormSaleItem = {
   quantity: 1,
   unitPrice: 0,
   costPrice: 0,
+  discount: 0,
+  discountType: 'fixed',
   notes: null
+}
+
+function lineGross(item: Pick<FormSaleItem, 'quantity' | 'unitPrice'>): number {
+  return SaleCalculations.calculateLineTotal(item.quantity, item.unitPrice)
+}
+
+function lineDiscountAmount(item: Pick<FormSaleItem, 'quantity' | 'unitPrice' | 'discount' | 'discountType'>): number {
+  return SaleCalculations.calculateLineDiscount(item.quantity, item.unitPrice, item.discount, item.discountType)
+}
+
+function lineSubtotal(item: Pick<FormSaleItem, 'quantity' | 'unitPrice' | 'discount' | 'discountType'>): number {
+  return SaleCalculations.calculateLineSubtotal(item.quantity, item.unitPrice, item.discount, item.discountType)
+}
+
+function discountValidationMessage(value: number, discountType: DiscountType, fixedMaximum: number, label: string): string | null {
+  if (value < 0) return `${label} discount cannot be negative.`
+  if (discountType === 'percentage' && value > 100) return `${label} percentage discount cannot exceed 100%.`
+  if (discountType === 'fixed' && value > fixedMaximum) return `${label} fixed discount cannot exceed ${fixedMaximum.toLocaleString()}.`
+  return null
 }
 
 export default function MultiItemSalesForm({ 
@@ -64,7 +87,7 @@ export default function MultiItemSalesForm({
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [taxRate, setTaxRate] = useState(0)
   const [discountAmount, setDiscountAmount] = useState(0)
-  const [discountType, setDiscountType] = useState<'PERCENTAGE' | 'FIXED'>('FIXED')
+  const [discountType, setDiscountType] = useState<DiscountType>('fixed')
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [productSearchQueries, setProductSearchQueries] = useState<{[key: string]: string}>({})
@@ -111,7 +134,7 @@ export default function MultiItemSalesForm({
       setPaymentMethod('CASH')
       setTaxRate(0)
       setDiscountAmount(0)
-      setDiscountType('FIXED')
+      setDiscountType('fixed')
       setNotes('')
       setProductSearchQueries({})
     }
@@ -152,17 +175,16 @@ export default function MultiItemSalesForm({
 
   // Calculate totals
   const calculations = useMemo(() => {
-    const validItems = items.filter(item => 
-      item.productName.trim() && item.quantity > 0 && item.unitPrice > 0
+    const validItems = items.filter(item =>
+      (item.productName || '').trim() && item.quantity > 0 && item.unitPrice > 0
     )
     
-    const subtotal = validItems.reduce((sum, item) => 
-      sum + SaleCalculations.calculateLineTotal(item.quantity, item.unitPrice), 0
-    )
+    const subtotal = validItems.reduce((sum, item) => sum + lineSubtotal(item), 0)
     
     const tax = taxRate > 0 ? SaleCalculations.calculateTax(subtotal, taxRate) : 0
+    const discountBase = subtotal + tax
     const discount = discountAmount > 0 
-      ? SaleCalculations.calculateDiscount(subtotal, discountAmount, discountType)
+      ? Math.min(discountBase, SaleCalculations.calculateDiscount(discountBase, discountAmount, discountType))
       : 0
     
     const total = SaleCalculations.calculateTotal(subtotal, tax, discount)
@@ -170,12 +192,24 @@ export default function MultiItemSalesForm({
     return { subtotal, tax, discount, total, itemCount: validItems.length }
   }, [items, taxRate, discountAmount, discountType])
 
+  const itemDiscountValidation = useMemo(() => {
+    return items
+      .map(item => discountValidationMessage(item.discount, item.discountType, lineGross(item), item.productName || 'Line'))
+      .find(Boolean) || null
+  }, [items])
+
+  const cartDiscountValidation = useMemo(() => {
+    return discountValidationMessage(discountAmount, discountType, calculations.subtotal + calculations.tax, 'Cart')
+  }, [calculations.subtotal, calculations.tax, discountAmount, discountType])
+
+  const saleValidationMessage = itemDiscountValidation || cartDiscountValidation
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    const validItems = items.filter(item => 
-      item.productName.trim() && item.quantity > 0 && item.unitPrice > 0
+    const validItems = items.filter(item =>
+      (item.productName || '').trim() && item.quantity > 0 && item.unitPrice > 0
     )
     
     if (validItems.length === 0) {
@@ -183,18 +217,16 @@ export default function MultiItemSalesForm({
       return
     }
 
+    if (saleValidationMessage) {
+      alert(saleValidationMessage)
+      return
+    }
+
     setIsSubmitting(true)
     
     try {
       // Calculate totals for the sale
-      const subtotal = validItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
-      const tax = taxRate > 0 ? SaleCalculations.calculateTax(subtotal, taxRate) : 0
-      const discount = discountAmount > 0 
-        ? SaleCalculations.calculateDiscount(subtotal, discountAmount, discountType)
-        : 0
-      const total = SaleCalculations.calculateTotal(subtotal, tax, discount)
-      
-      const saleId = await createMultiItemSale(userId, {
+      const completedSale = await createMultiItemSaleAndReturn(userId, {
         items: validItems.map(item => ({
           productId: item.productId,
           productName: item.productName,
@@ -203,6 +235,11 @@ export default function MultiItemSalesForm({
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           costPrice: item.costPrice,
+          discount: item.discount,
+          discountType: item.discountType,
+          discountAmount: lineDiscountAmount(item),
+          lineSubtotal: lineSubtotal(item),
+          lineTotal: lineGross(item),
           notes: item.notes
         })),
         customerName: customerName.trim() || undefined,
@@ -210,53 +247,11 @@ export default function MultiItemSalesForm({
         customerEmail: customerEmail.trim() || undefined,
         paymentMethod,
         taxRate: taxRate > 0 ? taxRate : undefined,
-        discount: discountAmount > 0 ? discountAmount : undefined,
-        discountType: discountAmount > 0 ? discountType : undefined,
+        discount: discountAmount,
+        discountType,
         notes: notes.trim() || undefined
       })
-      
-      // Create the sale object for the receipt
-      const completedSale: MultiItemSale = {
-        id: saleId,
-        saleNumber: `SALE-${Date.now()}`,
-        items: validItems.map((item, index) => ({
-          id: `item_${saleId}_${index + 1}`,
-          productId: item.productId || null,
-          productName: item.productName,
-          saleType: item.saleType || 'PRODUCT',
-          serviceDescription: item.serviceDescription || null,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          originalPrice: item.originalPrice || null,
-          isPriceOverridden: item.isPriceOverridden || false,
-          costPrice: item.costPrice || 0,
-          lineTotal: item.quantity * item.unitPrice,
-          profit: item.quantity * (item.unitPrice - (item.costPrice || 0)),
-          notes: item.notes || null
-        })),
-        customerName: customerName.trim() || null,
-        customerPhone: customerPhone.trim() || null,
-        customerEmail: customerEmail.trim() || null,
-        paymentMethod: PAYMENT_METHODS.find(pm => pm.name === paymentMethod) || PAYMENT_METHODS[0],
-        subtotal: subtotal,
-        tax: taxRate > 0 ? tax : null,
-        taxRate: taxRate > 0 ? taxRate : null,
-        discount: discountAmount > 0 ? discount : null,
-        discountType: discountAmount > 0 ? discountType : null,
-        totalAmount: total,
-        timestamp: Date.now(),
-        date: new Date().toISOString().split('T')[0],
-        notes: notes.trim() || null,
-        createdBy: null,
-        isDeleted: false,
-        deletedAt: null,
-        lastModifiedAt: Date.now(),
-        userId,
-        branchId: null,
-        isSynced: false,
-        lastSyncedAt: 0
-      }
-      
+
       onSuccess(completedSale)
       onClose()
     } catch (error) {
@@ -304,14 +299,20 @@ export default function MultiItemSalesForm({
             
             <div className="space-y-4">
               <AnimatePresence>
-                {items.map((item, index) => (
-                  <motion.div
-                    key={item.tempId}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className="bg-gray-50 rounded-xl p-6 border border-gray-200"
-                  >
+                {items.map((item, index) => {
+                  const gross = lineGross(item)
+                  const itemDiscount = lineDiscountAmount(item)
+                  const itemSubtotal = lineSubtotal(item)
+                  const itemDiscountError = discountValidationMessage(item.discount, item.discountType, gross, 'Line')
+
+                  return (
+                    <motion.div
+                      key={item.tempId}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className="bg-gray-50 rounded-xl p-6 border border-gray-200"
+                    >
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="font-medium text-gray-900">Item #{index + 1}</h4>
                       {items.length > 1 && (
@@ -462,13 +463,53 @@ export default function MultiItemSalesForm({
                         />
                       </div>
 
-                      {/* Line Total */}
+                      {/* Line Discount */}
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Line Discount
+                        </label>
+                        <div className="grid grid-cols-[minmax(0,1fr)_140px] gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.discount}
+                            onChange={(e) => updateItem(item.tempId, { discount: Number(e.target.value) || 0 })}
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${itemDiscountError ? 'border-red-500' : 'border-gray-300'}`}
+                            placeholder="0"
+                          />
+                          <select
+                            value={item.discountType}
+                            onChange={(e) => updateItem(item.tempId, { discountType: e.target.value as DiscountType })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="fixed">Fixed</option>
+                            <option value="percentage">Percentage</option>
+                          </select>
+                        </div>
+                        <p className={`mt-1 text-xs ${itemDiscountError ? 'text-red-600' : 'text-gray-500'}`}>
+                          {itemDiscountError || `Discount amount: ${currencySymbol} ${itemDiscount.toLocaleString()}`}
+                        </p>
+                      </div>
+
+                      {/* Line Totals */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Line Total
+                          Line Subtotal
                         </label>
-                        <div className="px-3 py-2 bg-gray-100 border rounded-lg text-gray-900 font-medium">
-                          {currencySymbol} {SaleCalculations.calculateLineTotal(item.quantity, item.unitPrice).toLocaleString()}
+                        <div className="space-y-1 rounded-lg border bg-white px-3 py-2 text-sm">
+                          <div className="flex justify-between gap-3 text-gray-500">
+                            <span>Gross</span>
+                            <span>{currencySymbol} {gross.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between gap-3 text-red-600">
+                            <span>Discount</span>
+                            <span>-{currencySymbol} {itemDiscount.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between gap-3 border-t pt-1 font-semibold text-gray-900">
+                            <span>Subtotal</span>
+                            <span>{currencySymbol} {itemSubtotal.toLocaleString()}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -486,8 +527,9 @@ export default function MultiItemSalesForm({
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  )
+                })}
               </AnimatePresence>
 
               {/* Add Item Button */}
@@ -576,7 +618,7 @@ export default function MultiItemSalesForm({
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Discount ({discountType === 'PERCENTAGE' ? '%' : currencySymbol})
+                      Cart Discount ({discountType === 'percentage' ? '%' : currencySymbol})
                     </label>
                     <div className="flex gap-2">
                       <input
@@ -585,17 +627,20 @@ export default function MultiItemSalesForm({
                         step="0.01"
                         value={discountAmount}
                         onChange={(e) => setDiscountAmount(Number(e.target.value) || 0)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${cartDiscountValidation ? 'border-red-500' : 'border-gray-300'}`}
                       />
                       <select
                         value={discountType}
-                        onChange={(e) => setDiscountType(e.target.value as 'PERCENTAGE' | 'FIXED')}
+                        onChange={(e) => setDiscountType(e.target.value as DiscountType)}
                         className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="FIXED">{currencySymbol}</option>
-                        <option value="PERCENTAGE">%</option>
+                        <option value="fixed">Fixed</option>
+                        <option value="percentage">Percentage</option>
                       </select>
                     </div>
+                    {cartDiscountValidation && (
+                      <p className="mt-1 text-xs text-red-600">{cartDiscountValidation}</p>
+                    )}
                   </div>
                 </div>
 
@@ -626,16 +671,17 @@ export default function MultiItemSalesForm({
                     <span className="text-gray-600">Subtotal:</span>
                     <span className="font-medium">{currencySymbol} {calculations.subtotal.toLocaleString()}</span>
                   </div>
-                  {calculations.tax > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Tax ({taxRate}%):</span>
-                      <span className="font-medium">{currencySymbol} {calculations.tax.toLocaleString()}</span>
-                    </div>
-                  )}
-                  {calculations.discount > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Discount:</span>
-                      <span className="font-medium text-red-600">-{currencySymbol} {calculations.discount.toLocaleString()}</span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Tax ({taxRate}%):</span>
+                    <span className="font-medium">{currencySymbol} {calculations.tax.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Cart discount amount:</span>
+                    <span className="font-medium text-red-600">-{currencySymbol} {calculations.discount.toLocaleString()}</span>
+                  </div>
+                  {saleValidationMessage && (
+                    <div className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600">
+                      {saleValidationMessage}
                     </div>
                   )}
                   <hr className="border-gray-300" />
@@ -659,9 +705,9 @@ export default function MultiItemSalesForm({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || calculations.itemCount === 0}
+              disabled={isSubmitting || calculations.itemCount === 0 || Boolean(saleValidationMessage)}
               className={`px-8 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                isSubmitting || calculations.itemCount === 0
+                isSubmitting || calculations.itemCount === 0 || Boolean(saleValidationMessage)
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
               }`}

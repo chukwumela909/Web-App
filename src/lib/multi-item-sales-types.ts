@@ -2,6 +2,8 @@
 // Enhanced sales system to support multiple products/services per transaction
 
 export type SaleType = 'PRODUCT' | 'SERVICE' | 'OTHER'
+export type DiscountType = 'fixed' | 'percentage'
+export type LegacyDiscountType = DiscountType | 'FIXED' | 'PERCENTAGE'
 
 export interface SaleItem {
   id: string // Unique ID for this item within the sale
@@ -14,8 +16,12 @@ export interface SaleItem {
   originalPrice?: number | null // Original product price (if overridden)
   isPriceOverridden?: boolean // Flag if price was manually changed
   costPrice: number // Cost price for profit calculation
+  discount?: number | null // Original discount value entered for this line
+  discountType?: DiscountType | null // Discount value type
+  discountAmount?: number | null // Calculated discount amount for this line
+  lineSubtotal?: number | null // Gross minus line discount
   lineTotal: number // quantity * unitPrice
-  profit: number // (unitPrice - costPrice) * quantity
+  profit: number // line subtotal - cost
   notes?: string | null // Item-specific notes
 }
 
@@ -34,8 +40,9 @@ export interface MultiItemSale {
   subtotal: number // Sum of all line totals
   tax?: number | null // Tax amount if applicable
   taxRate?: number | null // Tax rate percentage
-  discount?: number | null // Discount amount
-  discountType?: 'PERCENTAGE' | 'FIXED' | null // Type of discount
+  discount?: number | null // Original cart-level discount value
+  discountType?: DiscountType | null // Type of discount
+  discountAmount?: number | null // Calculated cart-level discount amount
   totalAmount: number // Final amount after tax and discount
   
   // Transaction Details
@@ -67,8 +74,10 @@ export interface HeldSale {
   customerEmail?: string | null
   paymentMethod: PaymentMethod
   subtotal: number
+  tax?: number | null
   discount?: number | null
-  discountType?: 'FIXED' | null
+  discountType?: DiscountType | null
+  discountAmount?: number | null
   totalAmount: number
   timestamp: number
   lastModifiedAt: number
@@ -111,8 +120,32 @@ export class SaleCalculations {
     return Number(((unitPrice - validCostPrice) * quantity).toFixed(2))
   }
   
+  static normalizeDiscountType(discountType?: LegacyDiscountType | null): DiscountType {
+    return String(discountType || 'fixed').toLowerCase() === 'percentage' ? 'percentage' : 'fixed'
+  }
+
+  static calculateDiscount(baseAmount: number, discount: number, discountType: LegacyDiscountType): number {
+    const amount = Math.max(0, Number(discount || 0))
+    if (this.normalizeDiscountType(discountType) === 'percentage') {
+      return Number((baseAmount * (amount / 100)).toFixed(2))
+    }
+    return Number(amount.toFixed(2))
+  }
+
+  static calculateLineDiscount(quantity: number, unitPrice: number, discount = 0, discountType: LegacyDiscountType = 'fixed'): number {
+    const lineGross = this.calculateLineTotal(quantity, unitPrice)
+    const discountAmount = this.calculateDiscount(lineGross, discount, discountType)
+    return Number(Math.min(lineGross, Math.max(0, discountAmount)).toFixed(2))
+  }
+
+  static calculateLineSubtotal(quantity: number, unitPrice: number, discount = 0, discountType: LegacyDiscountType = 'fixed'): number {
+    const lineGross = this.calculateLineTotal(quantity, unitPrice)
+    const discountAmount = this.calculateLineDiscount(quantity, unitPrice, discount, discountType)
+    return Number(Math.max(0, lineGross - discountAmount).toFixed(2))
+  }
+
   static calculateSubtotal(items: SaleItem[]): number {
-    return Number(items.reduce((sum, item) => sum + item.lineTotal, 0).toFixed(2))
+    return Number(items.reduce((sum, item) => sum + Number(item.lineSubtotal ?? item.lineTotal ?? 0), 0).toFixed(2))
   }
   
   static calculateTotal(subtotal: number, tax = 0, discount = 0): number {
@@ -123,12 +156,6 @@ export class SaleCalculations {
     return Number((subtotal * (taxRate / 100)).toFixed(2))
   }
   
-  static calculateDiscount(subtotal: number, discount: number, discountType: 'PERCENTAGE' | 'FIXED'): number {
-    if (discountType === 'PERCENTAGE') {
-      return Number((subtotal * (discount / 100)).toFixed(2))
-    }
-    return Number(discount.toFixed(2))
-  }
 }
 
 // Sales summary for reporting

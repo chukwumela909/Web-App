@@ -28,13 +28,14 @@ import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { useInvalidateBusinessData, usePOSDataQuery } from '@/hooks/useBusinessQueries'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
-  completeHeldSale,
+  completeHeldSaleAndReturn,
   createHeldSale,
-  createMultiItemSale,
+  createMultiItemSaleAndReturn,
   deleteHeldSale
 } from '@/lib/firestore'
 import type { Product, Sale } from '@/lib/firestore'
-import type { HeldSale, MultiItemSale, SaleItem } from '@/lib/multi-item-sales-types'
+import type { DiscountType, HeldSale, MultiItemSale, SaleItem } from '@/lib/multi-item-sales-types'
+import { SaleCalculations } from '@/lib/multi-item-sales-types'
 
 type PaymentMethodName = 'CASH' | 'MPESA' | 'BANK_TRANSFER' | 'CARD'
 
@@ -47,6 +48,8 @@ interface CartItem {
   quantity: number
   unitPrice: number
   costPrice: number
+  discount: string
+  discountType: DiscountType
   stock: number
 }
 
@@ -54,7 +57,11 @@ interface ReceiptLine {
   productName: string
   quantity: number
   unitPrice: number
-  lineTotal: number
+  lineGross: number
+  discount?: number | null
+  discountType?: DiscountType | null
+  discountAmount?: number | null
+  lineSubtotal: number
 }
 
 interface ReceiptSnapshot {
@@ -65,7 +72,10 @@ interface ReceiptSnapshot {
   cashierName: string
   items: ReceiptLine[]
   subtotal: number
+  tax?: number | null
   discount?: number | null
+  discountType?: DiscountType | null
+  discountAmount?: number | null
   totalAmount: number
   timestamp: number
 }
@@ -142,9 +152,38 @@ function saleTitle(id: string, productName?: string, items?: SaleItem[]): string
   return `Sale #${shortId} - ${firstItem}`
 }
 
-function normaliseDiscount(value: number, subtotal: number): number {
+function normaliseFixedDiscount(value: number, maximum: number): number {
   if (!Number.isFinite(value)) return 0
-  return Math.min(subtotal, Math.max(0, value))
+  return Math.min(maximum, Math.max(0, value))
+}
+
+function numberFromInput(value: string): number {
+  const parsed = Number(value || 0)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function lineGross(item: Pick<CartItem, 'quantity' | 'unitPrice'>): number {
+  return SaleCalculations.calculateLineTotal(item.quantity, item.unitPrice)
+}
+
+function lineDiscountAmount(item: Pick<CartItem, 'quantity' | 'unitPrice' | 'discount' | 'discountType'>): number {
+  const gross = lineGross(item)
+  const discountValue = numberFromInput(item.discount)
+  const rawDiscount = item.discountType === 'percentage'
+    ? gross * discountValue / 100
+    : discountValue
+  return Number(normaliseFixedDiscount(rawDiscount, gross).toFixed(2))
+}
+
+function lineSubtotal(item: Pick<CartItem, 'quantity' | 'unitPrice' | 'discount' | 'discountType'>): number {
+  return Number(Math.max(0, lineGross(item) - lineDiscountAmount(item)).toFixed(2))
+}
+
+function discountValidationMessage(value: number, discountType: DiscountType, fixedMaximum: number, label: string): string | null {
+  if (value < 0) return `${label} discount cannot be negative.`
+  if (discountType === 'percentage' && value > 100) return `${label} percentage discount cannot exceed 100%.`
+  if (discountType === 'fixed' && value > fixedMaximum) return `${label} fixed discount cannot exceed ${fixedMaximum.toLocaleString()}.`
+  return null
 }
 
 function SalesPOSContent() {
@@ -164,7 +203,10 @@ function SalesPOSContent() {
   const [isSaleActive, setIsSaleActive] = useState(false)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [customerName, setCustomerName] = useState('')
-  const [discount, setDiscount] = useState('')
+  const [discount, setDiscount] = useState('0')
+  const [discountType, setDiscountType] = useState<DiscountType>('fixed')
+  const [tax, setTax] = useState('0')
+  const [notes, setNotes] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodName>('CASH')
   const [resumedHeldSaleId, setResumedHeldSaleId] = useState<string | null>(null)
 
@@ -187,6 +229,15 @@ function SalesPOSContent() {
   const singleSales = posData?.singleSales || []
   const multiItemSales = posData?.multiItemSales || []
   const heldSales = posData?.heldSales || []
+  const businessProfile = posData?.businessProfile || null
+  const receiptBusinessName = businessProfile?.businessName?.trim() || user?.displayName?.trim() || 'Business'
+  const receiptBusinessPhone = businessProfile?.businessPhone?.trim()
+  const receiptBusinessAddress = businessProfile?.businessAddress?.trim()
+  const receiptHeaderText = businessProfile?.receiptHeaderText?.trim()
+  const receiptThankYouMessage =
+    businessProfile?.receiptThankYouMessage?.trim() ||
+    businessProfile?.receiptFooterText?.trim() ||
+    'Thank you for your business!'
   const loading = isLoading && !posData
   const errorMessage = posError instanceof Error ? posError.message : posError ? 'Unable to load POS data.' : ''
 
@@ -254,38 +305,43 @@ function SalesPOSContent() {
   }, [activeProducts, searchQuery, selectedCategory])
 
   const subtotal = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0),
+    () => Number(cartItems.reduce((sum, item) => sum + lineSubtotal(item), 0).toFixed(2)),
     [cartItems]
   )
+  const taxAmount = useMemo(
+    () => Number(Math.max(0, numberFromInput(tax)).toFixed(2)),
+    [tax]
+  )
   const discountAmount = useMemo(
-    () => normaliseDiscount(Number(discount || 0), subtotal),
-    [discount, subtotal]
+    () => {
+      const discountValue = numberFromInput(discount)
+      const discountBase = subtotal + taxAmount
+      const rawDiscount = discountType === 'percentage'
+        ? discountBase * discountValue / 100
+        : discountValue
+      return Number(normaliseFixedDiscount(rawDiscount, discountBase).toFixed(2))
+    },
+    [discount, discountType, subtotal, taxAmount]
   )
   const totalAmount = useMemo(
-    () => Math.max(0, subtotal - discountAmount),
-    [subtotal, discountAmount]
+    () => Number(Math.max(0, subtotal + taxAmount - discountAmount).toFixed(2)),
+    [subtotal, taxAmount, discountAmount]
   )
+  const cartDiscountValidation = useMemo(
+    () => discountValidationMessage(numberFromInput(discount), discountType, subtotal + taxAmount, 'Cart'),
+    [discount, discountType, subtotal, taxAmount]
+  )
+  const itemDiscountValidation = useMemo(
+    () => cartItems
+      .map(item => discountValidationMessage(numberFromInput(item.discount), item.discountType, lineGross(item), item.productName))
+      .find(Boolean) || null,
+    [cartItems]
+  )
+  const saleValidationMessage = itemDiscountValidation || cartDiscountValidation
   const cartQuantity = useMemo(
     () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
     [cartItems]
   )
-
-  const receiptFromCart = useCallback((saleId: string, timestamp = Date.now()): ReceiptSnapshot => ({
-    id: saleId,
-    customerName: customerName.trim() || null,
-    paymentMethod: paymentLabel(paymentMethod),
-    cashierName,
-    items: cartItems.map(item => ({
-      productName: item.productName,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      lineTotal: item.quantity * item.unitPrice
-    })),
-    subtotal,
-    discount: discountAmount > 0 ? discountAmount : null,
-    totalAmount,
-    timestamp
-  }), [cartItems, cashierName, customerName, discountAmount, paymentMethod, subtotal, totalAmount])
 
   const receiptFromMultiSale = useCallback((sale: MultiItemSale): ReceiptSnapshot => ({
     id: sale.id,
@@ -297,10 +353,17 @@ function SalesPOSContent() {
       productName: item.productName,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
-      lineTotal: item.lineTotal || item.quantity * item.unitPrice
+      lineGross: item.lineTotal || item.quantity * item.unitPrice,
+      discount: item.discount || null,
+      discountType: item.discountType || null,
+      discountAmount: item.discountAmount || null,
+      lineSubtotal: item.lineSubtotal ?? item.lineTotal ?? item.quantity * item.unitPrice
     })),
     subtotal: sale.subtotal,
+    tax: sale.tax,
     discount: sale.discount,
+    discountType: sale.discountType,
+    discountAmount: sale.discountAmount,
     totalAmount: sale.totalAmount,
     timestamp: sale.timestamp
   }), [cashierName])
@@ -314,7 +377,8 @@ function SalesPOSContent() {
       productName: sale.productName,
       quantity: sale.quantitySold,
       unitPrice: sale.unitPrice,
-      lineTotal: sale.totalAmount
+      lineGross: sale.totalAmount,
+      lineSubtotal: sale.totalAmount
     }],
     subtotal: sale.totalAmount,
     discount: null,
@@ -366,7 +430,10 @@ function SalesPOSContent() {
   const resetSaleState = () => {
     setCartItems([])
     setCustomerName('')
-    setDiscount('')
+    setDiscount('0')
+    setDiscountType('fixed')
+    setTax('0')
+    setNotes('')
     setPaymentMethod('CASH')
     setResumedHeldSaleId(null)
     setIsSaleActive(false)
@@ -404,6 +471,8 @@ function SalesPOSContent() {
         quantity: 1,
         unitPrice: Number(product.sellingPrice || 0),
         costPrice: Number(product.costPrice || 0),
+        discount: '0',
+        discountType: 'fixed',
         stock
       }]
     })
@@ -425,6 +494,12 @@ function SalesPOSContent() {
     setCartItems(prevItems => prevItems.filter(item => item.productId !== productId))
   }
 
+  const updateCartItemDiscount = (productId: string, updates: Partial<Pick<CartItem, 'discount' | 'discountType'>>) => {
+    setCartItems(prevItems => prevItems.map(item =>
+      item.productId === productId ? { ...item, ...updates } : item
+    ))
+  }
+
   const cartQuantityForProduct = (productId: string) => {
     return cartItems.find(item => item.productId === productId)?.quantity || 0
   }
@@ -436,8 +511,12 @@ function SalesPOSContent() {
     quantity: item.quantity,
     unitPrice: item.unitPrice,
     costPrice: item.costPrice,
-    lineTotal: item.quantity * item.unitPrice,
-    profit: item.quantity * (item.unitPrice - item.costPrice)
+    discount: numberFromInput(item.discount),
+    discountType: item.discountType,
+    discountAmount: lineDiscountAmount(item),
+    lineSubtotal: lineSubtotal(item),
+    lineTotal: lineGross(item),
+    profit: lineSubtotal(item) - item.quantity * item.costPrice
   }))
 
   const handleHoldSale = async () => {
@@ -450,7 +529,10 @@ function SalesPOSContent() {
         items: cartItemsForPersistence(),
         customerName: customerName.trim() || undefined,
         paymentMethod,
-        discount: discountAmount,
+        tax: taxAmount,
+        discount: numberFromInput(discount),
+        discountType,
+        notes: notes.trim() || undefined,
         branchId: selectedBranchId || undefined,
         createdBy: user?.uid || staff?.authId || null
       })
@@ -489,13 +571,18 @@ function SalesPOSContent() {
         quantity: Number(item.quantity || 1),
         unitPrice: Number(item.unitPrice || 0),
         costPrice: Number(item.costPrice || 0),
+        discount: String(item.discount || 0),
+        discountType: item.discountType || 'fixed',
         stock: Number(product?.quantity || item.quantity || 0)
       }
     })
 
     setCartItems(nextCart)
     setCustomerName(heldSale.customerName || '')
-    setDiscount(heldSale.discount ? String(heldSale.discount) : '')
+    setDiscount(heldSale.discount ? String(heldSale.discount) : '0')
+    setDiscountType(heldSale.discountType || 'fixed')
+    setTax(heldSale.tax ? String(heldSale.tax) : '0')
+    setNotes(heldSale.notes || '')
     setPaymentMethod(paymentName(heldSale.paymentMethod))
     setResumedHeldSaleId(heldSale.id)
     setSelectedRecentSale(null)
@@ -513,20 +600,27 @@ function SalesPOSContent() {
         return
       }
 
+      if (saleValidationMessage) {
+        window.alert(saleValidationMessage)
+        return
+      }
+
       const salePayload = {
         items: cartItemsForPersistence(),
         customerName: customerName.trim() || undefined,
         paymentMethod,
-        discount: discountAmount,
-        discountType: 'FIXED' as const,
+        tax: taxAmount,
+        discount: numberFromInput(discount),
+        discountType,
+        notes: notes.trim() || undefined,
         branchId: selectedBranchId || undefined
       }
 
-      const saleId = resumedHeldSaleId
-        ? await completeHeldSale(effectiveUserId, resumedHeldSaleId, salePayload)
-        : await createMultiItemSale(effectiveUserId, salePayload)
+      const sale = resumedHeldSaleId
+        ? await completeHeldSaleAndReturn(effectiveUserId, resumedHeldSaleId, salePayload)
+        : await createMultiItemSaleAndReturn(effectiveUserId, salePayload)
 
-      setReceiptSale(receiptFromCart(saleId))
+      setReceiptSale(receiptFromMultiSale(sale))
       resetSaleState()
       await refreshPOSData()
     } catch (error) {
@@ -815,45 +909,146 @@ function SalesPOSContent() {
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-5">
-                        {cartItems.map(item => (
-                          <div key={item.productId} className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-3">
-                            <button
-                              type="button"
-                              onClick={() => removeCartItem(item.productId)}
-                              className="mt-0.5 grid h-6 w-6 place-items-center rounded-[5px] bg-[#fff1ee] text-[#ef4444]"
-                              title="Remove item"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                            <div className="min-w-0">
-                              <p className="text-[14px] font-semibold text-[#141925]">
-                                <span className="mr-2 text-[#7a818f]">{item.quantity}x</span>
-                                {item.productName}
-                              </p>
+                      <div className="space-y-4">
+                        {cartItems.map(item => {
+                          const gross = lineGross(item)
+                          const itemDiscountAmount = lineDiscountAmount(item)
+                          const itemSubtotal = lineSubtotal(item)
+                          const itemDiscountError = discountValidationMessage(numberFromInput(item.discount), item.discountType, gross, 'Line')
+
+                          return (
+                            <div key={item.productId} className="rounded-[8px] border border-[#edf0f4] bg-white p-3">
+                              <div className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => removeCartItem(item.productId)}
+                                  className="mt-0.5 grid h-6 w-6 place-items-center rounded-[5px] bg-[#fff1ee] text-[#ef4444]"
+                                  title="Remove item"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                                <div className="min-w-0">
+                                  <p className="text-[14px] font-semibold text-[#141925]">
+                                    <span className="mr-2 text-[#7a818f]">{item.quantity}x</span>
+                                    {item.productName}
+                                  </p>
+                                  <p className="mt-1 text-[11px] font-medium text-[#7a818f]">
+                                    Gross {formatMoney(gross)} - Unit {formatMoney(item.unitPrice)}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-[14px] font-bold">{formatMoney(itemSubtotal)}</p>
+                                  {itemDiscountAmount > 0 && (
+                                    <p className="text-[11px] font-semibold text-[#d92d20]">-{formatMoney(itemDiscountAmount)}</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_112px] gap-2">
+                                <label>
+                                  <span className="mb-1 block text-[11px] font-bold text-[#777e8b]">Line discount</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={item.discount}
+                                    onChange={event => updateCartItemDiscount(item.productId, { discount: event.target.value })}
+                                    className={`dashboard-field h-9 w-full px-3 text-[12px] ${itemDiscountError ? 'border-[#f04438]' : ''}`}
+                                    placeholder="0"
+                                  />
+                                </label>
+                                <label>
+                                  <span className="mb-1 block text-[11px] font-bold text-[#777e8b]">Type</span>
+                                  <select
+                                    value={item.discountType}
+                                    onChange={event => updateCartItemDiscount(item.productId, { discountType: event.target.value as DiscountType })}
+                                    className="dashboard-field h-9 w-full px-2 text-[12px]"
+                                  >
+                                    <option value="fixed">Fixed</option>
+                                    <option value="percentage">Percentage</option>
+                                  </select>
+                                </label>
+                              </div>
+                              <div className="mt-2 flex items-center justify-between text-[11px] font-semibold">
+                                <span className={itemDiscountError ? 'text-[#d92d20]' : 'text-[#7a818f]'}>
+                                  {itemDiscountError || `Discount amount: ${formatMoney(itemDiscountAmount)}`}
+                                </span>
+                                <span className="text-[#141925]">Subtotal: {formatMoney(itemSubtotal)}</span>
+                              </div>
                             </div>
-                            <p className="text-[14px] font-bold">{formatMoney(item.quantity * item.unitPrice)}</p>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                   </div>
 
                   <div className="space-y-4 pt-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[16px] font-semibold text-[#777e8b]">Total ({cartQuantity} items)</span>
-                      <span className="text-[24px] font-extrabold">{formatMoney(totalAmount).replace(' ', '')}</span>
+                    <div className="space-y-2 rounded-[8px] bg-[#f8fafc] p-3">
+                      <div className="flex items-center justify-between text-[13px] font-semibold text-[#777e8b]">
+                        <span>Subtotal ({cartQuantity} items)</span>
+                        <span>{formatMoney(subtotal)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[13px] font-semibold text-[#777e8b]">
+                        <span>Tax</span>
+                        <span>{formatMoney(taxAmount)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[13px] font-semibold text-[#d92d20]">
+                        <span>Cart discount amount</span>
+                        <span>-{formatMoney(discountAmount)}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-[#d9dee7] pt-2">
+                        <span className="text-[16px] font-bold text-[#141925]">Total</span>
+                        <span className="text-[24px] font-extrabold">{formatMoney(totalAmount).replace(' ', '')}</span>
+                      </div>
                     </div>
 
                     <label className="grid grid-cols-[105px_minmax(0,1fr)] items-center gap-3">
-                      <span className="text-[15px] font-semibold text-[#777e8b]">Discount ({displayCurrency})</span>
+                      <span className="text-[15px] font-semibold text-[#777e8b]">Tax</span>
                       <input
                         type="number"
                         min="0"
+                        step="0.01"
+                        value={tax}
+                        onChange={event => setTax(event.target.value)}
+                        placeholder="0"
+                        className="dashboard-field h-10 px-4 text-[13px]"
+                      />
+                    </label>
+
+                    <div className="grid grid-cols-[105px_minmax(0,1fr)_112px] items-center gap-3">
+                      <span className="text-[15px] font-semibold text-[#777e8b]">Cart discount</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
                         value={discount}
                         onChange={event => setDiscount(event.target.value)}
                         placeholder="0"
-                        className="dashboard-field h-10 px-4 text-[13px]"
+                        className={`dashboard-field h-10 px-4 text-[13px] ${cartDiscountValidation ? 'border-[#f04438]' : ''}`}
+                      />
+                      <select
+                        value={discountType}
+                        onChange={event => setDiscountType(event.target.value as DiscountType)}
+                        className="dashboard-field h-10 px-2 text-[13px]"
+                      >
+                        <option value="fixed">Fixed</option>
+                        <option value="percentage">Percentage</option>
+                      </select>
+                    </div>
+                    {saleValidationMessage && (
+                      <p className="rounded-[8px] bg-[#fff1ee] px-3 py-2 text-[12px] font-semibold text-[#d92d20]">
+                        {saleValidationMessage}
+                      </p>
+                    )}
+
+                    <label className="block">
+                      <span className="mb-1 block text-[13px] font-bold text-[#777e8b]">Notes</span>
+                      <textarea
+                        value={notes}
+                        onChange={event => setNotes(event.target.value)}
+                        placeholder="Optional sale notes"
+                        rows={2}
+                        className="dashboard-field w-full resize-none px-4 py-2 text-[13px]"
                       />
                     </label>
 
@@ -880,7 +1075,7 @@ function SalesPOSContent() {
                     <button
                       type="button"
                       onClick={handleCompleteSale}
-                      disabled={submitting || cartItems.length === 0}
+                      disabled={submitting || cartItems.length === 0 || Boolean(saleValidationMessage)}
                       className="dashboard-action-primary mt-2 flex h-12 w-full text-[18px] disabled:bg-[#aeb9d2]"
                     >
                       {submitting && <Loader2 className="h-5 w-5 animate-spin" />}
@@ -918,7 +1113,7 @@ function SalesPOSContent() {
                             <span className="mr-2 text-[#7a818f]">{item.quantity}x</span>
                             {item.productName}
                           </p>
-                          <p className="text-[14px] font-bold">{formatMoney(item.lineTotal)}</p>
+                          <p className="text-[14px] font-bold">{formatMoney(item.lineSubtotal)}</p>
                         </div>
                       ))}
                     </div>
@@ -1037,7 +1232,16 @@ function SalesPOSContent() {
 
                 <div ref={receiptRef} className="min-h-0 flex-1 overflow-y-auto px-9 py-7">
                   <div className="border-b border-[#cfd4dd] pb-6 text-center">
-                    <h3 className="text-[24px] font-extrabold">FahamPesa</h3>
+                    <h3 className="text-[24px] font-extrabold">{receiptBusinessName}</h3>
+                    {receiptHeaderText ? (
+                      <p className="text-[16px] text-[#7a818f]">{receiptHeaderText}</p>
+                    ) : null}
+                    {receiptBusinessPhone ? (
+                      <p className="text-[16px] text-[#7a818f]">{receiptBusinessPhone}</p>
+                    ) : null}
+                    {receiptBusinessAddress ? (
+                      <p className="text-[16px] text-[#7a818f]">{receiptBusinessAddress}</p>
+                    ) : null}
                     <p className="text-[16px] text-[#7a818f]">Sales Receipt</p>
                     <p className="text-[16px] text-[#7a818f]">{new Date(receiptSale.timestamp).toLocaleString()}</p>
                   </div>
@@ -1065,8 +1269,13 @@ function SalesPOSContent() {
                           <div>
                             <p className="text-[16px] font-bold">{item.productName}</p>
                             <p className="text-[16px] text-[#7a818f]">{item.quantity} x {formatMoney(item.unitPrice)}</p>
+                            {item.discountAmount ? (
+                              <p className="text-[14px] text-[#d92d20]">
+                                Discount: -{formatMoney(item.discountAmount)}
+                              </p>
+                            ) : null}
                           </div>
-                          <p className="self-end text-[16px] font-bold">{formatMoney(item.lineTotal)}</p>
+                          <p className="self-end text-[16px] font-bold">{formatMoney(item.lineSubtotal)}</p>
                         </div>
                       ))}
                     </div>
@@ -1080,7 +1289,13 @@ function SalesPOSContent() {
                     {receiptSale.discount ? (
                       <div className="flex justify-between text-[16px]">
                         <span>Discount:</span>
-                        <span className="font-bold">-{formatMoney(receiptSale.discount)}</span>
+                        <span className="font-bold">-{formatMoney(receiptSale.discountAmount || receiptSale.discount)}</span>
+                      </div>
+                    ) : null}
+                    {receiptSale.tax ? (
+                      <div className="flex justify-between text-[16px]">
+                        <span>Tax:</span>
+                        <span className="font-bold">{formatMoney(receiptSale.tax)}</span>
                       </div>
                     ) : null}
                     <div className="flex justify-between text-[20px] font-extrabold">
@@ -1090,8 +1305,7 @@ function SalesPOSContent() {
                   </div>
 
                   <div className="py-5 text-center text-[16px] text-[#7a818f]">
-                    <p>Thank you for your business!</p>
-                    <p>Powered by Fahampesa</p>
+                    <p>{receiptThankYouMessage}</p>
                   </div>
                 </div>
 
