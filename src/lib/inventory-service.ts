@@ -52,7 +52,6 @@ import {
   getBackendProducts,
   getSelectedBackendBranchId,
   isBackendAvailable,
-  shouldUseFirebaseFallback,
   transitionBackendTransfer
 } from '@/lib/backend-business-api'
 
@@ -209,8 +208,7 @@ export async function getInventoryItems(userId: string, branchId?: string): Prom
         updatedAt: product.updatedAt
       }))
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend inventory unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -507,8 +505,7 @@ export async function getStockMovements(
         hasMore: false
       }
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend stock movements unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -581,8 +578,7 @@ export async function adjustStock(
       await adjustBackendStock(request)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend stock adjustment unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -648,8 +644,7 @@ export async function createStockTransfer(
         priority: 'normal'
       })
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend transfer create unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -720,8 +715,7 @@ export async function approveStockTransfer(
       await transitionBackendTransfer(transferId, 'ship')
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend transfer approve/ship unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -775,8 +769,7 @@ export async function receiveStockTransfer(
       })
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend transfer receive unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -907,8 +900,7 @@ export async function getStockTransfers(userId: string, branchId?: string): Prom
         ? stockTransfers.filter(transfer => transfer.fromBranchId === branchId || transfer.toBranchId === branchId)
         : stockTransfers
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend transfers unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1185,8 +1177,7 @@ export async function getLowStockAlerts(userId: string, branchId?: string): Prom
       const targetBranch = branchId || await getSelectedBackendBranchId()
       return (await getBackendInventoryAlerts(targetBranch)).map(mapBackendLowStockAlert)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend inventory alerts unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 

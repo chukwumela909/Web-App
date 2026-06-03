@@ -61,7 +61,6 @@ import {
   isBackendAvailable,
   mapSupplier as mapBackendSupplier,
   receiveBackendPurchaseOrder,
-  shouldUseFirebaseFallback,
   updateBackendSupplier
 } from '@/lib/backend-business-api'
 
@@ -125,8 +124,7 @@ export async function getSuppliers(
       }
       return limitCount ? suppliers.slice(0, limitCount) : suppliers
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend suppliers unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -188,7 +186,7 @@ export async function getSuppliers(
   }
   
   return filteredSuppliers
-    .filter(supplier => !branchId || !(supplier as Supplier & { branchId?: string | null }).branchId || (supplier as Supplier & { branchId?: string | null }).branchId === branchId)
+    .filter(supplier => !branchId || (supplier as Supplier & { branchId?: string | null }).branchId === branchId)
 }
 
 export async function getSupplier(supplierId: string, branchId?: string): Promise<Supplier | null> {
@@ -197,8 +195,7 @@ export async function getSupplier(supplierId: string, branchId?: string): Promis
       const row = await getBackendSupplier(supplierId, branchId)
       return mapBackendSupplier(row)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend supplier detail unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -218,8 +215,7 @@ export async function createSupplier(
     try {
       return await createBackendSupplier(data as Partial<Supplier>, branchId)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend supplier create unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -272,8 +268,7 @@ export async function updateSupplier(
       await updateBackendSupplier(supplierId, data as Partial<Supplier>)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend supplier update unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -297,8 +292,7 @@ export async function deleteSupplier(supplierId: string): Promise<void> {
       await deleteBackendSupplier(supplierId)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend supplier delete unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -339,8 +333,7 @@ export async function getPurchaseOrders(
       }
       return limitCount ? orders.slice(0, limitCount) : orders
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend purchase orders unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -417,8 +410,7 @@ export async function getPurchaseOrder(purchaseOrderId: string): Promise<Purchas
       const orders = await getBackendPurchaseOrders()
       return orders.find((order) => order.id === purchaseOrderId) || null
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend purchase order detail unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -465,8 +457,7 @@ export async function createPurchaseOrder(
     try {
       return await createBackendPurchaseOrder(data)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend purchase order create unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -540,13 +531,16 @@ export async function approvePurchaseOrder(
   userId: string,
   data: ApprovePurchaseOrderRequest
 ): Promise<void> {
-  if (isBackendAvailable() && data.approved) {
+  if (!data.approved) {
+    throw new Error('Purchase order rejection must be handled by the backend API before it can be used.')
+  }
+
+  if (isBackendAvailable()) {
     try {
       await approveBackendPurchaseOrder(purchaseOrderId)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend purchase order approve unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -606,8 +600,7 @@ export async function receivePurchaseOrder(
       await receiveBackendPurchaseOrder(data.purchaseOrderId, data.items)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend purchase order receive unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -720,8 +713,7 @@ export async function cancelPurchaseOrder(
       await cancelBackendPurchaseOrder(purchaseOrderId)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend purchase order cancel unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -881,8 +873,7 @@ export async function getSupplierDashboard(userId: string, branchId?: string): P
     try {
       return await getBackendSupplierDashboard(branchId)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend supplier dashboard unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -892,7 +883,7 @@ export async function getSupplierDashboard(userId: string, branchId?: string): P
   )
   const suppliers = suppliersSnap.docs
     .map(doc => ({ id: doc.id, ...doc.data() } as Supplier))
-    .filter(supplier => !branchId || !(supplier as Supplier & { branchId?: string | null }).branchId || (supplier as Supplier & { branchId?: string | null }).branchId === branchId)
+    .filter(supplier => !branchId || (supplier as Supplier & { branchId?: string | null }).branchId === branchId)
   
   const totalSuppliers = suppliers.length
   const activeSuppliers = suppliers.filter(s => s.status === 'ACTIVE').length
@@ -906,7 +897,7 @@ export async function getSupplierDashboard(userId: string, branchId?: string): P
   )
   let recentOrders = recentOrdersSnap.docs
     .map(doc => ({ id: doc.id, ...doc.data() } as PurchaseOrder))
-    .filter(order => !branchId || !order.branchId || order.branchId === branchId)
+    .filter(order => !branchId || order.branchId === branchId)
   
   // Sort client-side and limit to 10
   recentOrders = recentOrders

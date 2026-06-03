@@ -132,7 +132,7 @@ export const generateBackupData = async (user: User): Promise<BackupData> => {
 }
 
 /**
- * Upload backup file to VPS (with fallback to local download)
+ * Upload backup file to VPS.
  */
 export const uploadBackupToVPS = async (
   backupData: BackupData, 
@@ -149,7 +149,6 @@ export const uploadBackupToVPS = async (
     })
     const filename = `fahampesa-backup-${user.uid}-${new Date().toISOString().split('T')[0]}-${Date.now()}.json`
 
-    // Try VPS upload first
     try {
       // Get Firebase auth token
       const token = await user.getIdToken()
@@ -193,38 +192,7 @@ export const uploadBackupToVPS = async (
       return { success: true, fileUrl: result.url }
 
     } catch (vpsError) {
-      console.warn('VPS upload failed, using fallback method:', vpsError)
-      
-      // Fallback: Download backup locally and save record to Firestore
-      const url = URL.createObjectURL(jsonBlob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-
-      // Save backup record to Firestore (local backup)
-      const backupRecord: BackupFile = {
-        id: filename,
-        filename: filename,
-        url: 'local', // Indicates local backup
-        size: jsonBlob.size,
-        uploadedAt: new Date().toISOString(),
-        description: `${description} (Local backup - VPS not available)`
-      }
-
-      await setDoc(doc(db, `users/${user.uid}/backups`, backupRecord.id), {
-        ...backupRecord,
-        createdAt: serverTimestamp()
-      })
-
-      return { 
-        success: true, 
-        fileUrl: 'local',
-        error: 'VPS not available - backup downloaded locally. Please upload manually after VPS setup.' 
-      }
+      throw vpsError
     }
 
   } catch (error) {

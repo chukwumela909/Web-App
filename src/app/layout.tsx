@@ -1,15 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Archivo, DM_Sans, Manrope, Roboto, Inter } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { StaffProvider } from "@/contexts/StaffContext";
-import { AdminAccessProvider } from "@/contexts/AdminAccessContext";
-import { NotificationsProvider } from "@/contexts/NotificationsContext";
-import { BranchProvider } from "@/contexts/BranchContext";
-import { OnboardingProvider } from "@/components/onboarding/OnboardingProvider";
-import { QueryProvider } from "@/components/providers/QueryProvider";
+import RootClientShell from "@/components/providers/RootClientShell";
 import ErrorHandler from "@/components/ErrorHandler";
-import ChatwootWidget from "@/components/ChatwootWidget";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -75,22 +68,7 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         <ErrorHandler />
-        <ChatwootWidget />
-        <QueryProvider>
-          <AuthProvider>
-            <StaffProvider>
-              <AdminAccessProvider>
-                <NotificationsProvider>
-                  <OnboardingProvider>
-                    <BranchProvider>
-                      {children}
-                    </BranchProvider>
-                  </OnboardingProvider>
-                </NotificationsProvider>
-              </AdminAccessProvider>
-            </StaffProvider>
-          </AuthProvider>
-        </QueryProvider>
+        <RootClientShell>{children}</RootClientShell>
       </body>
     </html>
   );

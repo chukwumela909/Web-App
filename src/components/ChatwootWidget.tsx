@@ -40,6 +40,8 @@ const ChatwootWidget = ({
   darkMode = 'auto'
 }: ChatwootWidgetProps = {}) => {
   useEffect(() => {
+    if (!websiteToken) return;
+
     // Add Chatwoot Settings
     const addChatwootSettings = () => {
       const script = document.createElement('script');
@@ -69,26 +71,43 @@ const ChatwootWidget = ({
       document.head.appendChild(script);
     };
 
-    // Check if script is already loaded
-    const existingScript = document.querySelector(`script[src="${baseUrl}/packs/js/sdk.js"]`);
-    if (!existingScript) {
-      addChatwootSettings();
-    } else if (window.chatwootSDK) {
-      // Re-initialize if script exists but SDK is available
-      window.chatwootSDK.run({
-        websiteToken,
-        baseUrl,
-        locale,
-        type: 'standard',
-        launcherTitle,
-        showPopoutButton,
-        widgetStyle: 'standard',
-        darkMode
-      });
+    const initializeChatwoot = () => {
+      // Check if script is already loaded
+      const existingScript = document.querySelector(`script[src="${baseUrl}/packs/js/sdk.js"]`);
+      if (!existingScript) {
+        addChatwootSettings();
+      } else if (window.chatwootSDK) {
+        // Re-initialize if script exists but SDK is available
+        window.chatwootSDK.run({
+          websiteToken,
+          baseUrl,
+          locale,
+          type: 'standard',
+          launcherTitle,
+          showPopoutButton,
+          widgetStyle: 'standard',
+          darkMode
+        });
+      }
+    };
+
+    let idleCallbackId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    if (typeof window.requestIdleCallback === 'function') {
+      idleCallbackId = window.requestIdleCallback(initializeChatwoot, { timeout: 3000 });
+    } else {
+      timeoutId = setTimeout(initializeChatwoot, 2000);
     }
 
     // Cleanup function
     return () => {
+      if (idleCallbackId !== undefined && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleCallbackId);
+      }
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
       // Note: We don't remove the script on unmount to avoid issues with re-mounting
       // The widget will persist across page navigations which is typically desired
     };

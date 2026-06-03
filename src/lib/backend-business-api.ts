@@ -133,11 +133,7 @@ export interface BackendAdminPaymentEvent {
 }
 
 export function isBackendAvailable() {
-  return Boolean(auth.currentUser)
-}
-
-export function shouldUseFirebaseFallback(error: unknown) {
-  return !isBackendApiError(error) || error.status >= 500
+  return true
 }
 
 async function currentUser() {
@@ -1012,7 +1008,8 @@ export function mapSupplier(row: AnyRecord): Supplier {
     categories: row.categories || [],
     status: (row.status || 'ACTIVE').toUpperCase(),
     createdBy: row.createdBy || '',
-    userId: row.userId || ''
+    userId: row.userId || '',
+    branchId: row.branchId || row.branch?.id || null
   } as Supplier
 }
 

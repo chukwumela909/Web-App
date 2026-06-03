@@ -38,7 +38,6 @@ import {
   getBackendSingleItemSales,
   isBackendAvailable,
   recordBackendDebtorPayment,
-  shouldUseFirebaseFallback,
   updateBackendExpense,
   updateBackendProduct,
   updateBackendSale,
@@ -557,8 +556,7 @@ export async function getProducts(userId: string, branchId?: string): Promise<Pr
     try {
       return await getBackendProducts(branchId)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend products unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -582,7 +580,7 @@ export async function getProducts(userId: string, branchId?: string): Promise<Pr
     if (typeof isActive === 'boolean') return isActive
     if (typeof active === 'boolean') return active
     return true
-  }).filter(p => !branchId || !p.branchId || p.branchId === branchId) as Product[]
+  }).filter(p => !branchId || p.branchId === branchId) as Product[]
 }
 
 export async function createProduct(userId: string, data: Partial<Product>): Promise<void> {
@@ -591,8 +589,7 @@ export async function createProduct(userId: string, data: Partial<Product>): Pro
       await createBackendProduct(data)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend product create unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -653,8 +650,7 @@ export async function updateProduct(productId: string, data: Partial<Product>): 
       await updateBackendProduct(productId, data)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend product update unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -676,8 +672,7 @@ export async function getProduct(productId: string): Promise<Product | null> {
     try {
       return await getBackendProduct(productId)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend product detail unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -699,8 +694,7 @@ export async function softDeleteProduct(productId: string): Promise<void> {
       await deleteBackendProduct(productId)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend product delete unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -713,8 +707,7 @@ export async function getSales(userId: string, max: number = 2000, branchId?: st
     try {
       return (await getBackendSingleItemSales(branchId)).slice(0, max)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend sales unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -730,18 +723,17 @@ export async function getSales(userId: string, max: number = 2000, branchId?: st
   const filteredList = list.filter(sale => sale.isDeleted !== true)
   
   return filteredList
-    .filter(sale => !branchId || !sale.branchId || sale.branchId === branchId)
+    .filter(sale => !branchId || sale.branchId === branchId)
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
 }
 
 export async function createSale(userId: string, data: Partial<Sale>): Promise<void> {
-  if (isBackendAvailable() && data.productId) {
+  if (isBackendAvailable()) {
     try {
       await createBackendSale(data)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend sale create unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -797,8 +789,7 @@ export async function updateSale(saleId: string, data: Partial<Sale>): Promise<v
       await updateBackendSale(saleId, data)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend sale update unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -818,8 +809,7 @@ export async function deleteSale(saleId: string): Promise<void> {
       await deleteBackendSale(saleId)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend sale delete unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -836,8 +826,7 @@ export async function getDebtors(userId: string, branchId?: string): Promise<Deb
     try {
       return await getBackendDebtors(branchId)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend debtors unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -855,7 +844,7 @@ export async function getDebtors(userId: string, branchId?: string): Promise<Deb
     return true
   }) as Debtor[]
   return list
-    .filter(debtor => !branchId || !(debtor as Debtor & { branchId?: string | null }).branchId || (debtor as Debtor & { branchId?: string | null }).branchId === branchId)
+    .filter(debtor => !branchId || (debtor as Debtor & { branchId?: string | null }).branchId === branchId)
     .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
 }
 
@@ -869,8 +858,7 @@ export async function createDebtor(userId: string, data: Partial<Debtor>): Promi
       await createBackendDebtor(data)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend debtor create unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -913,8 +901,7 @@ export async function recordDebtorPayment(userId: string, data: Partial<DebtorPa
       await recordBackendDebtorPayment(data)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend debtor payment unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -957,8 +944,7 @@ export async function getExpenses(userId: string, max: number = 200): Promise<Ex
     try {
       return (await getBackendExpenses()).slice(0, max)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend expenses unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -978,8 +964,7 @@ export async function createExpense(userId: string, data: Partial<Expense>): Pro
       await createBackendExpense(data)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend expense create unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1022,8 +1007,7 @@ export async function updateExpense(expenseId: string, data: Partial<Expense>): 
       await updateBackendExpense(expenseId, data)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend expense update unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1042,8 +1026,7 @@ export async function deleteExpense(expenseId: string): Promise<void> {
       await deleteBackendExpense(expenseId)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend expense delete unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1141,8 +1124,7 @@ export async function getBusinessProfile(userId: string): Promise<BusinessProfil
     try {
       return backendSettingsProfile(userId, await getBackendSettings())
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend business settings unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1157,8 +1139,7 @@ export async function upsertBusinessProfile(userId: string, profile: Partial<Bus
       await updateBackendSettings(backendBusinessSettingsPayload(profile))
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend business settings update unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1197,8 +1178,7 @@ export async function getNotificationSettings(userId: string): Promise<Notificat
         ? ({ uid: userId, ...settings.notificationSettings } as NotificationSettings)
         : null
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend notification settings unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1213,8 +1193,7 @@ export async function upsertNotificationSettings(userId: string, settings: Parti
       await updateBackendSettings({ notificationSettings: settings })
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend notification settings update unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1244,8 +1223,7 @@ export async function getDeviceSettings(userId: string): Promise<DeviceSettings 
         ? ({ uid: userId, ...settings.deviceSettings } as DeviceSettings)
         : null
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend device settings unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1260,8 +1238,7 @@ export async function upsertDeviceSettings(userId: string, settings: Partial<Dev
       await updateBackendSettings({ deviceSettings: settings })
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend device settings update unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1296,8 +1273,7 @@ export async function getDataSyncSettings(userId: string): Promise<DataSyncSetti
         ? normalizeDataSyncSettings(userId, settings.syncSettings)
         : null
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend sync settings unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1312,8 +1288,7 @@ export async function upsertDataSyncSettings(userId: string, settings: Partial<D
       await updateBackendSettings({ syncSettings: settings })
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend sync settings update unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1680,8 +1655,7 @@ export async function createMultiItemSale(userId: string, data: {
     try {
       return await createBackendSale(data)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend multi-item sale create unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1770,8 +1744,7 @@ export async function createMultiItemSaleAndReturn(userId: string, data: {
     try {
       return await createBackendSaleAndReturn(data)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend multi-item sale create unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1823,8 +1796,7 @@ export async function getMultiItemSales(userId: string, max: number = 2000, bran
     try {
       return (await getBackendMultiItemSales(branchId)).slice(0, max)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend multi-item sales unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1840,7 +1812,7 @@ export async function getMultiItemSales(userId: string, max: number = 2000, bran
   const filteredList = list.filter(sale => sale.isDeleted !== true)
   
   return filteredList
-    .filter(sale => !branchId || !sale.branchId || sale.branchId === branchId)
+    .filter(sale => !branchId || sale.branchId === branchId)
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
 }
 

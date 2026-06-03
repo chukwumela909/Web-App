@@ -243,6 +243,11 @@ export default function ReportsPage() {
     const load = async () => {
       if (!effectiveUserId) return
       setLoading(true)
+      setSummaries([])
+      setRecentSales([])
+      setMultiItemSales([])
+      setProducts([])
+      setDebtors([])
       try {
         const [s, rs, mis, prods, br, st, dbt] = await Promise.all([
           getDailySummaries(effectiveUserId, 90),

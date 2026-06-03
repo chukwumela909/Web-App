@@ -3,7 +3,6 @@
 import { useState, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, ArrowUpRight } from 'lucide-react'
 import { DownloadModal } from '@/components/DownloadModal'
 import { ProductCard, StockDashboardMockup, InventoryCardMockup } from '@/components/ProductMockup'
@@ -122,18 +121,11 @@ function FAQItem({ question, answer, isOpen, onClick }: { question: string, answ
           <h3 className="font-inter font-semibold text-[20px] text-[#001031] leading-[35px] tracking-[-0.4px]">
             {question}
           </h3>
-          <AnimatePresence>
-            {isOpen && (
-              <motion.p
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="font-inter font-normal text-[20px] text-[#2f3037] leading-[35px] tracking-[-0.4px] overflow-hidden"
-              >
-                {answer}
-              </motion.p>
-            )}
-          </AnimatePresence>
+          {isOpen && (
+            <p className="font-inter font-normal text-[20px] text-[#2f3037] leading-[35px] tracking-[-0.4px] overflow-hidden">
+              {answer}
+            </p>
+          )}
         </div>
         <button className="shrink-0 mt-1">
           <Image
@@ -222,14 +214,8 @@ export default function LandingPage() {
         </div>
 
         {/* Mobile Menu */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[60] bg-white lg:hidden flex flex-col"
-            >
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-[60] bg-white lg:hidden flex flex-col">
               {/* Mobile Menu Header */}
               <div className="h-[80px] flex items-center justify-between px-4 sm:px-6 border-b border-gray-100 shrink-0">
                 <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-[7px]">
@@ -291,9 +277,8 @@ export default function LandingPage() {
                   Start a free trial
                 </Link>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        )}
       </header>
 
       {/* Hero Section */}
@@ -301,38 +286,19 @@ export default function LandingPage() {
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[100px] pt-[60px] lg:pt-[60px] pb-[40px] lg:pb-[80px] relative z-10">
           <div className="lg:w-[50%]">
             {/* Floating Tag */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 }}
-              className="inline-flex items-center bg-white mb-6 lg:mb-8 rounded-[90px] px-3 lg:px-5 py-1.5 lg:py-2.5 gap-2"
-            >
+            <div className="inline-flex items-center bg-white mb-6 lg:mb-8 rounded-[90px] px-3 lg:px-5 py-1.5 lg:py-2.5 gap-2">
               <Image src={assets.check} alt="" width={20} height={20} className="lg:w-[24px] lg:h-[24px]" />
               <span className="font-dm-sans font-semibold text-[12px] lg:text-[18px] text-[#004AAD]">Smart tool for modern businesses</span>
-            </motion.div>
+            </div>
 
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="font-inter font-medium text-[32px] sm:text-[48px] lg:text-[72px] text-[#001031] leading-[1.1] tracking-[-1px] lg:tracking-[-2px] mb-6 lg:mb-8"
-            >
+            <h1 className="font-inter font-medium text-[32px] sm:text-[48px] lg:text-[72px] text-[#001031] leading-[1.1] tracking-[-1px] lg:tracking-[-2px] mb-6 lg:mb-8">
               POS System built for your Business
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="font-inter font-normal text-[14px] lg:text-[18px] text-[#001031] leading-[22px] lg:leading-[30px] tracking-[-0.4px] mb-8 lg:mb-12 max-w-[600px]"
-            >
+            </h1>
+            <p className="font-inter font-normal text-[14px] lg:text-[18px] text-[#001031] leading-[22px] lg:leading-[30px] tracking-[-0.4px] mb-8 lg:mb-12 max-w-[600px]">
               Fahampesa gives your business the tools to sell faster, track stock in real time, and stay in control anywhere. Secure, offline-first, and built to scale with you.
-            </motion.p>
+            </p>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="flex flex-row gap-3 lg:gap-5 mb-8 lg:mb-12"
-            >
+            <div className="flex flex-row gap-3 lg:gap-5 mb-8 lg:mb-12">
               <button
                 onClick={() => setDownloadModalOpen(true)}
                 className="flex items-center justify-center gap-[8px] lg:gap-[10px] border border-[#004AAD] rounded-[10px] px-[16px] lg:px-[32px] py-[12px] lg:py-[18px] hover:bg-[#004AAD]/5 transition-colors"
@@ -344,14 +310,9 @@ export default function LandingPage() {
                 <span className="font-dm-sans font-semibold text-[14px] lg:text-[18px] text-white">Start a free trial</span>
                 <Image src={assets.arrowForward} alt="" width={16} height={16} className="lg:w-[22px] lg:h-[22px]" />
               </Link>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="flex flex-wrap gap-4 lg:gap-10"
-            >
+            <div className="flex flex-wrap gap-4 lg:gap-10">
               <div className="flex items-center gap-[6px] lg:gap-[10px]">
                 <Image src={assets.wifiOff} alt="" width={16} height={16} className="lg:w-[20px] lg:h-[20px]" />
                 <span className="font-inter font-normal text-[12px] lg:text-[16px] text-[#001031] tracking-[-0.4px]">Works online and offline</span>
@@ -360,16 +321,11 @@ export default function LandingPage() {
                 <Image src={assets.sun} alt="" width={16} height={16} className="lg:w-[20px] lg:h-[20px]" />
                 <span className="font-inter font-normal text-[12px] lg:text-[16px] text-[#001031] tracking-[-0.4px]">Real-time reports and insights</span>
               </div>
-            </motion.div>
+            </div>
           </div>
 
           {/* Hero mockup image - Mobile */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.6 }}
-            className="lg:hidden relative -mr-20 ml-4 w-[calc(100%+80px)] h-[350px] mt-8"
-          >
+          <div className="lg:hidden relative -mr-20 ml-4 w-[calc(100%+80px)] h-[350px] mt-8">
             <Image
               src="/assets/figma/landing/hero-image.png"
               alt="FahamPesa Dashboard Preview"
@@ -377,15 +333,10 @@ export default function LandingPage() {
               className="object-contain object-right"
               priority
             />
-          </motion.div>
+          </div>
 
           {/* Hero mockup image - Desktop */}
-          <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-            className="hidden lg:block absolute right-0 top-[50%] -translate-y-[50%] w-[52%] h-[70%] max-h-[450px]"
-          >
+          <div className="hidden lg:block absolute right-0 top-[50%] -translate-y-[50%] w-[52%] h-[70%] max-h-[450px]">
             <Image
               src="/assets/figma/landing/hero-image.png"
               alt="FahamPesa Dashboard Preview"
@@ -393,7 +344,7 @@ export default function LandingPage() {
               className="object-contain object-right"
               priority
             />
-          </motion.div>
+          </div>
         </div>
       </section>
 

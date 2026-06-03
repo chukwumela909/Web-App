@@ -55,6 +55,7 @@ interface Supplier {
   notes?: string
   createdAt?: Date
   lastOrderDate?: Date
+  branchId?: string | null
 }
 
 interface SupplierDashboard {
@@ -83,6 +84,30 @@ const staggerChildren = {
     transition: {
       staggerChildren: 0.1
     }
+  }
+}
+
+function normalizeSupplierForDisplay(supplier: Partial<Supplier> & { id: string }): Supplier {
+  return {
+    id: supplier.id,
+    name: supplier.name || 'Unnamed supplier',
+    contactPerson: supplier.contactPerson || '',
+    email: supplier.email || '',
+    phone: supplier.phone || '',
+    address: supplier.address || '',
+    categories: Array.isArray(supplier.categories) ? supplier.categories : [],
+    status: supplier.status || 'ACTIVE',
+    onTimeDeliveryRate: Number(supplier.onTimeDeliveryRate || 0),
+    totalOrders: Number(supplier.totalOrders || 0),
+    completedOrders: Number(supplier.completedOrders || 0),
+    qualityRating: supplier.qualityRating,
+    serviceRating: supplier.serviceRating,
+    pricingRating: supplier.pricingRating,
+    paymentTerms: supplier.paymentTerms || 'NET_30',
+    notes: supplier.notes || '',
+    createdAt: supplier.createdAt,
+    lastOrderDate: supplier.lastOrderDate,
+    branchId: supplier.branchId || null
   }
 }
 
@@ -140,7 +165,7 @@ function SuppliersContent() {
         undefined,
         activeBranchId
       )
-      setSuppliers(data as any)
+      setSuppliers(data.map((supplier: Supplier) => normalizeSupplierForDisplay(supplier)))
     } catch (error) {
       console.error('Error loading suppliers:', error)
     }
@@ -168,6 +193,8 @@ function SuppliersContent() {
       setLoading(true)
       setDashboard(null)
       setSuppliers([])
+      setShowDetailsModal(null)
+      setShowEditModal(null)
       Promise.all([
         loadDashboard(),
         loadSuppliers()
@@ -195,8 +222,8 @@ function SuppliersContent() {
     }
   }
 
-  const formatPaymentTerms = (terms: string) => {
-    return terms.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
+  const formatPaymentTerms = (terms?: string) => {
+    return (terms || 'NET_30').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
   }
 
   const formatCurrency = (amount: number) => `${currencySymbol} ${amount.toLocaleString()}`
@@ -677,15 +704,17 @@ function SuppliersContent() {
                       {/* Action Buttons */}
                       <div className="flex items-center gap-2">
                         <Button
+                          type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => setShowDetailsModal(supplier)}
+                          onClick={() => setShowDetailsModal(normalizeSupplierForDisplay(supplier))}
                           className="flex-1 hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition-colors"
                         >
                           <EyeIcon className="h-4 w-4 mr-2" />
                           View Details
                         </Button>
                         <Button
+                          type="button"
                           size="sm"
                           variant="outline"
                           onClick={() => setShowEditModal(supplier)}
@@ -694,6 +723,7 @@ function SuppliersContent() {
                           <PencilIcon className="h-4 w-4" />
                         </Button>
                         <Button
+                          type="button"
                           size="sm"
                           variant="outline"
                           className="hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"

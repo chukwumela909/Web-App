@@ -17,8 +17,7 @@ import {
 import { db } from '@/lib/firebase'
 import {
   getBackendAdminAuditLogs,
-  isBackendAvailable,
-  shouldUseFirebaseFallback
+  isBackendAvailable
 } from '@/lib/backend-business-api'
 
 // Types for real Firebase data
@@ -358,8 +357,7 @@ export class SuperAdminService {
           sessionId: log.sessionId
         }))
       } catch (error) {
-        if (!shouldUseFirebaseFallback(error)) throw error
-        console.warn('Backend admin audit logs unavailable, falling back to Firestore:', error)
+        throw error
       }
     }
 

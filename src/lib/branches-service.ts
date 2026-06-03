@@ -66,7 +66,6 @@ import {
   getBackendBranches,
   getBackendTransfers,
   isBackendAvailable,
-  shouldUseFirebaseFallback,
   transitionBackendTransfer,
   updateBackendBranch
 } from '@/lib/backend-business-api'
@@ -179,8 +178,7 @@ export async function getBranches(
       }
       return limitCount ? branches.slice(0, limitCount) : branches
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend branches unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -349,8 +347,7 @@ export async function getBranch(branchId: string): Promise<Branch | null> {
     try {
       return await getBackendBranch(branchId)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend branch detail unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -391,8 +388,7 @@ export async function createBranch(
     try {
       return await createBackendBranch(data as Partial<Branch>)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend branch create unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -452,8 +448,7 @@ export async function updateBranch(
       await updateBackendBranch(branchId, data as Partial<Branch>)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend branch update unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -476,8 +471,7 @@ export async function deactivateBranch(
       await disableBackendBranch(branchId)
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend branch disable unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -584,8 +578,7 @@ export async function getBranchTransfers(
       }
       return limitCount ? transfers.slice(0, limitCount) : transfers
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend transfers unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -671,8 +664,7 @@ export async function getBranchTransfer(transferId: string): Promise<BranchTrans
       const transfers = await getBackendTransfers()
       return transfers.find((transfer) => transfer.id === transferId) || null
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend transfer detail unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -723,8 +715,7 @@ export async function createBranchTransfer(
     try {
       return await createBackendTransfer(data)
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend transfer create unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -828,8 +819,7 @@ export async function approveBranchTransfer(
       await transitionBackendTransfer(transferId, data.approved ? 'approve' : 'reject', data.approved ? undefined : { reason: data.rejectionReason })
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend transfer approve/reject unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -897,8 +887,7 @@ export async function shipBranchTransfer(
       })
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend transfer ship unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -928,8 +917,7 @@ export async function receiveBranchTransfer(
       })
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend transfer receive unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1039,8 +1027,7 @@ export async function cancelBranchTransfer(
       await transitionBackendTransfer(transferId, 'cancel', { reason })
       return
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend transfer cancel unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
@@ -1260,8 +1247,7 @@ export async function getBranchDashboard(userId: string): Promise<BranchDashboar
 
       return aggregateDashboard
     } catch (error) {
-      if (!shouldUseFirebaseFallback(error)) throw error
-      console.warn('Backend branch dashboard unavailable, falling back to Firestore:', error)
+      throw error
     }
   }
 
