@@ -54,6 +54,7 @@ import {
   isBackendAvailable,
   transitionBackendTransfer
 } from '@/lib/backend-business-api'
+import type { Product } from '@/lib/firestore'
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -186,27 +187,45 @@ async function getInventoryRecordsForBranch(userId: string, branchId: string): P
   )
 }
 
+function inventoryItemFromProduct(product: Product, branchId: string): InventoryItem {
+  return {
+    id: product.id,
+    productId: product.id,
+    branchId,
+    currentStock: product.quantity || 0,
+    reservedStock: 0,
+    availableStock: product.quantity || 0,
+    minStockLevel: product.minStockLevel || 0,
+    reorderPoint: product.minStockLevel || 0,
+    averageCostPrice: product.costPrice || 0,
+    lastCostPrice: product.costPrice || 0,
+    binLocation: product.location || undefined,
+    userId: product.userId,
+    createdAt: product.createdAt,
+    updatedAt: product.updatedAt
+  }
+}
+
+export async function getInventorySnapshot(userId: string, branchId?: string): Promise<{ products: Product[]; inventoryItems: InventoryItem[] }> {
+  if (isBackendAvailable()) {
+    const targetBranch = branchId || await getSelectedBackendBranchId()
+    const products = await getBackendProducts(targetBranch)
+    return {
+      products,
+      inventoryItems: products.map((product) => inventoryItemFromProduct(product, targetBranch))
+    }
+  }
+
+  const inventoryItems = await getInventoryItems(userId, branchId)
+  return { products: [], inventoryItems }
+}
+
 export async function getInventoryItems(userId: string, branchId?: string): Promise<InventoryItem[]> {
   if (isBackendAvailable()) {
     try {
       const targetBranch = branchId || await getSelectedBackendBranchId()
       const products = await getBackendProducts(targetBranch)
-      return products.map((product) => ({
-        id: product.id,
-        productId: product.id,
-        branchId: targetBranch,
-        currentStock: product.quantity || 0,
-        reservedStock: 0,
-        availableStock: product.quantity || 0,
-        minStockLevel: product.minStockLevel || 0,
-        reorderPoint: product.minStockLevel || 0,
-        averageCostPrice: product.costPrice || 0,
-        lastCostPrice: product.costPrice || 0,
-        binLocation: product.location || undefined,
-        userId: product.userId,
-        createdAt: product.createdAt,
-        updatedAt: product.updatedAt
-      }))
+      return products.map((product) => inventoryItemFromProduct(product, targetBranch))
     } catch (error) {
       throw error
     }

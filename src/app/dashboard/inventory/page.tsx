@@ -5,6 +5,8 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
 import { useAuth } from '@/contexts/AuthContext'
+import { useBranch } from '@/contexts/BranchContext'
+import { useStaff } from '@/contexts/StaffContext'
 import { useCurrency, formatCurrency } from '@/hooks/useCurrency'
 import { useEffect, useState } from 'react'
 import {
@@ -21,13 +23,14 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { getBranches as getBranchRecords, createBranch as createBranchRecord } from '@/lib/branches-service'
+import { createBranch as createBranchRecord } from '@/lib/branches-service'
 import { linkBackendProductToBranch } from '@/lib/backend-business-api'
 import {
   adjustStock as adjustStockRecord,
   approveStockTransfer,
   createStockTransfer,
   getInventoryItems,
+  getInventorySnapshot,
   getStockTransfers,
   receiveStockTransfer
 } from '@/lib/inventory-service'
@@ -122,11 +125,17 @@ const staggerChildren = {
 
 function InventoryContent() {
   const { user } = useAuth()
+  const { staff } = useStaff()
+  const {
+    branches,
+    selectedBranchId,
+    loading: branchesLoading,
+    refreshBranches,
+    setSelectedBranchId
+  } = useBranch()
   const { currency } = useCurrency()
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [selectedBranch, setSelectedBranch] = useState<string>('')
   const [dashboard, setDashboard] = useState<InventoryDashboard | null>(null)
   const [stockLevels, setStockLevels] = useState<StockLevel[]>([])
   const [movements, setMovements] = useState<StockMovement[]>([])
@@ -135,6 +144,8 @@ function InventoryContent() {
   const [showAdjustModal, setShowAdjustModal] = useState<StockLevel | null>(null)
   const [showTransferModal, setShowTransferModal] = useState(false)
   const [transferActionId, setTransferActionId] = useState<string | null>(null)
+  const effectiveUserId = staff ? staff.userId : user?.uid
+  const selectedBranch = selectedBranchId || branches[0]?.id || ''
 
   // Create default branch if none exist
   const createDefaultBranch = async () => {
@@ -148,70 +159,31 @@ function InventoryContent() {
         contact: { phone: '', email: '' },
         openingHours: []
       } as any)
-      await loadBranches()
+      await refreshBranches()
     } catch (error) {
       console.error('Error creating default branch:', error)
     }
   }
 
-  // Load branches
-  const loadBranches = async () => {
-    if (!user) return
+  const applyInventorySnapshot = async () => {
+    if (!effectiveUserId || !selectedBranch) return
 
     try {
-      const data = await getBranchRecords(user.uid)
-      setBranches(data as any)
-      if (data.length > 0 && !selectedBranch) {
-        setSelectedBranch(data[0].id)
-      } else if (data.length === 0) {
-        await createDefaultBranch()
+      const { products: snapshotProducts, inventoryItems } = await getInventorySnapshot(effectiveUserId, selectedBranch)
+      if (snapshotProducts.length > 0) {
+        setProducts(snapshotProducts as Product[])
       }
-    } catch (error) {
-      console.error('Error loading branches:', error)
-    }
-  }
-
-  // Load products
-  const loadProducts = async () => {
-    if (!user) return
-
-    try {
-      const { getProducts } = await import('@/lib/firestore')
-      const productList = await getProducts(user.uid)
-      setProducts(productList)
-    } catch (error) {
-      console.error('Error loading products:', error)
-    }
-  }
-
-  // Load dashboard data
-  const loadDashboard = async () => {
-    if (!user || !selectedBranch) return
-
-    try {
-      const inventory = await getInventoryItems(user.uid, selectedBranch)
       setDashboard({
         branchId: selectedBranch,
-        totalProducts: inventory.length,
-        lowStockItems: inventory.filter((item) => item.currentStock > 0 && item.currentStock <= item.minStockLevel).length,
-        outOfStockItems: inventory.filter((item) => item.currentStock === 0).length,
+        totalProducts: inventoryItems.length,
+        lowStockItems: inventoryItems.filter((item) => item.currentStock > 0 && item.currentStock <= item.minStockLevel).length,
+        outOfStockItems: inventoryItems.filter((item) => item.currentStock === 0).length,
         expiringItems: 0,
-        totalInventoryValue: inventory.reduce((sum, item) => sum + Number(item.currentStock || 0) * Number(item.averageCostPrice || 0), 0),
+        totalInventoryValue: inventoryItems.reduce((sum, item) => sum + Number(item.currentStock || 0) * Number(item.averageCostPrice || 0), 0),
         recentMovements: [],
         alerts: { lowStock: [], expiring: [] }
       })
-    } catch (error) {
-      console.error('Error loading dashboard:', error)
-    }
-  }
-
-  // Load stock levels
-  const loadStockLevels = async () => {
-    if (!user || !selectedBranch) return
-
-    try {
-      const inventory = await getInventoryItems(user.uid, selectedBranch)
-      setStockLevels(inventory.map((item) => ({
+      setStockLevels(inventoryItems.map((item) => ({
         productId: item.productId,
         branchId: item.branchId,
         currentStock: item.currentStock,
@@ -221,13 +193,13 @@ function InventoryContent() {
         isLowStock: item.currentStock <= item.minStockLevel
       })))
     } catch (error) {
-      console.error('Error loading stock levels:', error)
+      console.error('Error loading inventory snapshot:', error)
     }
   }
 
   // Load stock movements
   const loadMovements = async () => {
-    if (!user || !selectedBranch) return
+    if (!effectiveUserId || !selectedBranch) return
 
     try {
       setMovements([])
@@ -237,10 +209,10 @@ function InventoryContent() {
   }
 
   const loadTransfers = async () => {
-    if (!user || !selectedBranch) return
+    if (!effectiveUserId || !selectedBranch) return
 
     try {
-      const transferList = await getStockTransfers(user.uid, selectedBranch)
+      const transferList = await getStockTransfers(effectiveUserId, selectedBranch)
       setTransfers(transferList)
     } catch (error) {
       console.error('Error loading transfers:', error)
@@ -249,7 +221,7 @@ function InventoryContent() {
 
   // Initialize inventory for existing products
   const initializeInventory = async () => {
-    if (!user || !selectedBranch) return
+    if (!effectiveUserId || !selectedBranch) return
 
     const confirmed = confirm(
       `This will create inventory records for all your products with 0 initial stock. ` +
@@ -261,8 +233,7 @@ function InventoryContent() {
     try {
       setLoading(true)
       alert('Inventory is initialized automatically from backend branch products.')
-      await loadStockLevels()
-      await loadDashboard()
+      await applyInventorySnapshot()
     } catch (error) {
       console.error('Error initializing inventory:', error)
       alert('Failed to initialize inventory')
@@ -273,20 +244,17 @@ function InventoryContent() {
 
   // Adjust stock
   const adjustStock = async (productId: string, quantity: number, reason: string, notes?: string) => {
-    if (!user || !selectedBranch) return
+    if (!effectiveUserId || !selectedBranch) return
 
     try {
-      await adjustStockRecord(user.uid, {
+      await adjustStockRecord(effectiveUserId, {
         productId,
         branchId: selectedBranch,
         quantity,
         reason,
         notes
       })
-      await loadStockLevels()
-      await loadDashboard()
-      await loadMovements()
-      await loadTransfers()
+      await refreshInventory()
       setShowAdjustModal(null)
     } catch (error) {
       console.error('Error adjusting stock:', error)
@@ -295,28 +263,32 @@ function InventoryContent() {
   }
 
   useEffect(() => {
-    if (user) {
-      loadBranches()
-      loadProducts()
+    if (!user || branchesLoading) return
+
+    if (branches.length === 0) {
+      createDefaultBranch()
+      return
     }
-  }, [user])
+
+    if (!selectedBranchId) {
+      setSelectedBranchId(branches[0].id)
+    }
+  }, [user, branchesLoading, branches, selectedBranchId])
 
   useEffect(() => {
-    if (selectedBranch) {
-      setLoading(true)
-      Promise.all([
-        loadDashboard(),
-        loadStockLevels(),
-        loadMovements(),
-        loadTransfers()
-      ]).finally(() => setLoading(false))
-    }
-  }, [selectedBranch])
+    if (!effectiveUserId || !selectedBranch) return
+
+    setLoading(true)
+    Promise.all([
+      applyInventorySnapshot(),
+      loadMovements(),
+      loadTransfers()
+    ]).finally(() => setLoading(false))
+  }, [effectiveUserId, selectedBranch])
 
   const refreshInventory = async () => {
     await Promise.all([
-      loadDashboard(),
-      loadStockLevels(),
+      applyInventorySnapshot(),
       loadMovements(),
       loadTransfers()
     ])
@@ -328,10 +300,10 @@ function InventoryContent() {
     reason?: string
     notes?: string
   }) => {
-    if (!user || !selectedBranch) return false
+    if (!effectiveUserId || !selectedBranch) return false
 
     try {
-      await createStockTransfer(user.uid, {
+      await createStockTransfer(effectiveUserId, {
         fromBranchId: selectedBranch,
         toBranchId: data.toBranchId,
         items: data.items,
@@ -439,7 +411,7 @@ function InventoryContent() {
           {branches.length > 1 && (
             <select
               value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
+              onChange={(e) => setSelectedBranchId(e.target.value)}
               className="dashboard-field px-3 py-2"
             >
               {branches.map(branch => (

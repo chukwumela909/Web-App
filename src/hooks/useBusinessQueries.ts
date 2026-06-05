@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import {
   getDebtors,
   getExpenses,
@@ -95,7 +96,8 @@ export function useDebtorsQuery({ userId, branchId }: BusinessQueryArgs) {
 }
 
 export function useDashboardDataQuery({ userId, branchId }: BusinessQueryArgs) {
-  return useQuery({
+  const queryClient = useQueryClient()
+  const query = useQuery({
     queryKey: businessQueryKeys.dashboard(userId, branchId),
     queryFn: async () => {
       const [products, sales, multiItemSales, expenses, debtors] = await Promise.all([
@@ -112,10 +114,23 @@ export function useDashboardDataQuery({ userId, branchId }: BusinessQueryArgs) {
     staleTime: 45 * 1000,
     placeholderData: previous => previous
   })
+
+  useEffect(() => {
+    if (!userId || !query.data) return
+
+    queryClient.setQueryData(businessQueryKeys.products(userId, branchId), query.data.products)
+    queryClient.setQueryData(businessQueryKeys.sales(userId, branchId, 2000), query.data.sales)
+    queryClient.setQueryData(businessQueryKeys.multiItemSales(userId, branchId, 2000), query.data.multiItemSales)
+    queryClient.setQueryData(businessQueryKeys.expenses(userId, branchId, 500), query.data.expenses)
+    queryClient.setQueryData(businessQueryKeys.debtors(userId, branchId), query.data.debtors)
+  }, [branchId, query.data, queryClient, userId])
+
+  return query
 }
 
 export function usePOSDataQuery({ userId, branchId }: BusinessQueryArgs) {
-  return useQuery({
+  const queryClient = useQueryClient()
+  const query = useQuery({
     queryKey: businessQueryKeys.pos(userId, branchId),
     queryFn: async () => {
       const [products, singleSales, multiItemSales, heldSales, businessProfile] = await Promise.all([
@@ -138,6 +153,17 @@ export function usePOSDataQuery({ userId, branchId }: BusinessQueryArgs) {
     staleTime: 30 * 1000,
     placeholderData: previous => previous
   })
+
+  useEffect(() => {
+    if (!userId || !query.data) return
+
+    queryClient.setQueryData(businessQueryKeys.products(userId, branchId), query.data.products)
+    queryClient.setQueryData(businessQueryKeys.sales(userId, branchId, 2000), query.data.singleSales)
+    queryClient.setQueryData(businessQueryKeys.multiItemSales(userId, branchId, 2000), query.data.multiItemSales)
+    queryClient.setQueryData(businessQueryKeys.heldSales(userId, branchId, 50), query.data.heldSales)
+  }, [branchId, query.data, queryClient, userId])
+
+  return query
 }
 
 export function useInvalidateBusinessData() {

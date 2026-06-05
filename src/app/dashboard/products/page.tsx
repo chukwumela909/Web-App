@@ -31,8 +31,6 @@ import { addSupplierLinkToProduct } from '@/lib/product-enhancements'
 import SupplierSelection from '@/components/products/SupplierSelection'
 import EnhancedProductDetail from '@/components/products/EnhancedProductDetail'
 import BulkUpload from '@/components/products/BulkUpload'
-import { getBranches } from '@/lib/branches-service'
-import { Branch } from '@/lib/branches-types'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { useInvalidateBusinessData, useProductsQuery } from '@/hooks/useBusinessQueries'
@@ -150,8 +148,6 @@ function ProductsPageContent() {
   const [showEnhancedDetail, setShowEnhancedDetail] = useState(false)
   const [selectedProductForDetail, setSelectedProductForDetail] = useState<FPProduct | null>(null)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [branchesLoading, setBranchesLoading] = useState(true)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [upgradeModalData, setUpgradeModalData] = useState<{
     feature: 'products'
@@ -161,7 +157,7 @@ function ProductsPageContent() {
   } | null>(null)
   const { user } = useAuth()
   const { staff } = useStaff()
-  const { selectedBranchId } = useBranch()
+  const { branches, selectedBranchId, loading: branchesLoading } = useBranch()
   const effectiveUserId = staff ? staff.userId : user?.uid
   const currency = useCurrency()
   const router = useRouter()
@@ -354,30 +350,12 @@ function ProductsPageContent() {
     }
   }
 
-  // Load branches for branch selector
   useEffect(() => {
-    const loadBranches = async () => {
-      if (!effectiveUserId) return
-
-      try {
-        setBranchesLoading(true)
-        const userBranches = await getBranches(effectiveUserId)
-        setBranches(userBranches)
-
-        // Set default branch for new products
-        if (userBranches.length > 0 && !productForm.branchId) {
-          const defaultBranch = userBranches.find(b => b.status === 'ACTIVE') || userBranches[0]
-          setProductForm(prev => ({ ...prev, branchId: defaultBranch.id }))
-        }
-      } catch (error) {
-        console.error('Error loading branches:', error)
-      } finally {
-        setBranchesLoading(false)
-      }
+    if (branches.length > 0 && !productForm.branchId) {
+      const defaultBranch = branches.find(b => b.status === 'ACTIVE') || branches[0]
+      setProductForm(prev => ({ ...prev, branchId: defaultBranch.id }))
     }
-
-    loadBranches()
-  }, [effectiveUserId])
+  }, [branches, productForm.branchId])
 
   useEffect(() => {
     const newParam = searchParams?.get('new')
