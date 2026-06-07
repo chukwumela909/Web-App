@@ -20,7 +20,8 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ArrowsRightLeftIcon,
-  CloudArrowUpIcon
+  CloudArrowUpIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
@@ -34,6 +35,7 @@ import BulkUpload from '@/components/products/BulkUpload'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { useInvalidateBusinessData, useProductsQuery } from '@/hooks/useBusinessQueries'
+import { exportBackendProducts } from '@/lib/backend-business-api'
 
 const categories = [
   "All Categories",
@@ -148,6 +150,7 @@ function ProductsPageContent() {
   const [showEnhancedDetail, setShowEnhancedDetail] = useState(false)
   const [selectedProductForDetail, setSelectedProductForDetail] = useState<FPProduct | null>(null)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
+  const [isExportingProducts, setIsExportingProducts] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [upgradeModalData, setUpgradeModalData] = useState<{
     feature: 'products'
@@ -334,6 +337,30 @@ function ProductsPageContent() {
   const handleShowEnhancedDetail = (product: FPProduct) => {
     setSelectedProductForDetail(product)
     setShowEnhancedDetail(true)
+  }
+
+  const handleExportProducts = async () => {
+    if (!selectedBranchId) {
+      alert('Please select a branch before exporting products.')
+      return
+    }
+
+    setIsExportingProducts(true)
+    try {
+      const csv = await exportBackendProducts(selectedBranchId)
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `fahampesa-products-${new Date().toISOString().slice(0, 10)}.csv`
+      link.click()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Product export failed:', error)
+      alert(error instanceof Error ? error.message : 'Failed to export products.')
+    } finally {
+      setIsExportingProducts(false)
+    }
   }
 
   const handleUpdateProduct = async (updates: Partial<FPProduct>) => {
@@ -665,7 +692,7 @@ function ProductsPageContent() {
           <motion.div variants={fadeInUp}>
             <h2 className="dashboard-section-title mb-6">Quick Actions</h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               <button
                 onClick={async () => {
                   const limitCheck = await canAddProduct()
@@ -706,6 +733,17 @@ function ProductsPageContent() {
                 <div className="flex items-center justify-center space-x-3">
                   <MagnifyingGlassIcon className="h-5 w-5 text-[#004aad]" />
                   <span className="font-medium text-sm">Browse Products</span>
+                </div>
+              </button>
+
+              <button
+                onClick={handleExportProducts}
+                disabled={isExportingProducts || !selectedBranchId}
+                className="dashboard-action-secondary min-h-[72px] w-full p-6 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <div className="flex items-center justify-center space-x-3">
+                  <ArrowDownTrayIcon className="h-5 w-5 text-[#004aad]" />
+                  <span className="font-medium text-sm">{isExportingProducts ? 'Exporting...' : 'Export CSV'}</span>
                 </div>
               </button>
             </div>

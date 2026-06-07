@@ -25,11 +25,14 @@ import {
   Globe,
   CheckCircle,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { SuperAdminService, BroadcastAnnouncement } from '@/lib/super-admin-service'
 import { SchedulerService } from '@/lib/scheduler-service'
 import { useAuth } from '@/contexts/AuthContext'
+import { getBackendNotificationRecipients } from '@/lib/backend-business-api'
 
 // Using BroadcastAnnouncement interface from our service
 
@@ -84,7 +87,7 @@ export default function BroadcastPage() {
   const [loading, setLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
   const [userMetrics, setUserMetrics] = useState({ total: 0, activeThisMonth: 0 })
-  const [newAnnouncement, setNewAnnouncement] = useState({
+  const [newAnnouncement, setNewAnnouncement] = useState<Pick<BroadcastAnnouncement, 'title' | 'message' | 'type' | 'channel' | 'targetAudience'>>({
     title: '',
     message: '',
     type: 'info' as const,
@@ -114,10 +117,11 @@ export default function BroadcastPage() {
 
   const fetchUserData = async () => {
     try {
+      const recipients = await getBackendNotificationRecipients('all_users').catch(() => null)
       const UserMetricsService = (await import('@/lib/user-metrics-service')).default
       const metrics = await UserMetricsService.getUserMetrics(true) // Force refresh
       setUserMetrics({
-        total: metrics.total,
+        total: recipients?.recipients.length ?? metrics.total,
         activeThisMonth: metrics.activeThisMonth
       })
     } catch (error) {

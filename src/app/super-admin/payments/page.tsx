@@ -14,6 +14,7 @@ import {
   manuallyActivateBackendAdminSubscription,
   retryBackendAdminPaymentEvent,
   searchBackendAdminBusinesses,
+  setBackendAdminBusinessStatus,
   type BackendAdminPaymentEvent,
   type BackendSubscriptionRecord,
 } from '@/lib/backend-business-api'
@@ -881,9 +882,9 @@ export default function PaymentsPage() {
             {/* Header */}
             <div className="flex flex-col gap-3">
               <h2 className="text-xl font-semibold text-[#f04438] uppercase tracking-wide">REVOKE SUBSCRIPTION</h2>
-              <h3 className="text-2xl font-semibold text-black">Subscription revoke is not available</h3>
+              <h3 className="text-2xl font-semibold text-black">Revoke backend account access?</h3>
               <p className="text-base text-[#717171]">
-                The backend billing API does not currently expose a subscription cancel/revoke endpoint. This action is disabled until that endpoint exists.
+                This will mark the business account as revoked in the backend. It does not cancel charges with an external billing provider.
               </p>
             </div>
 
@@ -945,17 +946,32 @@ export default function PaymentsPage() {
               </button>
               <button
                 onClick={async () => {
-                  toast({
-                    title: 'Unavailable',
-                    description: 'The backend does not support subscription revoke yet.',
-                    variant: 'destructive'
-                  })
-                  setRevokeModalOpen(false)
-                  setSelectedSubscription(null)
+                  if (!selectedSubscription) return
+                  setIsActionLoading(true)
+                  try {
+                    await setBackendAdminBusinessStatus(selectedSubscription.businessAccountId, 'revoke')
+                    toast({
+                      title: 'Subscription revoked',
+                      description: `${selectedSubscription.email} has been revoked in the backend.`,
+                      variant: 'success'
+                    })
+                    setRevokeModalOpen(false)
+                    setSelectedSubscription(null)
+                    await loadBillingData()
+                  } catch (error) {
+                    toast({
+                      title: 'Failed to revoke subscription',
+                      description: error instanceof Error ? error.message : 'Please try again.',
+                      variant: 'destructive'
+                    })
+                  } finally {
+                    setIsActionLoading(false)
+                  }
                 }}
-                className="flex h-12 items-center justify-center rounded-lg bg-[#717171] px-6 py-3 text-base font-bold text-white"
+                disabled={isActionLoading}
+                className="flex h-12 items-center justify-center rounded-lg bg-[#f04438] px-6 py-3 text-base font-bold text-white transition-colors hover:bg-[#d92d20] disabled:opacity-50"
               >
-                Action unavailable
+                {isActionLoading ? 'Revoking...' : 'Revoke access'}
               </button>
             </div>
           </div>

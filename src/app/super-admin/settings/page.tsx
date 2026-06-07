@@ -26,6 +26,10 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
+import {
+  getBackendPlatformSettings,
+  updateBackendPlatformSettings
+} from '@/lib/backend-business-api'
 
 interface PlatformSettings {
   platformName: string
@@ -61,13 +65,12 @@ export default function SettingsPage() {
     try {
       setLoading(true)
       
-      const response = await fetch('/api/admin/settings/platform')
-      const data = await response.json()
+      const data = await getBackendPlatformSettings<PlatformSettings>()
       
       if (data.success) {
         setPlatformSettings(data.settings)
       } else {
-        throw new Error(data.error || 'Failed to load settings')
+        throw new Error(data.message || 'Failed to load settings')
       }
       
     } catch (error) {
@@ -86,18 +89,10 @@ export default function SettingsPage() {
     try {
       setSaving(true)
       
-      const response = await fetch('/api/admin/settings/platform', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...platformSettings,
-          updatedBy: user?.email || 'Unknown'
-        })
+      const data = await updateBackendPlatformSettings<PlatformSettings & { updatedBy: string }>({
+        ...platformSettings,
+        updatedBy: user?.email || 'Unknown'
       })
-      
-      const data = await response.json()
       
       if (data.success) {
         toast({
@@ -106,7 +101,7 @@ export default function SettingsPage() {
         })
         setPlatformSettings(data.settings)
       } else {
-        throw new Error(data.error || 'Failed to save settings')
+        throw new Error(data.message || 'Failed to save settings')
       }
       
     } catch (error) {

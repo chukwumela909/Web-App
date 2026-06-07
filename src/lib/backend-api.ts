@@ -143,7 +143,11 @@ export async function request<T>(
     )
   }
 
-  return (body as ApiEnvelope<T>).data
+  if (body && typeof body === 'object' && 'data' in body) {
+    return (body as ApiEnvelope<T>).data
+  }
+
+  return body as T
 }
 
 export async function requestText(

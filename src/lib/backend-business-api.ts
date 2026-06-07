@@ -132,6 +132,31 @@ export interface BackendAdminPaymentEvent {
   createdAt?: string | null
 }
 
+export interface BackendPlatformSettingResponse<T = AnyRecord> {
+  success: boolean
+  settings: T
+  isDefault?: boolean
+  message?: string
+}
+
+export interface BackendNotificationSendResponse {
+  success: boolean
+  recipientCount: number
+  announcement?: AnyRecord
+}
+
+export interface BackendNotificationHistoryResponse {
+  success: boolean
+  announcements?: AnyRecord[]
+  announcement?: AnyRecord
+}
+
+export interface BackendNotificationRecipientsResponse {
+  success: boolean
+  recipients: AnyRecord[]
+  total: number
+}
+
 export function isBackendAvailable() {
   return true
 }
@@ -1078,6 +1103,10 @@ export async function recordBackendSupplierPayment(supplierId: string, data: Any
   })
 }
 
+export async function getBackendPurchaseOrderById(purchaseOrderId: string, branchId?: string): Promise<PurchaseOrder | null> {
+  return getBackendPurchaseOrder(purchaseOrderId, branchId)
+}
+
 export async function getBackendSupplierDashboard(branchId?: string): Promise<SupplierDashboard> {
   const suppliers = await getBackendSuppliers(branchId)
   return {
@@ -1339,6 +1368,13 @@ export async function getBackendCheckoutStatus(subscriptionId: string): Promise<
   }
 }
 
+export async function activateBackendSubscription(planType: BackendPlanType = 'monthly') {
+  return api<AnyRecord>('/billing/subscription/activate', {
+    method: 'POST',
+    body: JSON.stringify({ planType })
+  })
+}
+
 export async function startBackendMpesaCheckout(planType: BackendPlanType, phoneNumber: string): Promise<BackendMpesaCheckoutResponse> {
   const result = await api<AnyRecord>('/billing/mpesa/stk-push', {
     method: 'POST',
@@ -1374,6 +1410,78 @@ export async function startBackendStripeCheckout(planType: BackendPlanType, succ
 export async function searchBackendAdminBusinesses(params?: { q?: string; status?: string }) {
   const query = params ? `?${new URLSearchParams(Object.entries(params).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}` : ''
   return listFrom<AnyRecord>(await api(`/admin/businesses${query}`), ['businesses', 'accounts'])
+}
+
+export async function getBackendPlatformUserStats() {
+  return api<AnyRecord>('/admin/user-stats')
+}
+
+export async function setBackendPlatformUserDisabled(userId: string, disabled: boolean) {
+  return api<AnyRecord>(`/admin/users/${userId}/disable`, {
+    method: 'POST',
+    body: JSON.stringify({ disabled })
+  })
+}
+
+export async function getBackendPlatformSettings<T = AnyRecord>() {
+  return api<BackendPlatformSettingResponse<T>>('/admin/settings/platform')
+}
+
+export async function updateBackendPlatformSettings<T = AnyRecord>(settings: T) {
+  return api<BackendPlatformSettingResponse<T>>('/admin/settings/platform', {
+    method: 'POST',
+    body: JSON.stringify(settings)
+  })
+}
+
+export async function getBackendNotificationSettings<T = AnyRecord>() {
+  return api<BackendPlatformSettingResponse<T>>('/admin/settings/notifications')
+}
+
+export async function updateBackendNotificationSettings<T = AnyRecord>(settings: T) {
+  return api<BackendPlatformSettingResponse<T>>('/admin/settings/notifications', {
+    method: 'POST',
+    body: JSON.stringify(settings)
+  })
+}
+
+export async function getBackendIntegrationSettings<T = AnyRecord>() {
+  return api<BackendPlatformSettingResponse<T>>('/admin/settings/integrations')
+}
+
+export async function updateBackendIntegrationSettings<T = AnyRecord>(settings: T) {
+  return api<BackendPlatformSettingResponse<T>>('/admin/settings/integrations', {
+    method: 'POST',
+    body: JSON.stringify(settings)
+  })
+}
+
+export async function getBackendPlatformAdminUsers() {
+  return api<AnyRecord>('/admin/settings/admin-users')
+}
+
+export async function manageBackendPlatformAdminUser(action: AnyRecord) {
+  return api<AnyRecord>('/admin/settings/admin-users', {
+    method: 'POST',
+    body: JSON.stringify(action)
+  })
+}
+
+export async function sendBackendNotification(announcementId: string, announcement: AnyRecord) {
+  return api<BackendNotificationSendResponse>('/notifications/send', {
+    method: 'POST',
+    body: JSON.stringify({ announcementId, announcement })
+  })
+}
+
+export async function getBackendNotificationHistory(announcementId?: string) {
+  const query = announcementId ? `?announcementId=${encodeURIComponent(announcementId)}` : ''
+  return api<BackendNotificationHistoryResponse>(`/notifications/send${query}`)
+}
+
+export async function getBackendNotificationRecipients(audience?: string) {
+  const query = audience ? `?audience=${encodeURIComponent(audience)}` : ''
+  return api<BackendNotificationRecipientsResponse>(`/notifications/recipients${query}`)
 }
 
 export async function searchBackendAdminUsers(params?: { q?: string; status?: string }) {
@@ -1443,4 +1551,88 @@ export async function getBackendAdminAuditLogs() {
 
 export async function getBackendAdminPayments() {
   return listFrom<AnyRecord>(await api('/admin/payments'), ['payments', 'events']).map(normalizeAdminPaymentEvent)
+}
+
+export async function getBackendStaff(params?: { branchId?: string; status?: string }) {
+  const query = params ? `?${new URLSearchParams(Object.entries(params).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}` : ''
+  return listFrom<AnyRecord>(await api(`/staff${query}`), ['staff', 'members'])
+}
+
+export async function getBackendStaffMember(staffId: string) {
+  return api<AnyRecord>(`/staff/${staffId}`)
+}
+
+export async function createBackendStaffMember(data: AnyRecord) {
+  return api<AnyRecord>('/staff', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  })
+}
+
+export async function updateBackendStaffMember(staffId: string, data: AnyRecord) {
+  return api<AnyRecord>(`/staff/${staffId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data)
+  })
+}
+
+export async function deactivateBackendStaffMember(staffId: string) {
+  return api<AnyRecord>(`/staff/${staffId}`, { method: 'DELETE' })
+}
+
+export async function activateBackendStaffMember(staffId: string) {
+  return api<AnyRecord>(`/staff/${staffId}/activate`, { method: 'POST' })
+}
+
+export async function getBackendStaffLogs(params?: { staffId?: string; limit?: number }) {
+  const entries = Object.entries(params || {})
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => [key, String(value)] as [string, string])
+  const query = entries.length ? `?${new URLSearchParams(entries).toString()}` : ''
+  return listFrom<AnyRecord>(await api(`/staff/logs${query}`), ['logs', 'activityLogs'])
+}
+
+export async function createBackendStaffLog(data: AnyRecord) {
+  return api<AnyRecord>('/staff/logs', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  })
+}
+
+export async function setupBackendStaffTwoFactor() {
+  return api<AnyRecord>('/staff/2fa/setup', { method: 'POST' })
+}
+
+export async function verifyBackendStaffTwoFactor(token: string) {
+  return api<AnyRecord>('/staff/2fa/verify', {
+    method: 'POST',
+    body: JSON.stringify({ token })
+  })
+}
+
+export async function disableBackendStaffTwoFactor() {
+  return api<AnyRecord>('/staff/2fa/disable', { method: 'POST' })
+}
+
+export async function getBackendStaffInvitations(params?: { status?: string }) {
+  const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : ''
+  return listFrom<AnyRecord>(await api(`/staff/invitations${query}`), ['invitations'])
+}
+
+export async function createBackendStaffInvitation(data: AnyRecord) {
+  return api<AnyRecord>('/staff/invitations', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  })
+}
+
+export async function cancelBackendStaffInvitation(staffId: string) {
+  return api<AnyRecord>(`/staff/invitations/${staffId}/cancel`, { method: 'POST' })
+}
+
+export async function acceptBackendStaffInvitation(token: string) {
+  return api<AnyRecord>('/staff/invitations/accept', {
+    method: 'POST',
+    body: JSON.stringify({ token })
+  })
 }

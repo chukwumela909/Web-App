@@ -46,12 +46,13 @@ import { auth } from '@/lib/firebase'
 import { userManagementActions } from '@/lib/firebase-admin'
 import { useToast } from '@/hooks/use-toast'
 import { handleError } from '@/lib/error-handler'
-import { request } from '@/lib/backend-api'
 import {
+  activateBackendSubscription,
   manuallyActivateBackendAdminSubscription,
   searchBackendAdminBusinesses,
   searchBackendAdminUsers,
   setBackendAdminBusinessStatus,
+  setBackendPlatformUserDisabled,
   type BackendPlanType,
   type BackendSubscriptionRecord
 } from '@/lib/backend-business-api'
@@ -479,10 +480,7 @@ export default function UsersPage() {
       throw new Error('No authenticated user is available for backend activation.')
     }
 
-    const result = await request<Record<string, any>>('/billing/subscription/activate', {
-      user: currentUser,
-      method: 'POST'
-    })
+    const result = await activateBackendSubscription('monthly')
     const subscription = (result.subscription || result) as BackendSubscriptionRecord | null
 
     markUserSubscriptionActive(targetUser.id, subscription, 'monthly')
@@ -681,25 +679,15 @@ export default function UsersPage() {
               variant: 'success'
             })
           } else {
-            const response = await fetch(`/api/admin/users/${selectedUser.id}/disable`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ disabled: selectedUser.status === 'active' })
+            const result = await setBackendPlatformUserDisabled(
+              selectedUser.id,
+              selectedUser.status === 'active'
+            )
+            toast({
+              title: 'Success',
+              description: result.message || `User ${selectedUser.status === 'active' ? 'disabled' : 'enabled'} successfully`,
+              variant: 'success'
             })
-            
-            if (response.ok) {
-              const result = await response.json()
-              toast({
-                title: 'Success',
-                description: result.message || `User ${selectedUser.status === 'active' ? 'disabled' : 'enabled'} successfully`,
-                variant: 'success'
-              })
-            } else {
-              const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-              throw new Error(errorData.error || `Failed to update user status (${response.status})`)
-            }
           }
           break
           
@@ -714,7 +702,17 @@ export default function UsersPage() {
           break
           
         case 'revoke-subscription':
-          throw new Error('The backend does not support subscription revoke yet.')
+          const revokeBusinessAccountId = getUserBusinessAccountId(selectedUser)
+          if (!revokeBusinessAccountId) {
+            throw new Error(`No backend business account was found for ${selectedUser.email}.`)
+          }
+          await setBackendAdminBusinessStatus(revokeBusinessAccountId, 'revoke')
+          toast({
+            title: 'Success',
+            description: `Backend access revoked for ${selectedUser.email}`,
+            variant: 'success'
+          })
+          break
           
         case 'delete':
           console.log('Attempting to delete user:', selectedUser.id, selectedUser.email)
@@ -830,7 +828,13 @@ export default function UsersPage() {
             shouldRefreshUsers = false
             break
           case 'revoke-subscription':
-            throw new Error('The backend does not support subscription revoke yet.')
+            const revokeBusinessAccountId = getUserBusinessAccountId(user)
+            if (!revokeBusinessAccountId) {
+              throw new Error(`No backend business account was found for ${user.email}.`)
+            }
+            await setBackendAdminBusinessStatus(revokeBusinessAccountId, 'revoke')
+            shouldRefreshUsers = true
+            break
           case 'disable':
             const businessAccountId = getUserBusinessAccountId(user)
 
@@ -840,17 +844,7 @@ export default function UsersPage() {
                 user.status === 'active' ? 'pause' : 'resume'
               )
             } else {
-              const disableResponse = await fetch(`/api/admin/users/${user.id}/disable`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ disabled: user.status === 'active' })
-              })
-              if (!disableResponse.ok) {
-                const errorData = await disableResponse.json().catch(() => ({ error: 'Unknown error' }))
-                throw new Error(`Failed to ${user.status === 'active' ? 'disable' : 'enable'} user ${user.email}: ${errorData.error}`)
-              }
+              await setBackendPlatformUserDisabled(user.id, user.status === 'active')
             }
             break
           case 'delete':

@@ -54,12 +54,16 @@ import {
   createBackendPurchaseOrder,
   createBackendSupplier,
   deleteBackendSupplier,
+  getBackendPurchaseOrder,
   getBackendSupplier,
   getBackendPurchaseOrders,
   getBackendSupplierDashboard,
+  getBackendSupplierLedger,
+  getBackendSupplierPayments,
   getBackendSuppliers,
   isBackendAvailable,
   mapSupplier as mapBackendSupplier,
+  recordBackendSupplierPayment,
   receiveBackendPurchaseOrder,
   updateBackendSupplier
 } from '@/lib/backend-business-api'
@@ -311,6 +315,34 @@ export async function deleteSupplier(supplierId: string): Promise<void> {
   await deleteDoc(doc(db, 'suppliers', supplierId))
 }
 
+export async function getSupplierLedgerEntries(supplierId: string, branchId?: string): Promise<Record<string, any>[]> {
+  if (isBackendAvailable()) {
+    return getBackendSupplierLedger(supplierId, branchId)
+  }
+
+  return []
+}
+
+export async function getSupplierPaymentHistory(supplierId: string, branchId?: string): Promise<Record<string, any>[]> {
+  if (isBackendAvailable()) {
+    return getBackendSupplierPayments(supplierId, branchId)
+  }
+
+  return []
+}
+
+export async function recordSupplierPayment(
+  supplierId: string,
+  data: Record<string, any>,
+  branchId?: string
+): Promise<Record<string, any> | void> {
+  if (isBackendAvailable()) {
+    return recordBackendSupplierPayment(supplierId, data, branchId)
+  }
+
+  throw new Error('Supplier payment recording is available through the backend API only.')
+}
+
 // ============================================================================
 // PURCHASE ORDER OPERATIONS
 // ============================================================================
@@ -407,8 +439,7 @@ export async function getPurchaseOrders(
 export async function getPurchaseOrder(purchaseOrderId: string): Promise<PurchaseOrder | null> {
   if (isBackendAvailable()) {
     try {
-      const orders = await getBackendPurchaseOrders()
-      return orders.find((order) => order.id === purchaseOrderId) || null
+      return await getBackendPurchaseOrder(purchaseOrderId)
     } catch (error) {
       throw error
     }

@@ -15,6 +15,13 @@ import {
   getStaff,
   getStaffActivityLogs
 } from '@/lib/firestore'
+import {
+  activateBackendStaffMember,
+  deactivateBackendStaffMember,
+  getBackendStaff,
+  getBackendStaffLogs,
+  updateBackendStaffMember
+} from '@/lib/backend-business-api'
 import { getBranches } from '@/lib/branches-service'
 import { Branch } from '@/lib/branches-types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -95,6 +102,50 @@ const getSeverityIcon = (severity: StaffActivityLog['severity']) => {
   }
 }
 
+function toMillis(value: any) {
+  if (!value) return Date.now()
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') return new Date(value).getTime() || Date.now()
+  if (typeof value.seconds === 'number') return value.seconds * 1000
+  return Date.now()
+}
+
+function mapBackendStaff(row: any, ownerId: string): Staff {
+  return {
+    id: String(row.id || row._id || row.staffId || ''),
+    authId: String(row.firebaseUid || row.authId || row.user?.firebaseUid || ''),
+    userId: ownerId,
+    fullName: String(row.fullName || row.name || row.user?.fullName || row.email || 'Staff member'),
+    email: String(row.email || row.user?.email || ''),
+    phone: String(row.phone || row.user?.phone || ''),
+    role: String(row.role || 'cashier').toLowerCase() as StaffRole,
+    branchIds: Array.isArray(row.branchIds) ? row.branchIds.map(String) : [],
+    status: String(row.status || 'active').toLowerCase() as StaffStatus,
+    lastLogin: row.lastLoginAt ? toMillis(row.lastLoginAt) : undefined,
+    twoFactorEnabled: Boolean(row.twoFactorEnabled),
+    permissions: Array.isArray(row.permissions) ? row.permissions : [],
+    employeeId: row.employeeId,
+    salary: row.salary !== undefined ? Number(row.salary) : undefined,
+    emergencyContact: row.emergencyContact,
+    createdBy: String(row.createdBy || ownerId),
+    createdAt: row.createdAt ? toMillis(row.createdAt) : undefined,
+    updatedAt: row.updatedAt ? toMillis(row.updatedAt) : undefined
+  }
+}
+
+function mapBackendStaffLog(row: any, ownerId: string): StaffActivityLog {
+  return {
+    id: String(row.id || row._id || ''),
+    staffId: String(row.staffId || row.actorStaffId || ''),
+    staffName: String(row.staffName || row.actorName || 'Staff member'),
+    action: String(row.action || ''),
+    description: String(row.description || row.action || ''),
+    metadata: row.metadata || {},
+    severity: String(row.severity || 'info').toLowerCase() as StaffActivityLog['severity'],
+    timestamp: toMillis(row.createdAt || row.timestamp),
+    userId: ownerId
+  }
+}
 
 
 export default function StaffPage() {
@@ -138,6 +189,17 @@ export default function StaffPage() {
   const loadStaff = async () => {
     try {
       setLoading(true)
+      const backendStaff = await getBackendStaff({
+        branchId: selectedBranch === 'all' ? undefined : selectedBranch,
+        status: selectedStatus === 'all' ? undefined : selectedStatus
+      })
+      setStaff(backendStaff.map((member) => mapBackendStaff(member, user!.uid)))
+      return
+    } catch (backendError) {
+      console.warn('Unable to load backend staff, falling back to local staff:', backendError)
+    }
+
+    try {
       // Call getStaff directly from client-side to use authenticated user context
       const staffData = await getStaff(user!.uid)
       setStaff(staffData)
@@ -149,6 +211,14 @@ export default function StaffPage() {
   }
 
   const loadActivityLogs = async () => {
+    try {
+      const logs = await getBackendStaffLogs({ limit: 50 })
+      setActivityLogs(logs.map((log) => mapBackendStaffLog(log, user!.uid)))
+      return
+    } catch (backendError) {
+      console.warn('Unable to load backend staff logs, falling back to local logs:', backendError)
+    }
+
     try {
       // Call getStaffActivityLogs directly from client-side to use authenticated user context
       const logs = await getStaffActivityLogs(user!.uid, {}, 50)
@@ -172,6 +242,21 @@ export default function StaffPage() {
 
 
   const handleUpdateStaffStatus = async (staffId: string, status: StaffStatus) => {
+    try {
+      if (status === 'active') {
+        await activateBackendStaffMember(staffId)
+      } else if (status === 'inactive') {
+        await deactivateBackendStaffMember(staffId)
+      } else {
+        await updateBackendStaffMember(staffId, { status })
+      }
+      await loadStaff()
+      await loadActivityLogs()
+      return
+    } catch (backendError) {
+      console.warn('Unable to update backend staff status, falling back to local route:', backendError)
+    }
+
     try {
       let url = `/api/staff/${staffId}`
       let method = 'PUT'

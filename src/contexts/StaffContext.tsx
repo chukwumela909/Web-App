@@ -68,10 +68,13 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
                 userId: user.uid,
                 fullName: data.staff.name,
                 email: data.staff.email,
+                phone: data.staff.phone || '',
                 role: data.staff.role.toLowerCase().replace(/\s+/g, '_'), // Convert to old role format
                 permissions: data.staff.permissions || [],
                 status: data.staff.status,
                 branchIds: [], // Super-admin staff don't have branch restrictions
+                twoFactorEnabled: Boolean(data.staff.twoFactorEnabled),
+                createdBy: data.staff.createdBy || user.uid,
                 createdAt: data.staff.createdAt,
                 lastLogin: data.staff.lastLogin
               }

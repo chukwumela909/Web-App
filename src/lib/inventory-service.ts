@@ -46,6 +46,7 @@ import { getBranches as getBranchesFromService, getBranch as getBranchFromServic
 import {
   adjustBackendStock,
   createBackendTransfer,
+  getBackendInventory,
   getBackendInventoryAlerts,
   getBackendInventoryMovements,
   getBackendTransfers,
@@ -206,13 +207,42 @@ function inventoryItemFromProduct(product: Product, branchId: string): Inventory
   }
 }
 
+function inventoryItemFromBackendRow(row: any, branchId: string): InventoryItem {
+  const product = row.product || row.catalogProduct || row
+  const inventory = row.inventory || row.branchInventory || row.inventoryItem || row
+  const currentStock = Number(inventory.quantity ?? inventory.currentStock ?? row.quantity ?? row.currentStock ?? 0)
+  const reservedStock = Number(inventory.reservedStock ?? 0)
+
+  return {
+    id: String(inventory.id || inventory._id || product.id || product._id || ''),
+    productId: String(product.id || product._id || inventory.productId || row.productId || ''),
+    branchId: String(inventory.branchId || row.branchId || branchId),
+    currentStock,
+    reservedStock,
+    availableStock: Number(inventory.availableStock ?? Math.max(0, currentStock - reservedStock)),
+    minStockLevel: Number(inventory.reorderLevel ?? inventory.minStockLevel ?? row.minStockLevel ?? 0),
+    reorderPoint: Number(inventory.reorderPoint ?? inventory.reorderLevel ?? inventory.minStockLevel ?? row.minStockLevel ?? 0),
+    averageCostPrice: Number(inventory.averageCostPrice ?? inventory.costPrice ?? product.costPrice ?? 0),
+    lastCostPrice: Number(inventory.lastCostPrice ?? inventory.costPrice ?? product.costPrice ?? 0),
+    binLocation: inventory.binLocation || row.location || undefined,
+    userId: String(row.userId || product.userId || ''),
+    createdAt: dateFrom(inventory.createdAt || row.createdAt),
+    updatedAt: dateFrom(inventory.updatedAt || row.updatedAt)
+  }
+}
+
 export async function getInventorySnapshot(userId: string, branchId?: string): Promise<{ products: Product[]; inventoryItems: InventoryItem[] }> {
   if (isBackendAvailable()) {
     const targetBranch = branchId || await getSelectedBackendBranchId()
-    const products = await getBackendProducts(targetBranch)
+    const [products, inventoryRows] = await Promise.all([
+      getBackendProducts(targetBranch),
+      getBackendInventory(targetBranch)
+    ])
     return {
       products,
-      inventoryItems: products.map((product) => inventoryItemFromProduct(product, targetBranch))
+      inventoryItems: inventoryRows.length > 0
+        ? inventoryRows.map((row) => inventoryItemFromBackendRow(row, targetBranch))
+        : products.map((product) => inventoryItemFromProduct(product, targetBranch))
     }
   }
 
@@ -224,6 +254,10 @@ export async function getInventoryItems(userId: string, branchId?: string): Prom
   if (isBackendAvailable()) {
     try {
       const targetBranch = branchId || await getSelectedBackendBranchId()
+      const inventoryRows = await getBackendInventory(targetBranch)
+      if (inventoryRows.length > 0) {
+        return inventoryRows.map((row) => inventoryItemFromBackendRow(row, targetBranch))
+      }
       const products = await getBackendProducts(targetBranch)
       return products.map((product) => inventoryItemFromProduct(product, targetBranch))
     } catch (error) {

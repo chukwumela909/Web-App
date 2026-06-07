@@ -17,7 +17,10 @@ import {
 import { db } from '@/lib/firebase'
 import {
   getBackendAdminAuditLogs,
-  isBackendAvailable
+  getBackendNotificationHistory,
+  getBackendPlatformUserStats,
+  isBackendAvailable,
+  sendBackendNotification
 } from '@/lib/backend-business-api'
 
 // Types for real Firebase data
@@ -197,9 +200,44 @@ export class SuperAdminService {
     // Return null if we can't convert it
     return null
   }
+
+  private static mapBackendAnnouncement(row: any): BroadcastAnnouncement {
+    const payload = row.payload || row.announcement || row
+    const createdAt = this.safeDate(row.createdAt || payload.createdAt) || new Date()
+    return {
+      id: String(row.announcementId || row.id || row._id || payload.id || ''),
+      title: String(row.title || payload.title || ''),
+      message: String(row.message || payload.message || ''),
+      type: (row.type || payload.type || 'info') as BroadcastAnnouncement['type'],
+      channel: (row.channel || payload.channel || 'app') as BroadcastAnnouncement['channel'],
+      targetAudience: (row.targetAudience || payload.targetAudience || 'all_users') as BroadcastAnnouncement['targetAudience'],
+      status: 'sent',
+      createdAt,
+      createdBy: String(row.sentBy || payload.createdBy || 'Platform admin'),
+      sentAt: this.safeDate(row.sentAt || row.createdAt || payload.sentAt) || createdAt,
+      recipientCount: Number(row.recipientCount || payload.recipientCount || 0),
+      metadata: row.metadata || payload.metadata || row
+    }
+  }
   
   // User Analytics - Now using centralized service
   static async getUserMetrics() {
+    if (isBackendAvailable()) {
+      try {
+        const result = await getBackendPlatformUserStats()
+        const stats = result.stats || {}
+        return {
+          total: Number(stats.total ?? stats.totalUsers ?? 0),
+          daily: Number(stats.activeToday ?? 0),
+          weekly: Number(stats.activeThisWeek ?? 0),
+          monthly: Number(stats.activeThisMonth ?? stats.activeUsers ?? 0),
+          regions: Number(stats.uniqueRegions ?? stats.regions?.length ?? 0)
+        }
+      } catch (error) {
+        console.warn('Unable to load backend user metrics:', error)
+      }
+    }
+
     try {
       const UserMetricsService = (await import('@/lib/user-metrics-service')).default
       const metrics = await UserMetricsService.getUserMetrics(true) // Force refresh
@@ -396,13 +434,27 @@ export class SuperAdminService {
       const announcementsQuery = query(announcementsRef, orderBy('createdAt', 'desc'))
       const announcementsSnapshot = await getDocs(announcementsQuery)
       
-      return announcementsSnapshot.docs.map(doc => ({
+      const localAnnouncements = announcementsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         createdAt: this.safeDate(doc.data().createdAt) || new Date(),
         scheduledAt: this.safeDate(doc.data().scheduledAt),
         sentAt: this.safeDate(doc.data().sentAt)
       })) as BroadcastAnnouncement[]
+
+      if (!isBackendAvailable()) {
+        return localAnnouncements
+      }
+
+      const history = await getBackendNotificationHistory()
+      const backendAnnouncements = (history.announcements || []).map((announcement) =>
+        this.mapBackendAnnouncement(announcement)
+      )
+      const localIds = new Set(localAnnouncements.map((announcement) => announcement.id))
+      return [
+        ...localAnnouncements,
+        ...backendAnnouncements.filter((announcement) => !localIds.has(announcement.id))
+      ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     } catch (error) {
       console.error('Error fetching announcements:', error)
       return []
@@ -451,43 +503,52 @@ export class SuperAdminService {
     announcement: BroadcastAnnouncement
   ): Promise<{ success: boolean; recipientCount: number; error?: string }> {
     try {
-      // Import notification service
-      const { NotificationService } = await import('./notification-service')
-      
-      // Get recipients based on target audience
-      const recipients = await NotificationService.getRecipients(announcement.targetAudience)
-      
-      if (recipients.length === 0) {
-        return { success: false, recipientCount: 0, error: 'No recipients found for target audience' }
-      }
-      
-      // Send notification
-      const result = await NotificationService.sendNotification(announcement, recipients)
+      const result = isBackendAvailable()
+        ? await sendBackendNotification(announcementId, announcement)
+        : await (async () => {
+            const { NotificationService } = await import('./notification-service')
+            const recipients = await NotificationService.getRecipients(announcement.targetAudience)
+            if (recipients.length === 0) {
+              return { success: false, recipientCount: 0, sent: 0, failed: 0, errors: ['No recipients found for target audience'] }
+            }
+            const sent = await NotificationService.sendNotification(announcement, recipients)
+            return {
+              success: sent.success,
+              recipientCount: sent.sent,
+              sent: sent.sent,
+              failed: sent.failed,
+              errors: sent.errors
+            }
+          })()
+
+      const sentCount = Number((result as any).sent ?? result.recipientCount ?? 0)
+      const failedCount = Number((result as any).failed ?? 0)
+      const errors = (result as any).errors as string[] | undefined
       
       // Update announcement status in Firestore
       const announcementRef = doc(db, 'announcements', announcementId)
       const updateData: any = {
         status: result.success ? 'sent' : 'failed',
         sentAt: serverTimestamp(),
-        recipientCount: result.sent,
+        recipientCount: sentCount,
         metadata: {
-          totalRecipients: recipients.length,
-          sent: result.sent,
-          failed: result.failed
+          totalRecipients: result.recipientCount,
+          sent: sentCount,
+          failed: failedCount
         }
       }
       
       // Only add errors if they exist
-      if (result.errors && result.errors.length > 0) {
-        updateData.metadata.errors = result.errors
+      if (errors && errors.length > 0) {
+        updateData.metadata.errors = errors
       }
       
-      await updateDoc(announcementRef, updateData)
+      await updateDoc(announcementRef, updateData).catch(() => undefined)
       
       return {
         success: result.success,
-        recipientCount: result.sent,
-        error: result.errors ? result.errors.join('; ') : undefined
+        recipientCount: sentCount,
+        error: errors ? errors.join('; ') : undefined
       }
     } catch (error) {
       console.error('Error sending announcement:', error)

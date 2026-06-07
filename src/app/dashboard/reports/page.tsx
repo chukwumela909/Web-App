@@ -33,6 +33,11 @@ import { Branch } from '@/lib/branches-types'
 import {
   getBackendBranchPerformanceReport,
   getBackendDashboardReport,
+  getBackendExpensesReport,
+  getBackendInventoryValuationReport,
+  getBackendLowStockReport,
+  getBackendSalesReport,
+  getBackendSuppliersReport,
   isBackendAvailable
 } from '@/lib/backend-business-api'
 import { PlanGate } from '@/components/PlanGate'
@@ -290,9 +295,22 @@ export default function ReportsPage() {
         params.branchId = activeBranchId
       }
 
-      const [dashboardResult, branchResult] = await Promise.allSettled([
+      const [
+        dashboardResult,
+        branchResult,
+        salesResult,
+        inventoryValuationResult,
+        lowStockResult,
+        suppliersResult,
+        expensesResult
+      ] = await Promise.allSettled([
         getBackendDashboardReport(params),
-        getBackendBranchPerformanceReport(params)
+        getBackendBranchPerformanceReport(params),
+        getBackendSalesReport(params),
+        getBackendInventoryValuationReport(params),
+        getBackendLowStockReport(params),
+        getBackendSuppliersReport(params),
+        getBackendExpensesReport(params)
       ])
 
       if (dashboardResult.status === 'fulfilled') {
@@ -308,6 +326,18 @@ export default function ReportsPage() {
         setBackendBranchPerformanceReport([])
         if (branchResult.status === 'rejected') {
           console.warn('Backend branch performance report unavailable:', branchResult.reason)
+        }
+      }
+
+      for (const [name, result] of [
+        ['sales', salesResult],
+        ['inventory valuation', inventoryValuationResult],
+        ['low stock', lowStockResult],
+        ['suppliers', suppliersResult],
+        ['expenses', expensesResult]
+      ] as const) {
+        if (result.status === 'rejected') {
+          console.warn(`Backend ${name} report unavailable:`, result.reason)
         }
       }
     }
