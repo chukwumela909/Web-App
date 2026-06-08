@@ -1017,25 +1017,27 @@ function SalesPOSContent() {
                       />
                     </label>
 
-                    <div className="grid grid-cols-[105px_minmax(0,1fr)_112px] items-center gap-3">
-                      <span className="text-[15px] font-semibold text-[#777e8b]">Cart discount</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={discount}
-                        onChange={event => setDiscount(event.target.value)}
-                        placeholder="0"
-                        className={`dashboard-field h-10 px-4 text-[13px] ${cartDiscountValidation ? 'border-[#f04438]' : ''}`}
-                      />
-                      <select
-                        value={discountType}
-                        onChange={event => setDiscountType(event.target.value as DiscountType)}
-                        className="dashboard-field h-10 px-2 text-[13px]"
-                      >
-                        <option value="fixed">Fixed</option>
-                        <option value="percentage">Percentage</option>
-                      </select>
+                    <div className="space-y-2">
+                      <span className="block text-[15px] font-semibold text-[#777e8b]">Cart discount</span>
+                      <div className="grid grid-cols-[minmax(0,1fr)_112px] items-center gap-3">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={discount}
+                          onChange={event => setDiscount(event.target.value)}
+                          placeholder="0"
+                          className={`dashboard-field h-10 w-full px-3 text-[13px] ${cartDiscountValidation ? 'border-[#f04438]' : ''}`}
+                        />
+                        <select
+                          value={discountType}
+                          onChange={event => setDiscountType(event.target.value as DiscountType)}
+                          className="dashboard-field h-10 px-2 text-[13px]"
+                        >
+                          <option value="fixed">Fixed</option>
+                          <option value="percentage">Percentage</option>
+                        </select>
+                      </div>
                     </div>
                     {saleValidationMessage && (
                       <p className="rounded-[8px] bg-[#fff1ee] px-3 py-2 text-[12px] font-semibold text-[#d92d20]">
