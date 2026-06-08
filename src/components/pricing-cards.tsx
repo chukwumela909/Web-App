@@ -1,10 +1,19 @@
+"use client"
+
 import { Check, X } from "lucide-react"
+import { PLAN_PRICING } from "@/lib/subscription-types"
+import { getCurrencySymbol } from "@/hooks/useCurrency"
+import { usePublicCurrency } from "@/hooks/usePublicCurrency"
 
 interface PricingCardsProps {
   isYearly: boolean
 }
 
 export default function PricingCards({ isYearly }: PricingCardsProps) {
+  // Currency is resolved from the visitor's IP location:
+  // Kenya -> KSH, everywhere else -> USD.
+  const { currency } = usePublicCurrency()
+
   const features = [
     { name: "Add up to 20 products", free: true, pro: true },
     { name: "Inventory access", free: true, pro: true },
@@ -16,8 +25,15 @@ export default function PricingCards({ isYearly }: PricingCardsProps) {
     { name: "Sync across Mobile, Web, and Desktop", free: false, pro: true },
   ]
 
-  const freePrice = isYearly ? "$0" : "$0"
-  const proPrice = isYearly ? "$120" : "$10"
+  const symbol = getCurrencySymbol(currency)
+  // USD reads "$10"; KSH reads "KSh 2,000".
+  const separator = currency === "USD" ? "" : " "
+  const formatPrice = (amount: number) => `${symbol}${separator}${amount.toLocaleString()}`
+
+  const proAmount = isYearly ? PLAN_PRICING.yearly[currency] : PLAN_PRICING.monthly[currency]
+
+  const freePrice = formatPrice(0)
+  const proPrice = formatPrice(proAmount)
   const freePeriod = isYearly ? "/ Year" : "/ Month"
   const proPeriod = isYearly ? "/ Year" : "/ Month"
 
