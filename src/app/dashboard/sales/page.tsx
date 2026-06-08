@@ -855,7 +855,7 @@ function SalesPOSContent() {
             <aside className="min-h-0 overflow-hidden rounded-[8px]">
               {isSaleActive ? (
                 <section className="dashboard-panel flex h-full flex-col p-5">
-                  <div className="mb-7 flex items-center justify-between">
+                  <div className="mb-5 flex items-center justify-between">
                     <h2 className="text-[24px] font-bold tracking-[-0.02em]">Record Sale</h2>
                     <button
                       type="button"
@@ -867,122 +867,124 @@ function SalesPOSContent() {
                     </button>
                   </div>
 
-                  <label className="mb-7 block">
-                    <span className="mb-2 block text-[14px] font-bold">Customer name</span>
-                    <input
-                      value={customerName}
-                      onChange={event => setCustomerName(event.target.value)}
-                      placeholder="Customer name"
-                      className="dashboard-field h-10 w-full px-4 text-[13px]"
-                    />
-                  </label>
+                  <div className="-mr-1 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
+                    <label className="block">
+                      <span className="mb-2 block text-[14px] font-bold">Customer name</span>
+                      <input
+                        value={customerName}
+                        onChange={event => setCustomerName(event.target.value)}
+                        placeholder="Customer name"
+                        className="dashboard-field h-10 w-full px-4 text-[13px]"
+                      />
+                    </label>
 
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <h3 className="text-[20px] font-bold">Ordered Items</h3>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleHoldSale}
-                        disabled={savingHold || cartItems.length === 0}
-                        className="rounded-[5px] bg-[#eef5ff] px-2 py-1 text-[11px] font-medium text-[#2360c8] disabled:opacity-50"
-                      >
-                        {savingHold ? 'Holding...' : 'Hold Sale'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleClearSale}
-                        disabled={cartItems.length === 0}
-                        className="rounded-[5px] bg-[#fff1ee] px-2 py-1 text-[11px] font-medium text-[#f04438] disabled:opacity-50"
-                      >
-                        Clear all
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="min-h-0 flex-1 overflow-y-auto border-b border-dashed border-[#aeb4bf] pb-4 pr-1">
-                    {cartItems.length === 0 ? (
-                      <div className="grid h-full place-items-center text-center text-[#777e8b]">
-                        <div>
-                          <ShoppingCart className="mx-auto mb-3 h-10 w-10 text-[#c1c7d0]" />
-                          <p className="text-sm font-semibold">No items selected</p>
-                          <p className="mt-1 text-xs">Add products from the grid.</p>
+                    <div>
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <h3 className="text-[20px] font-bold">Ordered Items</h3>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleHoldSale}
+                            disabled={savingHold || cartItems.length === 0}
+                            className="rounded-[5px] bg-[#eef5ff] px-2 py-1 text-[11px] font-medium text-[#2360c8] disabled:opacity-50"
+                          >
+                            {savingHold ? 'Holding...' : 'Hold Sale'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleClearSale}
+                            disabled={cartItems.length === 0}
+                            className="rounded-[5px] bg-[#fff1ee] px-2 py-1 text-[11px] font-medium text-[#f04438] disabled:opacity-50"
+                          >
+                            Clear all
+                          </button>
                         </div>
                       </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {cartItems.map(item => {
-                          const gross = lineGross(item)
-                          const itemDiscountAmount = lineDiscountAmount(item)
-                          const itemSubtotal = lineSubtotal(item)
-                          const itemDiscountError = discountValidationMessage(numberFromInput(item.discount), item.discountType, gross, 'Line')
 
-                          return (
-                            <div key={item.productId} className="rounded-[8px] border border-[#edf0f4] bg-white p-3">
-                              <div className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => removeCartItem(item.productId)}
-                                  className="mt-0.5 grid h-6 w-6 place-items-center rounded-[5px] bg-[#fff1ee] text-[#ef4444]"
-                                  title="Remove item"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                                <div className="min-w-0">
-                                  <p className="text-[14px] font-semibold text-[#141925]">
-                                    <span className="mr-2 text-[#7a818f]">{item.quantity}x</span>
-                                    {item.productName}
-                                  </p>
-                                  <p className="mt-1 text-[11px] font-medium text-[#7a818f]">
-                                    Gross {formatMoney(gross)} - Unit {formatMoney(item.unitPrice)}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-[14px] font-bold">{formatMoney(itemSubtotal)}</p>
-                                  {itemDiscountAmount > 0 && (
-                                    <p className="text-[11px] font-semibold text-[#d92d20]">-{formatMoney(itemDiscountAmount)}</p>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_112px] gap-2">
-                                <label>
-                                  <span className="mb-1 block text-[11px] font-bold text-[#777e8b]">Line discount</span>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={item.discount}
-                                    onChange={event => updateCartItemDiscount(item.productId, { discount: event.target.value })}
-                                    className={`dashboard-field h-9 w-full px-3 text-[12px] ${itemDiscountError ? 'border-[#f04438]' : ''}`}
-                                    placeholder="0"
-                                  />
-                                </label>
-                                <label>
-                                  <span className="mb-1 block text-[11px] font-bold text-[#777e8b]">Type</span>
-                                  <select
-                                    value={item.discountType}
-                                    onChange={event => updateCartItemDiscount(item.productId, { discountType: event.target.value as DiscountType })}
-                                    className="dashboard-field h-9 w-full px-2 text-[12px]"
-                                  >
-                                    <option value="fixed">Fixed</option>
-                                    <option value="percentage">Percentage</option>
-                                  </select>
-                                </label>
-                              </div>
-                              <div className="mt-2 flex items-center justify-between text-[11px] font-semibold">
-                                <span className={itemDiscountError ? 'text-[#d92d20]' : 'text-[#7a818f]'}>
-                                  {itemDiscountError || `Discount amount: ${formatMoney(itemDiscountAmount)}`}
-                                </span>
-                                <span className="text-[#141925]">Subtotal: {formatMoney(itemSubtotal)}</span>
-                              </div>
+                      <div className="border-b border-dashed border-[#aeb4bf] pb-4">
+                        {cartItems.length === 0 ? (
+                          <div className="grid min-h-[140px] place-items-center text-center text-[#777e8b]">
+                            <div>
+                              <ShoppingCart className="mx-auto mb-3 h-10 w-10 text-[#c1c7d0]" />
+                              <p className="text-sm font-semibold">No items selected</p>
+                              <p className="mt-1 text-xs">Add products from the grid.</p>
                             </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {cartItems.map(item => {
+                              const gross = lineGross(item)
+                              const itemDiscountAmount = lineDiscountAmount(item)
+                              const itemSubtotal = lineSubtotal(item)
+                              const itemDiscountError = discountValidationMessage(numberFromInput(item.discount), item.discountType, gross, 'Line')
 
-                  <div className="space-y-4 pt-4">
+                              return (
+                                <div key={item.productId} className="rounded-[8px] border border-[#edf0f4] bg-white p-3">
+                                  <div className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => removeCartItem(item.productId)}
+                                      className="mt-0.5 grid h-6 w-6 place-items-center rounded-[5px] bg-[#fff1ee] text-[#ef4444]"
+                                      title="Remove item"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                    <div className="min-w-0">
+                                      <p className="text-[14px] font-semibold text-[#141925]">
+                                        <span className="mr-2 text-[#7a818f]">{item.quantity}x</span>
+                                        {item.productName}
+                                      </p>
+                                      <p className="mt-1 text-[11px] font-medium text-[#7a818f]">
+                                        Gross {formatMoney(gross)} - Unit {formatMoney(item.unitPrice)}
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-[14px] font-bold">{formatMoney(itemSubtotal)}</p>
+                                      {itemDiscountAmount > 0 && (
+                                        <p className="text-[11px] font-semibold text-[#d92d20]">-{formatMoney(itemDiscountAmount)}</p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-3 grid grid-cols-[minmax(0,1fr)_112px] gap-2">
+                                    <label>
+                                      <span className="mb-1 block text-[11px] font-bold text-[#777e8b]">Line discount</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={item.discount}
+                                        onChange={event => updateCartItemDiscount(item.productId, { discount: event.target.value })}
+                                        className={`dashboard-field h-9 w-full px-3 text-[12px] ${itemDiscountError ? 'border-[#f04438]' : ''}`}
+                                        placeholder="0"
+                                      />
+                                    </label>
+                                    <label>
+                                      <span className="mb-1 block text-[11px] font-bold text-[#777e8b]">Type</span>
+                                      <select
+                                        value={item.discountType}
+                                        onChange={event => updateCartItemDiscount(item.productId, { discountType: event.target.value as DiscountType })}
+                                        className="dashboard-field h-9 w-full px-2 text-[12px]"
+                                      >
+                                        <option value="fixed">Fixed</option>
+                                        <option value="percentage">Percentage</option>
+                                      </select>
+                                    </label>
+                                  </div>
+                                  <div className="mt-2 flex items-center justify-between text-[11px] font-semibold">
+                                    <span className={itemDiscountError ? 'text-[#d92d20]' : 'text-[#7a818f]'}>
+                                      {itemDiscountError || `Discount amount: ${formatMoney(itemDiscountAmount)}`}
+                                    </span>
+                                    <span className="text-[#141925]">Subtotal: {formatMoney(itemSubtotal)}</span>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="space-y-2 rounded-[8px] bg-[#f8fafc] p-3">
                       <div className="flex items-center justify-between text-[13px] font-semibold text-[#777e8b]">
                         <span>Subtotal ({cartQuantity} items)</span>
@@ -1071,17 +1073,17 @@ function SalesPOSContent() {
                         ))}
                       </div>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={handleCompleteSale}
-                      disabled={submitting || cartItems.length === 0 || Boolean(saleValidationMessage)}
-                      className="dashboard-action-primary mt-2 flex h-12 w-full text-[18px] disabled:bg-[#aeb9d2]"
-                    >
-                      {submitting && <Loader2 className="h-5 w-5 animate-spin" />}
-                      Complete Sale
-                    </button>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCompleteSale}
+                    disabled={submitting || cartItems.length === 0 || Boolean(saleValidationMessage)}
+                    className="dashboard-action-primary mt-4 flex h-12 w-full shrink-0 text-[18px] disabled:bg-[#aeb9d2]"
+                  >
+                    {submitting && <Loader2 className="h-5 w-5 animate-spin" />}
+                    Complete Sale
+                  </button>
                 </section>
               ) : selectedRecentSale?.kind === 'sale' ? (
                 <section className="dashboard-panel flex h-full flex-col p-5">
