@@ -50,7 +50,10 @@ function CheckoutContent() {
         if (currency === 'KSH') {
             return plan === 'yearly' ? 20000 : 2000
         } else {
-            return plan === 'yearly' ? 100 : 10
+            // TEST: USD reduced to Stripe's minimum ($0.50) to verify card payments.
+            // The actual charge is set by the backend (PLAN_PRICES.OTHER); this keeps the
+            // confirmation screen in sync. Revert to `plan === 'yearly' ? 100 : 10` for production.
+            return 0.5
         }
     }
 
