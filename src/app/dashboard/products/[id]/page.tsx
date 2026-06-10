@@ -28,13 +28,20 @@ import {
   ChartBarIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
+import { useBranch } from '@/contexts/BranchContext'
+import { useBusinessRole } from '@/hooks/useBusinessRole'
 import { useNotifications } from '@/contexts/NotificationsContext'
 import { Product, getProducts, softDeleteProduct } from '@/lib/firestore'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { getProductInventoryData, getProductPriceHistory } from '@/lib/product-enhancements'
+import { getStockMovements } from '@/lib/inventory-service'
+import type { StockMovement } from '@/lib/inventory-types'
 import { getSuppliers } from '@/lib/suppliers-service'
+import { getBranches } from '@/lib/branches-service'
+import type { Branch } from '@/lib/branches-types'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
+import BarcodeLabel from '@/components/products/BarcodeLabel'
 
 interface ProductInventoryData {
   totalStock: number
@@ -59,6 +66,8 @@ export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
+  const { selectedBranchId } = useBranch()
+  const { canSeeCost } = useBusinessRole()
   const { addNotification } = useNotifications()
   const { currency } = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
@@ -68,9 +77,12 @@ export default function ProductDetailPage() {
   const [inventoryData, setInventoryData] = useState<ProductInventoryData | null>(null)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [priceHistory, setPriceHistory] = useState<any[]>([])
+  const [movements, setMovements] = useState<StockMovement[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [showImageModal, setShowImageModal] = useState(false)
+  const [showLabelModal, setShowLabelModal] = useState(false)
 
   const fetchData = useCallback(async () => {
     if (!user || !productId) return
@@ -80,33 +92,54 @@ export default function ProductDetailPage() {
       // Fetch product details
       const products = await getProducts(user.uid)
       const foundProduct = products.find(p => p.id === productId)
-      
+
       if (!foundProduct) {
         router.push('/dashboard/products')
         return
       }
-      
+
       setProduct(foundProduct)
 
       // Fetch related data in parallel
-      const [inventoryResult, suppliersResult, priceHistoryResult] = await Promise.all([
+      const [inventoryResult, suppliersResult, priceHistoryResult, movementsResult, branchesResult] = await Promise.all([
         getProductInventoryData(productId, user.uid).catch(() => null),
         getSuppliers(user.uid).catch(() => []),
-        getProductPriceHistory(productId, undefined, 10).catch(() => [])
+        getProductPriceHistory(productId, undefined, 10).catch(() => []),
+        getStockMovements(user.uid, { productId, branchId: selectedBranchId || undefined }, { limit: 20 })
+          .then(result => result.movements)
+          .catch(() => [] as StockMovement[]),
+        getBranches(user.uid).catch(() => [] as Branch[])
       ])
 
       setInventoryData(inventoryResult)
       setSuppliers(suppliersResult)
       setPriceHistory(priceHistoryResult)
+      setMovements(movementsResult)
+      setBranches(branchesResult)
     } catch (error) {
       console.error('Error fetching product details:', error)
     } finally {
       setLoading(false)
     }
-  }, [user, productId, router])
+  }, [user, productId, router, selectedBranchId])
 
   useEffect(() => {
     fetchData()
+  }, [fetchData])
+
+  // Live updates: refetch when the tab regains focus / becomes visible
+  useEffect(() => {
+    const handleRefresh = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData()
+      }
+    }
+    window.addEventListener('focus', handleRefresh)
+    document.addEventListener('visibilitychange', handleRefresh)
+    return () => {
+      window.removeEventListener('focus', handleRefresh)
+      document.removeEventListener('visibilitychange', handleRefresh)
+    }
   }, [fetchData])
 
   const handleEdit = () => {
@@ -165,13 +198,29 @@ export default function ProductDetailPage() {
 
   const navigateImage = (direction: 'prev' | 'next') => {
     if (!product?.images) return
-    
+
     const totalImages = product.images.length
     if (direction === 'prev') {
       setCurrentImageIndex((prev) => (prev === 0 ? totalImages - 1 : prev - 1))
     } else {
       setCurrentImageIndex((prev) => (prev === totalImages - 1 ? 0 : prev + 1))
     }
+  }
+
+  const getBranchName = (branchId: string) =>
+    branches.find(branch => branch.id === branchId)?.name || branchId
+
+  const formatMovementType = (type: string) =>
+    type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
+
+  // Outbound movements decrease stock; inbound increase it.
+  const isOutboundMovement = (type: string) =>
+    type === 'SALE' || type.includes('OUT') || type === 'DAMAGE' || type === 'LOSS'
+
+  const formatMovementDate = (value: any) => {
+    if (!value) return ''
+    const date = value instanceof Date ? value : new Date(value)
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleString()
   }
 
   if (loading) {
@@ -229,6 +278,13 @@ export default function ProductDetailPage() {
             </div>
             
             <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowLabelModal(true)}
+                className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <QrCodeIcon className="h-5 w-5" />
+                <span>Print Label</span>
+              </button>
               <button
                 onClick={() => window.print()}
                 className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -377,20 +433,24 @@ export default function ProductDetailPage() {
                     <div className="text-sm text-gray-600 mb-1">Selling Price</div>
                     <div className="text-3xl font-bold text-gray-900">{currencySymbol} {product.sellingPrice.toLocaleString()}</div>
                   </div>
-                  <div>
-                    <div className="text-sm text-gray-600 mb-1">Cost Price</div>
-                    <div className="text-2xl font-semibold text-gray-700">{currencySymbol} {product.costPrice.toLocaleString()}</div>
-                  </div>
+                  {canSeeCost && (
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">Cost Price</div>
+                      <div className="text-2xl font-semibold text-gray-700">{currencySymbol} {product.costPrice.toLocaleString()}</div>
+                    </div>
+                  )}
                 </div>
-                <div className="mt-4 pt-4 border-t border-indigo-100">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Profit Margin:</span>
-                    <span className="font-medium text-green-600">
-                      {currencySymbol} {(product.sellingPrice - product.costPrice).toLocaleString()} 
-                      ({(((product.sellingPrice - product.costPrice) / product.sellingPrice) * 100).toFixed(1)}%)
-                    </span>
+                {canSeeCost && (
+                  <div className="mt-4 pt-4 border-t border-indigo-100">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Profit Margin:</span>
+                      <span className="font-medium text-green-600">
+                        {currencySymbol} {(product.sellingPrice - product.costPrice).toLocaleString()}
+                        ({(((product.sellingPrice - product.costPrice) / product.sellingPrice) * 100).toFixed(1)}%)
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Stock Information */}
@@ -413,6 +473,71 @@ export default function ProductDetailPage() {
                       <span>Location: {product.location}</span>
                     </div>
                   </div>
+                )}
+              </div>
+
+              {/* Stock per Branch */}
+              {inventoryData && Object.keys(inventoryData.branchStock).length > 0 && (
+                <div className="bg-gray-50 p-6 rounded-xl">
+                  <div className="mb-4 flex items-center space-x-2">
+                    <BuildingOffice2Icon className="h-5 w-5 text-gray-500" />
+                    <h3 className="text-lg font-semibold text-gray-900">Stock by Branch</h3>
+                  </div>
+                  <div className="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
+                    {Object.entries(inventoryData.branchStock).map(([branchId, stock]) => (
+                      <div key={branchId} className="flex items-center justify-between px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-gray-900">{getBranchName(branchId)}</p>
+                          <p className="text-xs text-gray-500">
+                            Available: {stock.available}
+                            {stock.reserved > 0 && ` • ${stock.reserved} reserved`}
+                          </p>
+                        </div>
+                        <span className="font-semibold text-gray-900">
+                          {stock.stock} {product.unitOfMeasure}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Stock Movement History */}
+              <div className="bg-gray-50 p-6 rounded-xl">
+                <div className="mb-4 flex items-center space-x-2">
+                  <ClockIcon className="h-5 w-5 text-gray-500" />
+                  <h3 className="text-lg font-semibold text-gray-900">Stock Movement History</h3>
+                </div>
+                {movements.length > 0 ? (
+                  <div className="space-y-3">
+                    {movements.map((movement) => {
+                      const outbound = isOutboundMovement(movement.movementType)
+                      return (
+                        <div
+                          key={movement.id}
+                          className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-900">{formatMovementType(movement.movementType)}</p>
+                            <p className="text-xs text-gray-500">
+                              {formatMovementDate(movement.createdAt)}
+                              {movement.reason ? ` • ${movement.reason}` : ''}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`font-semibold ${outbound ? 'text-red-600' : 'text-green-600'}`}>
+                              {outbound ? '-' : '+'}{movement.quantity}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {movement.previousStock} → {movement.newStock}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="py-4 text-center text-sm text-gray-500">No stock movements recorded for this product.</p>
                 )}
               </div>
 
@@ -525,6 +650,38 @@ export default function ProductDetailPage() {
                   width={800}
                   height={800}
                   className="max-w-full max-h-full object-contain"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Barcode Label Modal */}
+          {showLabelModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+              onClick={() => setShowLabelModal(false)}
+            >
+              <div
+                className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Print Barcode Label</h2>
+                    <p className="text-sm text-gray-500">{product.name}</p>
+                  </div>
+                  <button
+                    onClick={() => setShowLabelModal(false)}
+                    className="text-gray-400 transition-colors hover:text-gray-600"
+                  >
+                    <XCircleIcon className="h-6 w-6" />
+                  </button>
+                </div>
+                <BarcodeLabel
+                  value={product.barcode || product.sku || ''}
+                  productName={product.name}
+                  price={product.sellingPrice}
+                  currencySymbol={currencySymbol}
                 />
               </div>
             </div>

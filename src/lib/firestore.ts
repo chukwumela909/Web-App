@@ -41,7 +41,8 @@ import {
   updateBackendExpense,
   updateBackendProduct,
   updateBackendSale,
-  updateBackendSettings
+  updateBackendSettings,
+  updateBackendUserProfile
 } from '@/lib/backend-business-api'
 
 export interface ProductImage {
@@ -1051,6 +1052,17 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 }
 
 export async function upsertUserProfile(userId: string, profile: Partial<UserProfile>): Promise<void> {
+  // Persist the editable identity fields to the source-of-truth backend.
+  // Wrapped in try/catch so a backend hiccup does not break the Firestore path below.
+  try {
+    await updateBackendUserProfile({
+      fullName: profile.fullName ?? undefined,
+      phone: profile.phoneNumber ?? undefined
+    })
+  } catch (error) {
+    console.error('Failed to persist user profile to backend:', error)
+  }
+
   const ref = doc(db, 'users', userId)
   const existing = await getDoc(ref)
   const payload = {

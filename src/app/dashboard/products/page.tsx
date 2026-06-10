@@ -36,6 +36,8 @@ import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { useInvalidateBusinessData, useProductsQuery } from '@/hooks/useBusinessQueries'
 import { exportBackendProducts } from '@/lib/backend-business-api'
+import { useBusinessRole } from '@/hooks/useBusinessRole'
+import BarcodeLabel from '@/components/products/BarcodeLabel'
 
 const categories = [
   "All Categories",
@@ -150,6 +152,8 @@ function ProductsPageContent() {
   const [showEnhancedDetail, setShowEnhancedDetail] = useState(false)
   const [selectedProductForDetail, setSelectedProductForDetail] = useState<FPProduct | null>(null)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [labelProduct, setLabelProduct] = useState<FPProduct | null>(null)
   const [isExportingProducts, setIsExportingProducts] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [upgradeModalData, setUpgradeModalData] = useState<{
@@ -161,6 +165,7 @@ function ProductsPageContent() {
   const { user } = useAuth()
   const { staff } = useStaff()
   const { branches, selectedBranchId, loading: branchesLoading } = useBranch()
+  const { canSeeCost } = useBusinessRole()
   const effectiveUserId = staff ? staff.userId : user?.uid
   const currency = useCurrency()
   const router = useRouter()
@@ -570,6 +575,36 @@ function ProductsPageContent() {
 
 
 
+  // Live updates: refetch products when the tab regains focus / becomes visible
+  useEffect(() => {
+    const handleRefresh = () => {
+      if (document.visibilityState === 'visible') {
+        refetchProducts()
+      }
+    }
+    window.addEventListener('focus', handleRefresh)
+    document.addEventListener('visibilitychange', handleRefresh)
+    return () => {
+      window.removeEventListener('focus', handleRefresh)
+      document.removeEventListener('visibilitychange', handleRefresh)
+    }
+  }, [refetchProducts])
+
+  // Client-side search filter over loaded products (name / SKU / category / barcode)
+  const filteredProducts = useMemo(() => {
+    const term = searchQuery.trim().toLowerCase()
+    if (!term) return products
+    return products.filter((product) => {
+      const haystack = [
+        product.name,
+        product.sku,
+        product.category,
+        product.barcode
+      ]
+      return haystack.some((field) => (field || '').toString().toLowerCase().includes(term))
+    })
+  }, [products, searchQuery])
+
   const lowStockCount = useMemo(() => products.filter(p => p.quantity <= p.minStockLevel && p.quantity > 0).length, [products])
   const totalProducts = products.length
   const totalCostValue = useMemo(() => products.reduce((sum, p) => sum + (p.costPrice * p.quantity), 0), [products])
@@ -632,32 +667,34 @@ function ProductsPageContent() {
               </div>
 
               <div
-                onClick={() => setShowSellingValue(!showSellingValue)}
-                className="dashboard-card cursor-pointer p-6"
+                onClick={() => canSeeCost && setShowSellingValue(!showSellingValue)}
+                className={`dashboard-card p-6 ${canSeeCost ? 'cursor-pointer' : ''}`}
               >
                 {/* Header with icon and toggle indicator */}
                 <div className="flex items-center justify-between mb-4">
                   <TagIcon className="h-6 w-6 text-[#66BB6A]" />
-                  <div className="flex items-center space-x-1">
-                    <span className="text-sm font-semibold text-[#004aad]">
-                      {showSellingValue ? "Selling" : "Cost"}
-                    </span>
-                    <ArrowsRightLeftIcon className="h-4 w-4 text-[#004aad]" />
-                  </div>
+                  {canSeeCost && (
+                    <div className="flex items-center space-x-1">
+                      <span className="text-sm font-semibold text-[#004aad]">
+                        {showSellingValue ? "Selling" : "Cost"}
+                      </span>
+                      <ArrowsRightLeftIcon className="h-4 w-4 text-[#004aad]" />
+                    </div>
+                  )}
                 </div>
 
                 <div className="mb-2">
                   <span className="text-sm font-medium text-[#64748b]">
-                    {showSellingValue ? "Selling Value" : "Cost Value"}
+                    {!canSeeCost ? "Selling Value" : showSellingValue ? "Selling Value" : "Cost Value"}
                   </span>
                 </div>
 
                 <p className="dashboard-metric-value mb-2 text-3xl font-semibold tracking-[-0.02em] text-[#0f172a]">
-                  {currencySymbol} {Math.round(showSellingValue ? totalSellingValue : totalCostValue).toLocaleString()}
+                  {currencySymbol} {Math.round(!canSeeCost ? totalSellingValue : showSellingValue ? totalSellingValue : totalCostValue).toLocaleString()}
                 </p>
 
-                {/* Profit/Potential indicator */}
-                {totalSellingValue > totalCostValue && (
+                {/* Profit/Potential indicator (hidden from users who cannot see cost) */}
+                {canSeeCost && totalSellingValue > totalCostValue && (
                   <p className="text-sm font-medium text-[#66BB6A]">
                     {showSellingValue
                       ? `Profit: ${currencySymbol} ${Math.round(totalSellingValue - totalCostValue).toLocaleString()}`
@@ -752,9 +789,21 @@ function ProductsPageContent() {
           {/* Products Section - Mobile App Style */}
           {products.length > 0 && (
             <motion.div variants={fadeInUp}>
-              <h2 className="dashboard-section-title mb-6">Products</h2>
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="dashboard-section-title">Products</h2>
+                <div className="relative w-full sm:max-w-xs">
+                  <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#94a3b8]" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by name, SKU, category, barcode"
+                    className="dashboard-field w-full py-2 pl-10 pr-3"
+                  />
+                </div>
+              </div>
               <div className="space-y-4">
-                {[...products]
+                {[...filteredProducts]
                   .sort((a, b) => {
                     const aTime = typeof a.createdAt === 'number' ? a.createdAt : 0
                     const bTime = typeof b.createdAt === 'number' ? b.createdAt : 0
@@ -762,6 +811,7 @@ function ProductsPageContent() {
                   })
                   .map((product) => {
                     const primaryImageUrl = getProductImageUrl(product)
+                    const stockValue = product.costPrice * product.quantity
 
                     return (
                     <div key={product.id} className="dashboard-list-item p-4">
@@ -782,19 +832,32 @@ function ProductsPageContent() {
                         <div className="min-w-0 flex-1">
                           <h3 className="truncate font-semibold text-[#0f172a]">{product.name}</h3>
                           <p className="truncate text-sm font-medium text-[#64748b]">{product.quantity} {product.unitOfMeasure || 'pcs'} - {product.category}</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs font-medium text-[#94a3b8]">
+                            <span>Reorder: {product.minStockLevel}</span>
+                            <span>Cost: {canSeeCost ? `${currencySymbol} ${product.costPrice.toLocaleString()}` : '—'}</span>
+                            <span>Stock value: {canSeeCost ? `${currencySymbol} ${Math.round(stockValue).toLocaleString()}` : '—'}</span>
+                          </div>
                         </div>
                         <div className="flex-shrink-0 text-right">
                           <p className="font-semibold text-[#66BB6A]">{currencySymbol} {product.sellingPrice.toLocaleString()}</p>
                           <p className="mb-2 text-sm font-medium text-[#64748b]">
-                            {product.quantity <= product.minStockLevel ? (
-                              <span className="text-[#F29F05]">Low Stock</span>
-                            ) : product.quantity === 0 ? (
+                            {product.quantity === 0 ? (
                               <span className="text-[#DC2626]">Out of Stock</span>
+                            ) : product.quantity <= product.minStockLevel ? (
+                              <span className="text-[#F29F05]">Low Stock</span>
                             ) : (
                               <span className="text-[#66BB6A]">In Stock</span>
                             )}
                           </p>
                           <div className="flex items-center justify-end gap-3">
+                            <button
+                              onClick={() => setLabelProduct(product)}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-[#004aad] transition-colors hover:text-[#003d8f]"
+                              title="Print barcode label"
+                            >
+                              <QrCodeIcon className="h-3.5 w-3.5" />
+                              Print Label
+                            </button>
                             <button
                               onClick={() => handleEdit(product)}
                               className="inline-flex items-center gap-1 text-xs font-semibold text-[#004aad] transition-colors hover:text-[#003d8f]"
@@ -814,6 +877,12 @@ function ProductsPageContent() {
                     </div>
                     )
                   })}
+
+                {filteredProducts.length === 0 && (
+                  <div className="dashboard-empty-state py-8 text-center text-sm text-[#64748b]">
+                    No products match &quot;{searchQuery}&quot;.
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -1090,6 +1159,11 @@ function ProductsPageContent() {
                                   />
                                   <button
                                     type="button"
+                                    onClick={() => setProductForm(prev => ({
+                                      ...prev,
+                                      barcode: prev.barcode || Date.now().toString()
+                                    }))}
+                                    title="Generate a barcode value"
                                     className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
                                   >
                                     <QrCodeIcon className="h-5 w-5 text-[#004AAD]" />
@@ -1195,8 +1269,8 @@ function ProductsPageContent() {
                               </div>
                             </div>
 
-                            {/* Profit Margin Display */}
-                            {productForm.costPrice && productForm.sellingPrice && (
+                            {/* Profit Margin Display (hidden from users who cannot see cost) */}
+                            {canSeeCost && productForm.costPrice && productForm.sellingPrice && (
                               <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
                                 <div className="flex items-center justify-between">
                                   <span className="text-sm font-medium text-green-800">Profit Margin:</span>
@@ -1385,6 +1459,46 @@ function ProductsPageContent() {
                 }}
                 branchId={branches.length > 0 ? branches.find(b => b.status === 'ACTIVE')?.id || branches[0]?.id : undefined}
               />
+            )}
+          </AnimatePresence>
+
+          {/* Barcode Label Modal */}
+          <AnimatePresence>
+            {labelProduct && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                onClick={() => setLabelProduct(null)}
+              >
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">Print Barcode Label</h2>
+                      <p className="text-sm text-gray-500">{labelProduct.name}</p>
+                    </div>
+                    <button
+                      onClick={() => setLabelProduct(null)}
+                      className="text-gray-400 transition-colors hover:text-gray-600"
+                    >
+                      <XMarkIcon className="h-6 w-6" />
+                    </button>
+                  </div>
+                  <BarcodeLabel
+                    value={labelProduct.barcode || labelProduct.sku || ''}
+                    productName={labelProduct.name}
+                    price={labelProduct.sellingPrice}
+                    currencySymbol={currencySymbol}
+                  />
+                </motion.div>
+              </motion.div>
             )}
           </AnimatePresence>
 

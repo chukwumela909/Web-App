@@ -483,11 +483,13 @@ export async function generatePONumber(userId: string): Promise<string> {
 
 export async function createPurchaseOrder(
   userId: string,
-  data: CreatePurchaseOrderRequest
+  data: CreatePurchaseOrderRequest & { receiveImmediately?: boolean; amountPaid?: number }
 ): Promise<string> {
   if (isBackendAvailable()) {
     try {
-      return await createBackendPurchaseOrder(data)
+      // Thread the branch id and receiveImmediately flag through so the backend can
+      // create-and-immediately-receive the purchase (stock + supplier balance update at once).
+      return await createBackendPurchaseOrder(data, data.branchId)
     } catch (error) {
       throw error
     }

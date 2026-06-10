@@ -27,6 +27,7 @@ import {
   PhotoIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
+import { useBusinessRole } from '@/hooks/useBusinessRole'
 import { useNotifications } from '@/contexts/NotificationsContext'
 import { Product as FPProduct, getProduct, softDeleteProduct } from '@/lib/firestore'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
@@ -50,6 +51,7 @@ export default function ProductDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const { user } = useAuth()
+  const { canSeeCost } = useBusinessRole()
   const { addNotification } = useNotifications()
   const { currency } = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
@@ -347,11 +349,13 @@ export default function ProductDetailsPage() {
                     <div className="text-sm text-muted-foreground">Total Value</div>
                     <div className="text-xs text-muted-foreground">At selling price</div>
                   </div>
-                  <div className="text-center p-4 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{currencySymbol} {getCostValue().toLocaleString()}</div>
-                    <div className="text-sm text-muted-foreground">Cost Value</div>
-                    <div className="text-xs text-muted-foreground">Investment</div>
-                  </div>
+                  {canSeeCost && (
+                    <div className="text-center p-4 bg-muted/50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{currencySymbol} {getCostValue().toLocaleString()}</div>
+                      <div className="text-sm text-muted-foreground">Cost Value</div>
+                      <div className="text-xs text-muted-foreground">Investment</div>
+                    </div>
+                  )}
                 </div>
 
                 {product.lowStockAlertEnabled && (
@@ -366,15 +370,17 @@ export default function ProductDetailsPage() {
               <div className="bg-card rounded-xl shadow-sm border border-border p-6">
                 <h3 className="text-lg font-semibold text-card-foreground mb-6">Pricing Information</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-lg mx-auto mb-3">
-                      <CurrencyDollarIcon className="h-6 w-6 text-red-600" />
+                <div className={`grid grid-cols-1 gap-6 ${canSeeCost ? 'md:grid-cols-3' : 'md:grid-cols-1'}`}>
+                  {canSeeCost && (
+                    <div className="text-center">
+                      <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-lg mx-auto mb-3">
+                        <CurrencyDollarIcon className="h-6 w-6 text-red-600" />
+                      </div>
+                      <div className="text-2xl font-bold text-card-foreground">{currencySymbol} {product.costPrice.toLocaleString()}</div>
+                      <div className="text-sm text-muted-foreground">Cost Price</div>
+                      <div className="text-xs text-muted-foreground">Per {product.unitOfMeasure}</div>
                     </div>
-                    <div className="text-2xl font-bold text-card-foreground">{currencySymbol} {product.costPrice.toLocaleString()}</div>
-                    <div className="text-sm text-muted-foreground">Cost Price</div>
-                    <div className="text-xs text-muted-foreground">Per {product.unitOfMeasure}</div>
-                  </div>
+                  )}
 
                   <div className="text-center">
                     <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-lg mx-auto mb-3">
@@ -385,14 +391,16 @@ export default function ProductDetailsPage() {
                     <div className="text-xs text-muted-foreground">Per {product.unitOfMeasure}</div>
                   </div>
 
-                  <div className="text-center">
-                    <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-lg mx-auto mb-3">
-                      <ChartBarIcon className="h-6 w-6 text-blue-600" />
+                  {canSeeCost && (
+                    <div className="text-center">
+                      <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-lg mx-auto mb-3">
+                        <ChartBarIcon className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <div className="text-2xl font-bold text-card-foreground">{getProfitMargin().toFixed(1)}%</div>
+                      <div className="text-sm text-muted-foreground">Profit Margin</div>
+                      <div className="text-xs text-muted-foreground">{currencySymbol} {(product.sellingPrice - product.costPrice).toFixed(2)} profit</div>
                     </div>
-                    <div className="text-2xl font-bold text-card-foreground">{getProfitMargin().toFixed(1)}%</div>
-                    <div className="text-sm text-muted-foreground">Profit Margin</div>
-                    <div className="text-xs text-muted-foreground">{currencySymbol} {(product.sellingPrice - product.costPrice).toFixed(2)} profit</div>
-                  </div>
+                  )}
                 </div>
               </div>
 

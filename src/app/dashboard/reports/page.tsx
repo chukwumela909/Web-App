@@ -13,6 +13,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
 import { useBranch } from '@/contexts/BranchContext'
+import { useBusinessRole } from '@/hooks/useBusinessRole'
 import { useEffect, useMemo, useState } from 'react'
 import {
   DailySummary,
@@ -223,7 +224,8 @@ function BranchIcon() {
 export default function ReportsPage() {
   const { user } = useAuth()
   const { staff } = useStaff()
-  const { selectedBranchId } = useBranch()
+  const { selectedBranchId, branches: contextBranches } = useBranch()
+  const { isOwner, canSeeCost } = useBusinessRole()
   const currency = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
   const [loading, setLoading] = useState(true)
@@ -238,11 +240,23 @@ export default function ReportsPage() {
   const [backendBranchPerformanceReport, setBackendBranchPerformanceReport] = useState<BackendBranchPerformance[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('Last 7 Days')
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false)
+  const [showScopeDropdown, setShowScopeDropdown] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+
+  // Report scope (owners only): 'all' = consolidated network-wide analytics, or a
+  // specific branchId. Page-local so BranchContext never has to hold the synthetic
+  // 'all' value. Owners default to the consolidated all-branches view.
+  const [reportScope, setReportScope] = useState<string>('all')
 
   // Determine the effective user ID for data loading
   const effectiveUserId = staff ? staff.userId : user?.uid
-  const activeBranchId = selectedBranchId || undefined
+
+  // Resolve the branch filter that drives data loading + the backend report params.
+  // - Owners: follow the scope control. 'all' => no branch filter (consolidated).
+  // - Non-owners: always restricted to their selected/assigned branch.
+  const activeBranchId = isOwner
+    ? (reportScope === 'all' ? undefined : reportScope)
+    : (selectedBranchId || undefined)
 
   useEffect(() => {
     const load = async () => {
@@ -292,7 +306,12 @@ export default function ReportsPage() {
       }
 
       if (activeBranchId) {
+        // Specific branch (owner-selected, or a non-owner's restricted branch).
         params.branchId = activeBranchId
+      } else if (isOwner) {
+        // Owner consolidated view: explicitly request the all-branches aggregate.
+        // (The backend also treats an omitted branchId as all-branches for owners.)
+        params.branchId = 'all'
       }
 
       const [
@@ -343,7 +362,7 @@ export default function ReportsPage() {
     }
 
     loadBackendReports()
-  }, [effectiveUserId, selectedPeriod, activeBranchId])
+  }, [effectiveUserId, selectedPeriod, activeBranchId, isOwner])
 
   // Combine single-item and multi-item sales for calculations
   const allSalesData = useMemo(() => {
@@ -383,20 +402,21 @@ export default function ReportsPage() {
     return [...singleSales, ...multiSales].sort((a, b) => b.timestamp - a.timestamp)
   }, [recentSales, multiItemSales])
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (showPeriodDropdown) {
-        const target = event.target as Element
-        if (!target.closest('.period-dropdown')) {
-          setShowPeriodDropdown(false)
-        }
+      const target = event.target as Element
+      if (showPeriodDropdown && !target.closest('.period-dropdown')) {
+        setShowPeriodDropdown(false)
+      }
+      if (showScopeDropdown && !target.closest('.scope-dropdown')) {
+        setShowScopeDropdown(false)
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showPeriodDropdown])
+  }, [showPeriodDropdown, showScopeDropdown])
 
   // Calculate metrics from actual data (combined single and multi-item sales)
   const metrics = useMemo(() => {
@@ -841,7 +861,8 @@ export default function ReportsPage() {
     }
   }, [products, inventoryData])
 
-  // Chart.js configuration for Sales vs Profit
+  // Chart.js configuration for the sales trend. The Profit series is omitted for
+  // users who may not see cost/profit (cashiers, per canSeeCost).
   const chartData = {
     labels: trendData.labels,
     datasets: [
@@ -856,7 +877,7 @@ export default function ReportsPage() {
         pointBackgroundColor: '#004aad',
         borderWidth: 2
       },
-      {
+      ...(canSeeCost ? [{
         label: 'Profit',
         data: trendData.profitData,
         borderColor: '#027a48',
@@ -866,7 +887,7 @@ export default function ReportsPage() {
         pointRadius: 4,
         pointBackgroundColor: '#027a48',
         borderWidth: 2
-      }
+      }] : [])
     ]
   }
 
@@ -975,6 +996,56 @@ export default function ReportsPage() {
                   <span>{isExporting ? 'Exporting...' : 'Export'}</span>
                 </button>
 
+                {/* Report Scope (owners only): All Branches vs a specific branch */}
+                {isOwner && (
+                  <div className="relative scope-dropdown">
+                    <button
+                      onClick={() => setShowScopeDropdown(!showScopeDropdown)}
+                      className="dashboard-action-muted min-w-[180px] px-3 py-[15px]"
+                    >
+                      <BuildingOffice2Icon className="h-5 w-5 text-gray-500" />
+                      <span className="truncate text-[#717171] text-sm font-semibold">
+                        {reportScope === 'all'
+                          ? 'All Branches'
+                          : (contextBranches.find((b) => b.id === reportScope)?.name || 'Select Branch')}
+                      </span>
+                      <ChevronDownIcon className="h-5 w-5 text-gray-500 ml-auto" />
+                    </button>
+
+                    {showScopeDropdown && (
+                      <div className="absolute right-0 top-full z-50 mt-2 max-h-72 w-full min-w-[200px] overflow-y-auto rounded-[14px] border border-[#e6ebf2] bg-white shadow-[0_18px_45px_rgba(15,23,42,0.12)]">
+                        <div className="py-2">
+                          <button
+                            onClick={() => {
+                              setReportScope('all')
+                              setShowScopeDropdown(false)
+                            }}
+                            className={`w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm ${
+                              reportScope === 'all' ? 'bg-[#eef5ff] text-[#004aad] font-semibold' : 'text-[#334155]'
+                            }`}
+                          >
+                            All Branches
+                          </button>
+                          {contextBranches.map((branch) => (
+                            <button
+                              key={branch.id}
+                              onClick={() => {
+                                setReportScope(branch.id)
+                                setShowScopeDropdown(false)
+                              }}
+                              className={`w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm ${
+                                reportScope === branch.id ? 'bg-[#eef5ff] text-[#004aad] font-semibold' : 'text-[#334155]'
+                              }`}
+                            >
+                              {branch.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Period Filter */}
                 <div className="relative period-dropdown">
                   <button
@@ -1010,12 +1081,12 @@ export default function ReportsPage() {
               </div>
             </motion.div>
 
-            {/* Key Metrics Cards */}
+            {/* Key Metrics Cards. Profit is hidden from cashiers (canSeeCost). */}
             <motion.div
               initial="initial"
               animate="animate"
               variants={fadeInUp}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+              className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${canSeeCost ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}
             >
               <StatCard
                 title="Total Sales"
@@ -1023,12 +1094,14 @@ export default function ReportsPage() {
                 trend={metrics.totalSales > 0 ? "up" : null}
                 trendColor="blue"
               />
-              <StatCard
-                title="Total Profit"
-                value={`${currencySymbol} ${metrics.totalProfit.toLocaleString()}`}
-                trend={metrics.totalProfit > 0 ? "up" : null}
-                trendColor="green"
-              />
+              {canSeeCost && (
+                <StatCard
+                  title="Total Profit"
+                  value={`${currencySymbol} ${metrics.totalProfit.toLocaleString()}`}
+                  trend={metrics.totalProfit > 0 ? "up" : null}
+                  trendColor="green"
+                />
+              )}
               <StatCard
                 title="Transactions"
                 value={metrics.totalTransactions.toLocaleString()}
@@ -1049,19 +1122,24 @@ export default function ReportsPage() {
               variants={fadeInUp}
               className="grid grid-cols-1 lg:grid-cols-4 gap-4"
             >
-              {/* Sales vs Profit Trend Chart */}
+              {/* Sales (vs Profit) Trend Chart. Profit series/legend hidden from
+                  users without cost visibility (cashiers). */}
               <div className="dashboard-panel overflow-hidden p-5 lg:col-span-3">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="dashboard-section-title text-base">Sales vs Profit Trend</h3>
+                  <h3 className="dashboard-section-title text-base">
+                    {canSeeCost ? 'Sales vs Profit Trend' : 'Sales Trend'}
+                  </h3>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-[#004aad]" />
                       <span className="text-sm text-[#004aad]">Sales</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-[#027a48]" />
-                      <span className="text-sm text-[#027a48]">Profit</span>
-                    </div>
+                    {canSeeCost && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-[#027a48]" />
+                        <span className="text-sm text-[#027a48]">Profit</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="h-[200px]">
@@ -1156,25 +1234,27 @@ export default function ReportsPage() {
                 )}
               </div>
 
-              {/* Total Products Card */}
+              {/* Total Products Card. Cost/potential values hidden from cashiers. */}
               <div className="dashboard-panel flex flex-col gap-6 p-5">
                 <div className="flex flex-col gap-4">
                   <h3 className="dashboard-section-title text-base">Total Products</h3>
                   <span className="dashboard-metric-value text-base text-[#0f172a]">{productStats.totalProducts}</span>
                 </div>
 
-                <div className="flex flex-col gap-[10px]">
-                  <div className="flex items-center gap-[5px]">
-                    <TagIcon className="w-4 h-4 text-[#717171]" />
-                    <span className="text-[#717171] text-sm">Cost Value</span>
+                {canSeeCost && (
+                  <div className="flex flex-col gap-[10px]">
+                    <div className="flex items-center gap-[5px]">
+                      <TagIcon className="w-4 h-4 text-[#717171]" />
+                      <span className="text-[#717171] text-sm">Cost Value</span>
+                    </div>
+                    <span className="text-2xl font-bold text-black">
+                      {currencySymbol} {productStats.totalCostValue.toLocaleString()}
+                    </span>
+                    <span className="text-sm text-[#027a48]">
+                      Potential: {currencySymbol} {productStats.totalSellingValue.toLocaleString()}
+                    </span>
                   </div>
-                  <span className="text-2xl font-bold text-black">
-                    {currencySymbol} {productStats.totalCostValue.toLocaleString()}
-                  </span>
-                  <span className="text-sm text-[#027a48]">
-                    Potential: {currencySymbol} {productStats.totalSellingValue.toLocaleString()}
-                  </span>
-                </div>
+                )}
               </div>
             </motion.div>
 
@@ -1236,7 +1316,16 @@ export default function ReportsPage() {
               variants={fadeInUp}
               className="dashboard-panel p-5"
             >
-              <h3 className="dashboard-section-title mb-5 text-base">Branch Performance</h3>
+              <div className="mb-5 flex items-center justify-between">
+                <h3 className="dashboard-section-title text-base">Branch Performance</h3>
+                {isOwner && (
+                  <span className="text-xs font-medium text-[#64748b]">
+                    {reportScope === 'all'
+                      ? 'All branches (consolidated)'
+                      : (contextBranches.find((b) => b.id === reportScope)?.name || 'Selected branch')}
+                  </span>
+                )}
+              </div>
 
               {branchPerformance.length > 0 ? (
                 <div className="overflow-x-auto">
@@ -1246,9 +1335,14 @@ export default function ReportsPage() {
                         <th className="text-left px-4 py-2 text-base font-medium text-black">Branch</th>
                         <th className="text-left px-3 py-2 text-base font-medium text-black">Staff</th>
                         <th className="text-center px-3 py-2 text-base font-medium text-black">Products</th>
-                        <th className="text-center px-3 py-2 text-base font-medium text-black">Cost Value</th>
+                        {/* Cost Value / Profit columns hidden from cashiers (canSeeCost) */}
+                        {canSeeCost && (
+                          <th className="text-center px-3 py-2 text-base font-medium text-black">Cost Value</th>
+                        )}
                         <th className="text-center px-3 py-2 text-base font-medium text-black">Sales</th>
-                        <th className="text-center px-3 py-2 text-base font-medium text-black">Profit</th>
+                        {canSeeCost && (
+                          <th className="text-center px-3 py-2 text-base font-medium text-black">Profit</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -1262,15 +1356,19 @@ export default function ReportsPage() {
                           </td>
                           <td className="text-center px-3 py-4 text-sm text-black">{branch.staff}</td>
                           <td className="text-center px-3 py-4 text-sm text-black">{branch.products}</td>
-                          <td className="text-center px-3 py-4 text-sm text-black">
-                            {currencySymbol} {branch.costValue.toLocaleString()}
-                          </td>
+                          {canSeeCost && (
+                            <td className="text-center px-3 py-4 text-sm text-black">
+                              {currencySymbol} {branch.costValue.toLocaleString()}
+                            </td>
+                          )}
                           <td className="text-center px-3 py-4 text-sm text-black">
                             {currencySymbol} {branch.sales.toLocaleString()}
                           </td>
-                          <td className="text-center px-3 py-4 text-sm text-black">
-                            {currencySymbol} {branch.profit.toLocaleString()}
-                          </td>
+                          {canSeeCost && (
+                            <td className="text-center px-3 py-4 text-sm text-black">
+                              {currencySymbol} {branch.profit.toLocaleString()}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

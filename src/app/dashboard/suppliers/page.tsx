@@ -25,7 +25,11 @@ import {
   ArrowPathIcon,
   ChartBarIcon,
   ArrowTrendingUpIcon,
-  TrophyIcon
+  TrophyIcon,
+  BanknotesIcon,
+  DocumentTextIcon,
+  ShoppingCartIcon,
+  CurrencyDollarIcon
 } from '@heroicons/react/24/outline'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -35,9 +39,15 @@ import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import {
   createSupplier as createSupplierRecord,
+  createPurchaseOrder,
   getSupplierDashboard,
-  getSuppliers
+  getSuppliers,
+  getPurchaseOrders,
+  getSupplierPaymentHistory,
+  getSupplierLedgerEntries
 } from '@/lib/suppliers-service'
+import { getProducts, type Product } from '@/lib/firestore'
+import type { PurchaseOrder } from '@/lib/suppliers-types'
 import {
   BarChart,
   Bar,
@@ -71,6 +81,12 @@ interface Supplier {
   createdAt?: Date
   lastOrderDate?: Date
   branchId?: string | null
+  // Financial fields surfaced from the backend (via mapSupplier)
+  openingBalance?: number
+  totalPurchases?: number
+  totalPaid?: number
+  currentBalance?: number
+  outstandingBalance?: number
 }
 
 interface SupplierDashboard {
@@ -122,7 +138,12 @@ function normalizeSupplierForDisplay(supplier: Partial<Supplier> & { id: string 
     notes: supplier.notes || '',
     createdAt: supplier.createdAt,
     lastOrderDate: supplier.lastOrderDate,
-    branchId: supplier.branchId || null
+    branchId: supplier.branchId || null,
+    openingBalance: Number(supplier.openingBalance || 0),
+    totalPurchases: Number(supplier.totalPurchases || 0),
+    totalPaid: Number(supplier.totalPaid || 0),
+    currentBalance: Number(supplier.currentBalance ?? supplier.outstandingBalance ?? 0),
+    outstandingBalance: Number(supplier.outstandingBalance ?? supplier.currentBalance ?? 0)
   }
 }
 
@@ -629,6 +650,8 @@ function SuppliersContent() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState<Supplier | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState<Supplier | null>(null)
+  const [showPurchaseModal, setShowPurchaseModal] = useState<Supplier | null>(null)
+  const [detailRefreshKey, setDetailRefreshKey] = useState(0)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [upgradeModalData, setUpgradeModalData] = useState<{
     feature: 'suppliers'
@@ -691,6 +714,38 @@ function SuppliersContent() {
     }
   }
 
+  // Record a purchase from a supplier. Uses receiveImmediately so the backend creates AND
+  // receives the purchase order at once: branch stock increases and the supplier
+  // balance/payable updates immediately.
+  const createPurchase = async (supplier: Supplier, purchaseData: any) => {
+    if (!effectiveUserId) return false
+    if (!selectedBranchId) {
+      alert('Please select a branch before recording a purchase.')
+      return false
+    }
+
+    try {
+      await createPurchaseOrder(effectiveUserId, {
+        supplierId: supplier.id,
+        branchId: selectedBranchId,
+        items: purchaseData.items,
+        expectedDeliveryDate: new Date(),
+        paymentTerms: (purchaseData.paymentTerms || supplier.paymentTerms || 'NET_30') as any,
+        amountPaid: purchaseData.amountPaid,
+        receiveImmediately: true
+      })
+      await Promise.all([loadSuppliers(), loadDashboard()])
+      // Bump the key so the detail modal tabs (if open) refetch their data.
+      setDetailRefreshKey((key) => key + 1)
+      setShowPurchaseModal(null)
+      return true
+    } catch (error) {
+      console.error('Error recording purchase:', error)
+      alert('Failed to record purchase')
+      return false
+    }
+  }
+
   useEffect(() => {
     if (effectiveUserId) {
       setLoading(true)
@@ -714,6 +769,26 @@ function SuppliersContent() {
 
     return () => clearTimeout(timeoutId)
   }, [searchTerm, statusFilter, effectiveUserId, activeBranchId])
+
+  // Keep figures current when the user returns to this tab/window after making changes
+  // elsewhere (e.g. recording payments or purchases on another screen).
+  useEffect(() => {
+    const refresh = () => {
+      if (!effectiveUserId) return
+      if (document.visibilityState === 'hidden') return
+      loadSuppliers()
+      loadDashboard()
+      setDetailRefreshKey((key) => key + 1)
+    }
+
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveUserId, activeBranchId, statusFilter, searchTerm])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -1110,9 +1185,21 @@ function SuppliersContent() {
 
                       {/* Contact Information */}
                       <div className="space-y-2 mb-4">
+                        <div className="flex items-start gap-2 text-sm text-gray-600">
+                          <UserGroupIcon className="h-4 w-4 text-gray-400 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-medium text-gray-500">Contact</p>
+                            <span className="font-medium text-gray-700">
+                              {supplier.contactPerson?.trim()
+                                ? `${supplier.contactPerson}${supplier.phone ? ` · ${supplier.phone}` : ''}`
+                                : (supplier.phone || 'No contact on file')}
+                            </span>
+                          </div>
+                        </div>
+
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <PhoneIcon className="h-4 w-4 text-gray-400" />
-                          <span className="font-medium">{supplier.phone}</span>
+                          <span className="font-medium">{supplier.phone || 'Not provided'}</span>
                         </div>
 
                         {supplier.email && (
@@ -1164,6 +1251,29 @@ function SuppliersContent() {
                         </div>
                       </div>
 
+                      {/* Financials */}
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="bg-emerald-50 rounded-lg p-3">
+                          <div className="flex items-center gap-1 mb-1">
+                            <ShoppingCartIcon className="h-4 w-4 text-emerald-600" />
+                            <p className="text-xs text-emerald-600 font-medium">Total Purchases</p>
+                          </div>
+                          <p className="text-lg font-bold text-emerald-800 truncate">
+                            {formatCurrency(supplier.totalPurchases ?? 0)}
+                          </p>
+                        </div>
+
+                        <div className={`rounded-lg p-3 ${(supplier.currentBalance ?? supplier.outstandingBalance ?? 0) > 0 ? 'bg-red-50' : 'bg-gray-50'}`}>
+                          <div className="flex items-center gap-1 mb-1">
+                            <BanknotesIcon className={`h-4 w-4 ${(supplier.currentBalance ?? supplier.outstandingBalance ?? 0) > 0 ? 'text-red-600' : 'text-gray-500'}`} />
+                            <p className={`text-xs font-medium ${(supplier.currentBalance ?? supplier.outstandingBalance ?? 0) > 0 ? 'text-red-600' : 'text-gray-500'}`}>Outstanding</p>
+                          </div>
+                          <p className={`text-lg font-bold truncate ${(supplier.currentBalance ?? supplier.outstandingBalance ?? 0) > 0 ? 'text-red-700' : 'text-gray-800'}`}>
+                            {formatCurrency(supplier.currentBalance ?? supplier.outstandingBalance ?? 0)}
+                          </p>
+                        </div>
+                      </div>
+
                       {/* Ratings */}
                       {(supplier.qualityRating || supplier.serviceRating || supplier.pricingRating) && (
                         <div className="space-y-2 mb-4">
@@ -1205,34 +1315,45 @@ function SuppliersContent() {
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-2">
+                      <div className="space-y-2">
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
-                          onClick={() => setShowDetailsModal(normalizeSupplierForDisplay(supplier))}
-                          className="flex-1 hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition-colors"
+                          onClick={() => setShowPurchaseModal(normalizeSupplierForDisplay(supplier))}
+                          className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
                         >
-                          <EyeIcon className="h-4 w-4 mr-2" />
-                          View Details
+                          <ShoppingCartIcon className="h-4 w-4 mr-2" />
+                          Record Purchase
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setShowEditModal(supplier)}
-                          className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowDetailsModal(normalizeSupplierForDisplay(supplier))}
+                            className="flex-1 hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition-colors"
+                          >
+                            <EyeIcon className="h-4 w-4 mr-2" />
+                            View Details
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowEditModal(supplier)}
+                            className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -1323,9 +1444,28 @@ function SuppliersContent() {
         <SupplierDetailsModal
           supplier={showDetailsModal}
           branchName={selectedBranch?.name}
-          onClose={() => setShowDetailsModal(null)}
+          branchId={selectedBranchId || undefined}
+          userId={effectiveUserId}
+          refreshKey={detailRefreshKey}
+          formatCurrency={formatCurrency}
           formatPaymentTerms={formatPaymentTerms}
           renderStars={renderStars}
+          onClose={() => setShowDetailsModal(null)}
+          onRecordPurchase={() => {
+            setShowPurchaseModal(showDetailsModal)
+          }}
+        />
+      )}
+
+      {showPurchaseModal && (
+        <RecordPurchaseModal
+          supplier={showPurchaseModal}
+          userId={effectiveUserId}
+          branchId={selectedBranchId || undefined}
+          branchName={selectedBranch?.name}
+          formatCurrency={formatCurrency}
+          onSave={(data) => createPurchase(showPurchaseModal, data)}
+          onCancel={() => setShowPurchaseModal(null)}
         />
       )}
     </div>
@@ -1335,18 +1475,43 @@ function SuppliersContent() {
 interface SupplierDetailsModalProps {
   supplier: Supplier
   branchName?: string
-  onClose: () => void
+  branchId?: string
+  userId?: string
+  refreshKey?: number
+  formatCurrency: (amount: number) => string
   formatPaymentTerms: (terms: string) => string
   renderStars: (rating: number) => ReactNode
+  onClose: () => void
+  onRecordPurchase: () => void
+}
+
+function formatEntryDate(value: any): string {
+  if (!value) return '—'
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString()
 }
 
 function SupplierDetailsModal({
   supplier,
   branchName,
-  onClose,
+  branchId,
+  userId,
+  refreshKey,
+  formatCurrency,
   formatPaymentTerms,
-  renderStars
+  renderStars,
+  onClose,
+  onRecordPurchase
 }: SupplierDetailsModalProps) {
+  const [detailTab, setDetailTab] = useState('overview')
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
+  const [payments, setPayments] = useState<Record<string, any>[]>([])
+  const [ledger, setLedger] = useState<Record<string, any>[]>([])
+  const [loadingPurchases, setLoadingPurchases] = useState(false)
+  const [loadingPayments, setLoadingPayments] = useState(false)
+  const [loadingLedger, setLoadingLedger] = useState(false)
+
   const averageRating = [
     supplier.qualityRating,
     supplier.serviceRating,
@@ -1357,12 +1522,64 @@ function SupplierDetailsModal({
     ? averageRating.reduce((sum, rating) => sum + rating, 0) / averageRating.length
     : null
 
+  const outstanding = supplier.currentBalance ?? supplier.outstandingBalance ?? 0
+
+  // Purchases tab: branch-scoped purchase orders filtered to this supplier.
+  useEffect(() => {
+    if (detailTab !== 'purchases' || !userId) return
+    let cancelled = false
+    setLoadingPurchases(true)
+    getPurchaseOrders(userId, { branchId, supplierId: supplier.id })
+      .then((orders) => { if (!cancelled) setPurchaseOrders(orders.filter((o) => o.supplierId === supplier.id)) })
+      .catch((error) => { console.error('Error loading supplier purchase orders:', error); if (!cancelled) setPurchaseOrders([]) })
+      .finally(() => { if (!cancelled) setLoadingPurchases(false) })
+    return () => { cancelled = true }
+  }, [detailTab, userId, branchId, supplier.id, refreshKey])
+
+  // Payments tab.
+  useEffect(() => {
+    if (detailTab !== 'payments') return
+    let cancelled = false
+    setLoadingPayments(true)
+    getSupplierPaymentHistory(supplier.id, branchId)
+      .then((rows) => { if (!cancelled) setPayments(rows) })
+      .catch((error) => { console.error('Error loading supplier payments:', error); if (!cancelled) setPayments([]) })
+      .finally(() => { if (!cancelled) setLoadingPayments(false) })
+    return () => { cancelled = true }
+  }, [detailTab, branchId, supplier.id, refreshKey])
+
+  // Ledger tab.
+  useEffect(() => {
+    if (detailTab !== 'ledger') return
+    let cancelled = false
+    setLoadingLedger(true)
+    getSupplierLedgerEntries(supplier.id, branchId)
+      .then((rows) => { if (!cancelled) setLedger(rows) })
+      .catch((error) => { console.error('Error loading supplier ledger:', error); if (!cancelled) setLedger([]) })
+      .finally(() => { if (!cancelled) setLoadingLedger(false) })
+    return () => { cancelled = true }
+  }, [detailTab, branchId, supplier.id, refreshKey])
+
+  const LoadingRow = ({ label }: { label: string }) => (
+    <div className="flex items-center justify-center gap-3 py-10 text-sm text-gray-500">
+      <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-400" />
+      {label}
+    </div>
+  )
+
+  const EmptyRow = ({ icon: Icon, label }: { icon: typeof DocumentTextIcon; label: string }) => (
+    <div className="flex flex-col items-center justify-center py-10 text-center">
+      <Icon className="h-10 w-10 text-gray-300 mb-3" />
+      <p className="text-sm text-gray-500">{label}</p>
+    </div>
+  )
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-lg max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-start justify-between border-b px-6 py-5">
           <div>
@@ -1372,87 +1589,252 @@ function SupplierDetailsModal({
               {branchName ? ` - ${branchName}` : ''}
             </p>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={onClose}>
-            Close
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={onRecordPurchase}
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+            >
+              <ShoppingCartIcon className="h-4 w-4 mr-2" />
+              Record Purchase
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={onClose}>
+              Close
+            </Button>
+          </div>
         </div>
 
-        <div className="grid gap-6 p-6 md:grid-cols-2">
-          <Card className="p-4">
-            <h4 className="font-semibold text-gray-900 mb-4">Contact</h4>
-            <div className="space-y-3 text-sm text-gray-700">
-              <div className="flex items-center gap-2">
-                <PhoneIcon className="h-4 w-4 text-gray-400" />
-                <span>{supplier.phone || 'Not provided'}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <EnvelopeIcon className="h-4 w-4 text-gray-400" />
-                <span>{supplier.email || 'Not provided'}</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <MapPinIcon className="h-4 w-4 text-gray-400 mt-0.5" />
-                <span>{supplier.address || 'Not provided'}</span>
-              </div>
-            </div>
-          </Card>
+        {/* Financial summary */}
+        <div className="grid grid-cols-2 gap-3 px-6 pt-6 md:grid-cols-4">
+          <div className="rounded-lg bg-emerald-50 p-3">
+            <p className="text-xs font-medium text-emerald-600">Total Purchases</p>
+            <p className="mt-1 text-lg font-bold text-emerald-800">{formatCurrency(supplier.totalPurchases ?? 0)}</p>
+          </div>
+          <div className="rounded-lg bg-blue-50 p-3">
+            <p className="text-xs font-medium text-blue-600">Total Paid</p>
+            <p className="mt-1 text-lg font-bold text-blue-800">{formatCurrency(supplier.totalPaid ?? 0)}</p>
+          </div>
+          <div className={`rounded-lg p-3 ${outstanding > 0 ? 'bg-red-50' : 'bg-gray-50'}`}>
+            <p className={`text-xs font-medium ${outstanding > 0 ? 'text-red-600' : 'text-gray-500'}`}>Outstanding Balance</p>
+            <p className={`mt-1 text-lg font-bold ${outstanding > 0 ? 'text-red-700' : 'text-gray-800'}`}>{formatCurrency(outstanding)}</p>
+          </div>
+          <div className="rounded-lg bg-gray-50 p-3">
+            <p className="text-xs font-medium text-gray-500">Opening Balance</p>
+            <p className="mt-1 text-lg font-bold text-gray-800">{formatCurrency(supplier.openingBalance ?? 0)}</p>
+          </div>
+        </div>
 
-          <Card className="p-4">
-            <h4 className="font-semibold text-gray-900 mb-4">Performance</h4>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-lg bg-blue-50 p-3">
-                <p className="text-blue-600">Orders</p>
-                <p className="text-2xl font-bold text-blue-800">{supplier.totalOrders}</p>
-              </div>
-              <div className="rounded-lg bg-green-50 p-3">
-                <p className="text-green-600">On-time</p>
-                <p className="text-2xl font-bold text-green-800">{supplier.onTimeDeliveryRate}%</p>
-              </div>
-              <div className="rounded-lg bg-gray-50 p-3">
-                <p className="text-gray-600">Completed</p>
-                <p className="text-2xl font-bold text-gray-900">{supplier.completedOrders}</p>
-              </div>
-              <div className="rounded-lg bg-gray-50 p-3">
-                <p className="text-gray-600">Terms</p>
-                <p className="font-semibold text-gray-900">{formatPaymentTerms(supplier.paymentTerms)}</p>
-              </div>
-            </div>
-          </Card>
+        <Tabs value={detailTab} onValueChange={setDetailTab} className="p-6">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-50 rounded-xl p-1 mb-6">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium">Overview</TabsTrigger>
+            <TabsTrigger value="purchases" className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium">Purchases</TabsTrigger>
+            <TabsTrigger value="payments" className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium">Payments</TabsTrigger>
+            <TabsTrigger value="ledger" className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium">Ledger</TabsTrigger>
+          </TabsList>
 
-          <Card className="p-4">
-            <h4 className="font-semibold text-gray-900 mb-4">Categories</h4>
-            <div className="flex flex-wrap gap-2">
-              {supplier.categories.length > 0 ? supplier.categories.map((category) => (
-                <span key={category} className="rounded-lg bg-green-50 px-3 py-1 text-sm font-medium text-green-700">
-                  {category}
-                </span>
-              )) : (
-                <span className="text-sm text-gray-500">No categories listed</span>
-              )}
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <h4 className="font-semibold text-gray-900 mb-4">Ratings</h4>
-            {overallRating ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Overall</span>
-                  <div className="flex">{renderStars(overallRating)}</div>
+          {/* Overview */}
+          <TabsContent value="overview">
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card className="p-4">
+                <h4 className="font-semibold text-gray-900 mb-4">Contact</h4>
+                <div className="space-y-3 text-sm text-gray-700">
+                  <div className="flex items-center gap-2">
+                    <UserGroupIcon className="h-4 w-4 text-gray-400" />
+                    <span>{supplier.contactPerson || 'No contact person'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <PhoneIcon className="h-4 w-4 text-gray-400" />
+                    <span>{supplier.phone || 'Not provided'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <EnvelopeIcon className="h-4 w-4 text-gray-400" />
+                    <span>{supplier.email || 'Not provided'}</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <MapPinIcon className="h-4 w-4 text-gray-400 mt-0.5" />
+                    <span>{supplier.address || 'Not provided'}</span>
+                  </div>
                 </div>
-                {supplier.qualityRating && <RatingRow label="Quality" rating={supplier.qualityRating} renderStars={renderStars} />}
-                {supplier.serviceRating && <RatingRow label="Service" rating={supplier.serviceRating} renderStars={renderStars} />}
-                {supplier.pricingRating && <RatingRow label="Pricing" rating={supplier.pricingRating} renderStars={renderStars} />}
-              </div>
-            ) : (
-              <span className="text-sm text-gray-500">No ratings recorded</span>
-            )}
-          </Card>
+              </Card>
 
-          <Card className="p-4 md:col-span-2">
-            <h4 className="font-semibold text-gray-900 mb-2">Notes</h4>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{supplier.notes || 'No notes recorded for this supplier.'}</p>
-          </Card>
-        </div>
+              <Card className="p-4">
+                <h4 className="font-semibold text-gray-900 mb-4">Performance</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg bg-blue-50 p-3">
+                    <p className="text-blue-600">Orders</p>
+                    <p className="text-2xl font-bold text-blue-800">{supplier.totalOrders}</p>
+                  </div>
+                  <div className="rounded-lg bg-green-50 p-3">
+                    <p className="text-green-600">On-time</p>
+                    <p className="text-2xl font-bold text-green-800">{supplier.onTimeDeliveryRate}%</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <p className="text-gray-600">Completed</p>
+                    <p className="text-2xl font-bold text-gray-900">{supplier.completedOrders}</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <p className="text-gray-600">Terms</p>
+                    <p className="font-semibold text-gray-900">{formatPaymentTerms(supplier.paymentTerms)}</p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-4">
+                <h4 className="font-semibold text-gray-900 mb-4">Categories</h4>
+                <div className="flex flex-wrap gap-2">
+                  {supplier.categories.length > 0 ? supplier.categories.map((category) => (
+                    <span key={category} className="rounded-lg bg-green-50 px-3 py-1 text-sm font-medium text-green-700">
+                      {category}
+                    </span>
+                  )) : (
+                    <span className="text-sm text-gray-500">No categories listed</span>
+                  )}
+                </div>
+              </Card>
+
+              <Card className="p-4">
+                <h4 className="font-semibold text-gray-900 mb-4">Ratings</h4>
+                {overallRating ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Overall</span>
+                      <div className="flex">{renderStars(overallRating)}</div>
+                    </div>
+                    {supplier.qualityRating && <RatingRow label="Quality" rating={supplier.qualityRating} renderStars={renderStars} />}
+                    {supplier.serviceRating && <RatingRow label="Service" rating={supplier.serviceRating} renderStars={renderStars} />}
+                    {supplier.pricingRating && <RatingRow label="Pricing" rating={supplier.pricingRating} renderStars={renderStars} />}
+                  </div>
+                ) : (
+                  <span className="text-sm text-gray-500">No ratings recorded</span>
+                )}
+              </Card>
+
+              <Card className="p-4 md:col-span-2">
+                <h4 className="font-semibold text-gray-900 mb-2">Notes</h4>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{supplier.notes || 'No notes recorded for this supplier.'}</p>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Purchases */}
+          <TabsContent value="purchases">
+            <Card className="p-0 overflow-hidden">
+              {loadingPurchases ? (
+                <LoadingRow label="Loading purchase orders..." />
+              ) : purchaseOrders.length === 0 ? (
+                <EmptyRow icon={ShoppingCartIcon} label="No purchase orders for this supplier in this branch yet." />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-gray-500 border-b border-gray-100">
+                        <th className="py-3 px-4 font-medium">PO #</th>
+                        <th className="py-3 px-4 font-medium">Date</th>
+                        <th className="py-3 px-4 font-medium">Status</th>
+                        <th className="py-3 px-4 font-medium text-right">Total</th>
+                        <th className="py-3 px-4 font-medium text-right">Outstanding</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {purchaseOrders.map((po) => {
+                        const poOutstanding = Math.max(0, (po.totalAmount || 0) - ((po as any).amountPaid || 0))
+                        return (
+                          <tr key={po.id} className="border-b border-gray-50 hover:bg-gray-50/70">
+                            <td className="py-3 px-4 font-medium text-gray-900">{po.poNumber}</td>
+                            <td className="py-3 px-4 text-gray-600">{formatEntryDate(po.createdAt)}</td>
+                            <td className="py-3 px-4">
+                              <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                                {String(po.status).replace(/_/g, ' ')}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right text-gray-900">{formatCurrency(po.totalAmount || 0)}</td>
+                            <td className={`py-3 px-4 text-right font-medium ${poOutstanding > 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                              {formatCurrency(poOutstanding)}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </TabsContent>
+
+          {/* Payments */}
+          <TabsContent value="payments">
+            <Card className="p-0 overflow-hidden">
+              {loadingPayments ? (
+                <LoadingRow label="Loading payments..." />
+              ) : payments.length === 0 ? (
+                <EmptyRow icon={BanknotesIcon} label="No payments recorded for this supplier yet." />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-gray-500 border-b border-gray-100">
+                        <th className="py-3 px-4 font-medium">Date</th>
+                        <th className="py-3 px-4 font-medium text-right">Amount</th>
+                        <th className="py-3 px-4 font-medium">Method</th>
+                        <th className="py-3 px-4 font-medium">Reference</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payments.map((payment, index) => (
+                        <tr key={payment.id || index} className="border-b border-gray-50 hover:bg-gray-50/70">
+                          <td className="py-3 px-4 text-gray-600">{formatEntryDate(payment.date || payment.createdAt || payment.paidAt)}</td>
+                          <td className="py-3 px-4 text-right font-medium text-gray-900">{formatCurrency(Number(payment.amount || 0))}</td>
+                          <td className="py-3 px-4 text-gray-700">{String(payment.paymentMethod || payment.method || '—').replace(/_/g, ' ')}</td>
+                          <td className="py-3 px-4 text-gray-600">{payment.reference || payment.receiptNumber || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </TabsContent>
+
+          {/* Ledger */}
+          <TabsContent value="ledger">
+            <Card className="p-0 overflow-hidden">
+              {loadingLedger ? (
+                <LoadingRow label="Loading ledger..." />
+              ) : ledger.length === 0 ? (
+                <EmptyRow icon={DocumentTextIcon} label="No ledger entries for this supplier yet." />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-gray-500 border-b border-gray-100">
+                        <th className="py-3 px-4 font-medium">Date</th>
+                        <th className="py-3 px-4 font-medium">Entry</th>
+                        <th className="py-3 px-4 font-medium text-right">Debit</th>
+                        <th className="py-3 px-4 font-medium text-right">Credit</th>
+                        <th className="py-3 px-4 font-medium text-right">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ledger.map((entry, index) => (
+                        <tr key={entry.id || index} className="border-b border-gray-50 hover:bg-gray-50/70">
+                          <td className="py-3 px-4 text-gray-600">{formatEntryDate(entry.date || entry.createdAt)}</td>
+                          <td className="py-3 px-4 text-gray-700">
+                            {String(entry.entryType || entry.type || 'Entry').replace(/_/g, ' ')}
+                            {entry.reference ? <span className="text-gray-400"> · {entry.reference}</span> : null}
+                          </td>
+                          <td className="py-3 px-4 text-right text-gray-900">{Number(entry.debit || 0) ? formatCurrency(Number(entry.debit)) : '—'}</td>
+                          <td className="py-3 px-4 text-right text-gray-900">{Number(entry.credit || 0) ? formatCurrency(Number(entry.credit)) : '—'}</td>
+                          <td className="py-3 px-4 text-right font-medium text-gray-900">{formatCurrency(Number(entry.balanceAfter ?? entry.balance ?? 0))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </TabsContent>
+        </Tabs>
       </motion.div>
     </div>
   )
@@ -1489,6 +1871,7 @@ function AddSupplierModal({ onSave, onCancel }: AddSupplierModalProps) {
     address: '',
     categories: [] as string[],
     paymentTerms: 'NET_30',
+    openingBalance: 0,
     notes: ''
   })
   const [saving, setSaving] = useState(false)
@@ -1507,6 +1890,7 @@ function AddSupplierModal({ onSave, onCancel }: AddSupplierModalProps) {
         address: '',
         categories: [],
         paymentTerms: 'NET_30',
+        openingBalance: 0,
         notes: ''
       })
     }
@@ -1642,19 +2026,35 @@ function AddSupplierModal({ onSave, onCancel }: AddSupplierModalProps) {
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Payment Terms</label>
-            <select
-              value={formData.paymentTerms}
-              onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-md"
-            >
-              <option value="CASH_ON_DELIVERY">Cash on Delivery</option>
-              <option value="NET_7">Net 7 Days</option>
-              <option value="NET_15">Net 15 Days</option>
-              <option value="NET_30">Net 30 Days</option>
-              <option value="ADVANCE_PAYMENT">Advance Payment</option>
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Payment Terms</label>
+              <select
+                value={formData.paymentTerms}
+                onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-md"
+              >
+                <option value="CASH_ON_DELIVERY">Cash on Delivery</option>
+                <option value="NET_7">Net 7 Days</option>
+                <option value="NET_15">Net 15 Days</option>
+                <option value="NET_30">Net 30 Days</option>
+                <option value="ADVANCE_PAYMENT">Advance Payment</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Opening Balance</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={formData.openingBalance}
+                onChange={(e) => setFormData(prev => ({ ...prev, openingBalance: Number(e.target.value) || 0 }))}
+                className="w-full px-3 py-2 border rounded-md"
+                placeholder="0"
+              />
+              <p className="text-xs text-gray-400 mt-1">Amount already owed to this supplier when added.</p>
+            </div>
           </div>
 
           <div>
@@ -1675,6 +2075,255 @@ function AddSupplierModal({ onSave, onCancel }: AddSupplierModalProps) {
               disabled={saving || formData.categories.length === 0}
             >
               {saving ? 'Creating...' : 'Create Supplier'}
+            </Button>
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  )
+}
+
+interface PurchaseLineItem {
+  productId: string
+  quantityOrdered: number
+  unitCost: number
+}
+
+interface RecordPurchaseModalProps {
+  supplier: Supplier
+  userId?: string
+  branchId?: string
+  branchName?: string
+  formatCurrency: (amount: number) => string
+  onSave: (data: { items: PurchaseLineItem[]; amountPaid: number; paymentTerms: string }) => Promise<boolean>
+  onCancel: () => void
+}
+
+function RecordPurchaseModal({
+  supplier,
+  userId,
+  branchId,
+  branchName,
+  formatCurrency,
+  onSave,
+  onCancel
+}: RecordPurchaseModalProps) {
+  const [products, setProducts] = useState<Product[]>([])
+  const [loadingProducts, setLoadingProducts] = useState(true)
+  const [items, setItems] = useState<PurchaseLineItem[]>([])
+  const [amountPaid, setAmountPaid] = useState(0)
+  const [paymentTerms, setPaymentTerms] = useState(supplier.paymentTerms || 'NET_30')
+  const [saving, setSaving] = useState(false)
+
+  // Products must already exist in the selected branch to be purchased into stock.
+  useEffect(() => {
+    if (!userId || !branchId) {
+      setLoadingProducts(false)
+      return
+    }
+    let cancelled = false
+    setLoadingProducts(true)
+    getProducts(userId, branchId)
+      .then((rows) => { if (!cancelled) setProducts(rows) })
+      .catch((error) => { console.error('Error loading products for purchase:', error); if (!cancelled) setProducts([]) })
+      .finally(() => { if (!cancelled) setLoadingProducts(false) })
+    return () => { cancelled = true }
+  }, [userId, branchId])
+
+  const addLine = () => setItems(prev => [...prev, { productId: '', quantityOrdered: 1, unitCost: 0 }])
+  const removeLine = (index: number) => setItems(prev => prev.filter((_, i) => i !== index))
+  const updateLine = (index: number, patch: Partial<PurchaseLineItem>) =>
+    setItems(prev => prev.map((item, i) => {
+      if (i !== index) return item
+      const next = { ...item, ...patch }
+      // Default the unit cost from the product's cost price when a product is selected.
+      if (patch.productId) {
+        const product = products.find(p => p.id === patch.productId)
+        if (product && !item.unitCost) next.unitCost = Number(product.costPrice || 0)
+      }
+      return next
+    }))
+
+  const validItems = items.filter(item => item.productId && item.quantityOrdered > 0)
+  const total = validItems.reduce((sum, item) => sum + item.quantityOrdered * item.unitCost, 0)
+  const canSubmit = Boolean(branchId) && validItems.length > 0 && !saving
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!canSubmit) return
+    setSaving(true)
+    const success = await onSave({
+      items: validItems,
+      amountPaid: Number(amountPaid) || 0,
+      paymentTerms
+    })
+    if (!success) setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-lg max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-start justify-between border-b px-6 py-5">
+          <div>
+            <h3 className="text-2xl font-semibold text-gray-900">Record Purchase</h3>
+            <p className="text-sm text-gray-500">
+              From {supplier.name}{branchName ? ` · ${branchName}` : ''}
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+            Close
+          </Button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {!branchId && (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              <ClockIcon className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              <span>Select a branch first. Purchases increase stock in the selected branch.</span>
+            </div>
+          )}
+
+          {/* Line items */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-700">Items</label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={addLine}
+                disabled={!branchId || loadingProducts}
+              >
+                <PlusIcon className="h-4 w-4 mr-1" />
+                Add Item
+              </Button>
+            </div>
+
+            {loadingProducts ? (
+              <div className="flex items-center justify-center gap-3 py-8 text-sm text-gray-500">
+                <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-400" />
+                Loading products...
+              </div>
+            ) : products.length === 0 ? (
+              <p className="text-sm text-gray-500 py-4">
+                No products found in this branch. Add products to this branch before recording a purchase.
+              </p>
+            ) : items.length === 0 ? (
+              <p className="text-sm text-gray-500 py-4">No items yet. Click "Add Item" to start.</p>
+            ) : (
+              <div className="space-y-3">
+                {items.map((item, index) => (
+                  <div key={index} className="grid grid-cols-12 gap-2 items-end rounded-lg border p-3">
+                    <div className="col-span-12 md:col-span-5">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Product</label>
+                      <select
+                        value={item.productId}
+                        onChange={(e) => updateLine(index, { productId: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-md text-sm"
+                        required
+                      >
+                        <option value="">Select product</option>
+                        {products.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.name}{product.sku ? ` (${product.sku})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-4 md:col-span-2">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Qty</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={item.quantityOrdered}
+                        onChange={(e) => updateLine(index, { quantityOrdered: Number(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 border rounded-md text-sm"
+                        required
+                      />
+                    </div>
+                    <div className="col-span-5 md:col-span-3">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Unit Cost</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={item.unitCost}
+                        onChange={(e) => updateLine(index, { unitCost: Number(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 border rounded-md text-sm"
+                        required
+                      />
+                    </div>
+                    <div className="col-span-3 md:col-span-2 flex items-center justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => removeLine(index)}
+                        className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Total */}
+          <div className="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3">
+            <span className="text-sm font-medium text-gray-600">Purchase Total</span>
+            <span className="text-lg font-bold text-gray-900">{formatCurrency(total)}</span>
+          </div>
+
+          {/* Payment */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Amount Paid Now</label>
+              <div className="relative">
+                <CurrencyDollarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  max={total || undefined}
+                  value={amountPaid}
+                  onChange={(e) => setAmountPaid(Number(e.target.value) || 0)}
+                  className="w-full pl-9 pr-3 py-2 border rounded-md"
+                  placeholder="0"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Unpaid amount ({formatCurrency(Math.max(0, total - (Number(amountPaid) || 0)))}) becomes outstanding payable.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Payment Terms</label>
+              <select
+                value={paymentTerms}
+                onChange={(e) => setPaymentTerms(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md"
+              >
+                <option value="CASH_ON_DELIVERY">Cash on Delivery</option>
+                <option value="NET_7">Net 7 Days</option>
+                <option value="NET_15">Net 15 Days</option>
+                <option value="NET_30">Net 30 Days</option>
+                <option value="ADVANCE_PAYMENT">Advance Payment</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button type="submit" className="flex-1" disabled={!canSubmit}>
+              {saving ? 'Recording...' : 'Record Purchase'}
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel

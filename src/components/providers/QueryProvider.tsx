@@ -11,7 +11,10 @@ export function QueryProvider({ children }: { children: ReactNode }) {
         staleTime: 60 * 1000,
         gcTime: 10 * 60 * 1000,
         retry: 1,
-        refetchOnWindowFocus: false
+        // Refresh react-query-backed numbers when the user returns to the tab
+        refetchOnWindowFocus: true,
+        // Conservative background refresh so live numbers don't go stale while a tab stays focused
+        refetchInterval: 60 * 1000
       }
     }
   }))

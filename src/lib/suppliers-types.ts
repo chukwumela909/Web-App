@@ -54,7 +54,11 @@ export interface Supplier {
   paymentTerms: PaymentTerms
   customPaymentTerms?: string // For CUSTOM payment terms
   creditLimit?: number
-  currentBalance?: number // Outstanding amount owed
+  openingBalance?: number // Starting balance when the supplier was added
+  currentBalance?: number // Outstanding amount owed (the unpaid "payable")
+  outstandingBalance?: number // Alias of currentBalance, for display clarity
+  totalPurchases?: number // Cumulative monetary value of purchases from this supplier
+  totalPaid?: number // Cumulative payments made to this supplier
   
   // Product Categories
   categories: string[] // What product categories they supply

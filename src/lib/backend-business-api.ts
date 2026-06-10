@@ -1034,7 +1034,13 @@ export function mapSupplier(row: AnyRecord): Supplier {
     status: (row.status || 'ACTIVE').toUpperCase(),
     createdBy: row.createdBy || '',
     userId: row.userId || '',
-    branchId: row.branchId || row.branch?.id || null
+    branchId: row.branchId || row.branch?.id || null,
+    openingBalance: Number(row.openingBalance || 0),
+    totalPurchases: Number(row.totalPurchases || 0),
+    totalPaid: Number(row.totalPaid || 0),
+    // Backend tracks the unpaid liability ("payable") as the supplier's current balance.
+    currentBalance: Number(row.currentBalance || 0),
+    outstandingBalance: Number(row.currentBalance || 0)
   } as Supplier
 }
 
@@ -1183,7 +1189,10 @@ export async function createBackendPurchaseOrder(data: AnyRecord, branchId?: str
       shippingCost: data.shippingCost || 0,
       amountPaid: data.amountPaid || 0,
       paymentTerms: String(data.paymentTerms || 'net_30').toLowerCase(),
-      expectedDeliveryDate: new Date(data.expectedDeliveryDate || Date.now()).toISOString()
+      expectedDeliveryDate: new Date(data.expectedDeliveryDate || Date.now()).toISOString(),
+      // When true the backend creates and immediately receives the purchase so stock
+      // increases at once (the simple "Record Purchase" flow).
+      receiveImmediately: Boolean(data.receiveImmediately)
     })
   }))
 }
@@ -1634,5 +1643,15 @@ export async function acceptBackendStaffInvitation(token: string) {
   return api<AnyRecord>('/staff/invitations/accept', {
     method: 'POST',
     body: JSON.stringify({ token })
+  })
+}
+
+export async function updateBackendUserProfile(profile: { fullName?: string; phone?: string }) {
+  const payload: Record<string, string> = {}
+  if (profile.fullName !== undefined) payload.fullName = profile.fullName
+  if (profile.phone !== undefined) payload.phone = profile.phone
+  return api<AnyRecord>('/me', {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
   })
 }

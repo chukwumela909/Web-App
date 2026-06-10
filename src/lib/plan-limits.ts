@@ -28,7 +28,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
   pro: {
     products: 'unlimited',
     dailySales: 'unlimited',
-    branches: 'unlimited',
+    branches: 6, // Backend caps paid-tier accounts at 6 branches (account.service.ts)
     staff: 'unlimited',
     suppliers: 'unlimited',
     debtors: 'unlimited',

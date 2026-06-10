@@ -31,10 +31,12 @@ import {
   createStockTransfer,
   getInventoryItems,
   getInventorySnapshot,
+  getStockMovements,
   getStockTransfers,
   receiveStockTransfer
 } from '@/lib/inventory-service'
 import type { StockTransfer } from '@/lib/inventory-types'
+import { useBusinessRole } from '@/hooks/useBusinessRole'
 
 interface StockLevel {
   productId: string
@@ -134,6 +136,7 @@ function InventoryContent() {
     setSelectedBranchId
   } = useBranch()
   const { currency } = useCurrency()
+  const { canSeeCost } = useBusinessRole()
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [dashboard, setDashboard] = useState<InventoryDashboard | null>(null)
@@ -202,9 +205,32 @@ function InventoryContent() {
     if (!effectiveUserId || !selectedBranch) return
 
     try {
-      setMovements([])
+      const { movements: backendMovements } = await getStockMovements(
+        effectiveUserId,
+        { branchId: selectedBranch },
+        { limit: 50 }
+      )
+
+      const mapped: StockMovement[] = backendMovements.map((movement) => ({
+        id: movement.id,
+        productId: movement.productId,
+        branchId: movement.branchId,
+        movementType: movement.movementType,
+        quantity: movement.quantity,
+        previousStock: movement.previousStock,
+        newStock: movement.newStock,
+        referenceType: movement.referenceType,
+        referenceId: movement.referenceId,
+        status: movement.status,
+        reason: movement.reason,
+        notes: movement.notes,
+        createdAt: movement.createdAt ?? null
+      }))
+
+      setMovements(mapped)
     } catch (error) {
       console.error('Error loading movements:', error)
+      setMovements([])
     }
   }
 
@@ -293,6 +319,22 @@ function InventoryContent() {
       loadTransfers()
     ])
   }
+
+  // Live updates: refresh inventory when the tab regains focus / becomes visible
+  useEffect(() => {
+    const handleRefresh = () => {
+      if (document.visibilityState === 'visible' && effectiveUserId && selectedBranch) {
+        refreshInventory()
+      }
+    }
+    window.addEventListener('focus', handleRefresh)
+    document.addEventListener('visibilitychange', handleRefresh)
+    return () => {
+      window.removeEventListener('focus', handleRefresh)
+      document.removeEventListener('visibilitychange', handleRefresh)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveUserId, selectedBranch])
 
   const createTransfer = async (data: {
     toBranchId: string
@@ -496,7 +538,7 @@ function InventoryContent() {
                     <div>
                       <p className="text-sm font-medium text-[#64748b]">Inventory Value</p>
                       <p className="dashboard-metric-value text-3xl font-semibold tracking-[-0.02em] text-[#16a34a]">
-                        {formatCurrency(dashboard?.totalInventoryValue || 0, currency)}
+                        {canSeeCost ? formatCurrency(dashboard?.totalInventoryValue || 0, currency) : '—'}
                       </p>
                     </div>
                     <TruckIcon className="h-8 w-8 text-green-600" />
@@ -510,7 +552,7 @@ function InventoryContent() {
               <Card className="p-6">
                 <h2 className="dashboard-section-title mb-4">Recent Stock Movements</h2>
                 <div className="space-y-3">
-                  {dashboard?.recentMovements?.slice(0, 5).map((movement) => (
+                  {movements.slice(0, 5).map((movement) => (
                     <div key={movement.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-full ${
@@ -533,7 +575,9 @@ function InventoryContent() {
                         <p className="text-sm text-gray-600">{movement.newStock} remaining</p>
                       </div>
                     </div>
-                  )) || (
+                  ))}
+
+                  {movements.length === 0 && (
                     <div className="dashboard-empty-state py-4">No recent movements</div>
                   )}
                 </div>
@@ -646,7 +690,7 @@ function InventoryContent() {
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-[#334155]">Total Value</span>
                           <span className="dashboard-tabular font-bold text-[#0f172a]">
-                            {formatCurrency(dashboard.totalInventoryValue, currency)}
+                            {canSeeCost ? formatCurrency(dashboard.totalInventoryValue, currency) : '—'}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">

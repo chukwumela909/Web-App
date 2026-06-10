@@ -274,22 +274,34 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             
             {/* Right side icons */}
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              {/* Branch Selector - show if user has multiple branches */}
-              {branches.length > 1 && (
+              {/* Branch Selector - always present at the top of the dashboard.
+                  With multiple branches it's an interactive dropdown; with exactly
+                  one branch it renders as a static, disabled control. */}
+              {branches.length > 0 && (
                 <div className="relative branch-dropdown">
                   <button
-                    onClick={() => setShowBranchDropdown(!showBranchDropdown)}
-                    className="flex items-center px-3 py-2 text-sm font-medium text-[#475569] bg-[#f8fafc] border border-[#e2e8f0] rounded-[10px] hover:bg-white hover:text-[#0f172a] hover:shadow-[0_8px_20px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
+                    onClick={() => {
+                      if (branches.length > 1) setShowBranchDropdown(!showBranchDropdown)
+                    }}
+                    disabled={branches.length <= 1}
+                    aria-haspopup={branches.length > 1 ? 'listbox' : undefined}
+                    className={`flex items-center px-3 py-2 text-sm font-medium text-[#475569] bg-[#f8fafc] border border-[#e2e8f0] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200 ${
+                      branches.length > 1
+                        ? 'hover:bg-white hover:text-[#0f172a] hover:shadow-[0_8px_20px_rgba(15,23,42,0.06)]'
+                        : 'cursor-default'
+                    }`}
                   >
                     <BuildingOfficeIcon className="h-4 w-4 mr-2" />
                     <span className="hidden sm:inline truncate max-w-24">
                       {branchesLoading ? 'Loading...' : (currentBranch?.name || 'Select Branch')}
                     </span>
-                    <ChevronDownIcon className="h-4 w-4 ml-1 flex-shrink-0" />
+                    {branches.length > 1 && (
+                      <ChevronDownIcon className="h-4 w-4 ml-1 flex-shrink-0" />
+                    )}
                   </button>
-                  
+
                   {/* Branch Dropdown */}
-                  {showBranchDropdown && (
+                  {branches.length > 1 && showBranchDropdown && (
                     <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-[#e2e8f0] rounded-[14px] shadow-[0_18px_45px_rgba(15,23,42,0.12)] z-50 max-h-60 overflow-y-auto">
                       <div className="py-1">
                         {branches.map((branch) => (

@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
+import { useBusinessRole } from '@/hooks/useBusinessRole'
 import {
   ArrowLeftIcon,
   MagnifyingGlassIcon,
@@ -53,6 +54,7 @@ function SalesHistoryContent() {
   const PAYMENT_METHODS: PaymentMethod[] = ['CASH','MPESA','BANK_TRANSFER','CARD','CREDIT','CHEQUE','OTHER']
   const currency = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
+  const { canSeeCost } = useBusinessRole()
   const [loading, setLoading] = useState(true)
   const [sales, setSales] = useState<Sale[]>([])
   const [multiItemSales, setMultiItemSales] = useState<MultiItemSale[]>([])
@@ -340,15 +342,17 @@ function SalesHistoryContent() {
           {filteredSales.length > 0 && (
             <motion.div variants={fadeInUp} className="dashboard-panel p-6">
               <h3 className="text-lg font-semibold text-card-foreground mb-4">Summary</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className={`grid grid-cols-1 gap-4 ${canSeeCost ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
                 <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <p className="text-2xl font-bold text-blue-600">{currencySymbol} {totalSales.toLocaleString()}</p>
                   <p className="text-sm text-blue-500">Total Sales</p>
                 </div>
-                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">{currencySymbol} {totalProfit.toLocaleString()}</p>
-                  <p className="text-sm text-green-500">Total Profit</p>
-                </div>
+                {canSeeCost && (
+                  <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <p className="text-2xl font-bold text-green-600">{currencySymbol} {totalProfit.toLocaleString()}</p>
+                    <p className="text-sm text-green-500">Total Profit</p>
+                  </div>
+                )}
                 <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                   <p className="text-2xl font-bold text-orange-600">{filteredSales.length}</p>
                   <p className="text-sm text-orange-500">Transactions</p>
@@ -413,9 +417,11 @@ function SalesHistoryContent() {
                       <div className="flex items-center gap-2">
                         <div className="text-right mr-4">
                           <p className="text-xl font-bold text-[#4CAF50]">{currencySymbol} {sale.totalAmount.toLocaleString()}</p>
-                          <p className="text-sm text-orange-600">
-                            Profit: {currencySymbol} {(((sale.unitPrice || 0) - (sale.costPrice || 0)) * (sale.quantitySold || 0)).toLocaleString()}
-                          </p>
+                          {canSeeCost && (
+                            <p className="text-sm text-orange-600">
+                              Profit: {currencySymbol} {(((sale.unitPrice || 0) - (sale.costPrice || 0)) * (sale.quantitySold || 0)).toLocaleString()}
+                            </p>
+                          )}
                         </div>
 
                         {/* Action Buttons */}

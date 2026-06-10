@@ -7,7 +7,8 @@ import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
-import { 
+import { useBusinessRole } from '@/hooks/useBusinessRole'
+import {
   ArrowLeftIcon,
   CheckIcon,
   XMarkIcon,
@@ -32,6 +33,7 @@ function EditSalePageContent() {
   
   const { user } = useAuth()
   const { staff } = useStaff()
+  const { canSeeCost } = useBusinessRole()
   const currency = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
   const router = useRouter()
@@ -457,19 +459,21 @@ function EditSalePageContent() {
                             </div>
 
                             {/* Cost Price */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Cost Price ({currencySymbol})
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={item.costPrice || 0}
-                                onChange={(e) => handleItemChange(index, 'costPrice', parseFloat(e.target.value) || 0)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                              />
-                            </div>
+                            {canSeeCost && (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Cost Price ({currencySymbol})
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.costPrice || 0}
+                                  onChange={(e) => handleItemChange(index, 'costPrice', parseFloat(e.target.value) || 0)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                />
+                              </div>
+                            )}
                           </div>
                           
                           {/* Line Total and Profit */}
@@ -477,9 +481,11 @@ function EditSalePageContent() {
                             <span className="text-gray-600">
                               Line Total: {currencySymbol} {((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}
                             </span>
-                            <span className="text-green-600 font-medium">
-                              Profit: {currencySymbol} {(((item.unitPrice || 0) - (item.costPrice || 0)) * (item.quantity || 0)).toLocaleString()}
-                            </span>
+                            {canSeeCost && (
+                              <span className="text-green-600 font-medium">
+                                Profit: {currencySymbol} {(((item.unitPrice || 0) - (item.costPrice || 0)) * (item.quantity || 0)).toLocaleString()}
+                              </span>
+                            )}
                           </div>
                         </div>
                       ))}

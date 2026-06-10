@@ -119,8 +119,21 @@ export function usePlanLimits(): UsePlanLimitsReturn {
       const limit = limits[feature]
       const numericLimit = getNumericLimit(limit)
 
-      // Pro plan has unlimited access
-      if (planTier === 'pro' || numericLimit === Infinity) {
+      // Pro plan is unlimited for everything EXCEPT branches, which the backend
+      // hard-caps at 6 (account.service.ts → branch_limit_reached). For branches we
+      // always fall through and count the user's real branches against the limit.
+      if (feature !== 'branches' && (planTier === 'pro' || numericLimit === Infinity)) {
+        return {
+          allowed: true,
+          currentCount: 0,
+          limit: 'unlimited',
+          limitReached: false,
+        }
+      }
+
+      // Branches: the limit is finite (6) on the pro plan. Only treat it as open
+      // if the configured limit somehow resolved to unlimited.
+      if (feature === 'branches' && numericLimit === Infinity) {
         return {
           allowed: true,
           currentCount: 0,
@@ -192,14 +205,18 @@ export function usePlanLimits(): UsePlanLimitsReturn {
         const limitReached = currentCount >= numericLimit
         const allowed = !limitReached
 
+        // Branches are a hard cap (same ceiling regardless of plan), so the
+        // message must not promise "unlimited" on upgrade.
+        const limitMessage = feature === 'branches'
+          ? `You've reached the maximum of ${numericLimit} ${numericLimit === 1 ? 'branch' : 'branches'}.`
+          : `You've reached the ${FEATURE_NAMES[feature]} limit (${numericLimit}) for the Free plan. Upgrade to Pro for unlimited access.`
+
         return {
           allowed,
           currentCount,
           limit: numericLimit,
           limitReached,
-          message: limitReached
-            ? `You've reached the ${FEATURE_NAMES[feature]} limit (${numericLimit}) for the Free plan. Upgrade to Pro for unlimited access.`
-            : undefined,
+          message: limitReached ? limitMessage : undefined,
         }
       } catch (error) {
         console.error(`Error checking ${feature} limit:`, error)

@@ -6,6 +6,8 @@ import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus'
+import { useBusinessRole } from '@/hooks/useBusinessRole'
+import { isBackendApiError } from '@/lib/backend-api'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -96,13 +98,20 @@ const staggerChildren = {
   }
 }
 
+// Backend hard-caps paid-tier accounts at 6 branches (account.service.ts →
+// branch_limit_reached). Surface and enforce the same cap on the client.
+const MAX_BRANCHES = 6
+
 function BranchesContent() {
   const { user } = useAuth()
   const router = useRouter()
   const { currency } = useCurrency()
   const { isSubscribed, isLoading: subscriptionLoading } = useSubscriptionStatus()
+  const { isOwner } = useBusinessRole()
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('dashboard')
+  // Non-owners (managers) don't get the network-wide aggregate views; default
+  // them straight to the branch list. Owners keep the consolidated dashboard.
+  const [activeTab, setActiveTab] = useState(isOwner ? 'dashboard' : 'branches')
   const [branches, setBranches] = useState<Branch[]>([])
   const [dashboard, setDashboard] = useState<BranchDashboard | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -161,6 +170,12 @@ function BranchesContent() {
       return false
     }
 
+    // Hard 6-branch cap (mirrors the backend). Guard before hitting the API.
+    if (branches.length >= MAX_BRANCHES) {
+      alert(`You've reached the maximum of ${MAX_BRANCHES} branches.`)
+      return false
+    }
+
     try {
       await createBranchRecord(user.uid, branchData)
       await loadBranches()
@@ -169,7 +184,13 @@ function BranchesContent() {
       return true
     } catch (error) {
       console.error('Error creating branch:', error)
-      alert('Failed to create branch')
+      // Surface the backend's branch-limit message verbatim when the cap is hit
+      // server-side (e.g. another tab/device created a branch in the meantime).
+      if (isBackendApiError(error) && error.code === 'branch_limit_reached') {
+        alert(error.message || `You've reached the maximum of ${MAX_BRANCHES} branches.`)
+      } else {
+        alert('Failed to create branch')
+      }
       return false
     }
   }
@@ -210,6 +231,17 @@ function BranchesContent() {
 
     return () => clearTimeout(timeoutId)
   }, [searchTerm, statusFilter])
+
+  // Keep the active tab consistent with the resolved role: the network-wide
+  // aggregate Dashboard/Reports tabs are owner-only. Non-owners stay on the
+  // branch list; owners land on the consolidated dashboard.
+  useEffect(() => {
+    if (!isOwner && (activeTab === 'dashboard' || activeTab === 'reports')) {
+      setActiveTab('branches')
+    }
+  }, [isOwner, activeTab])
+
+  const branchLimitReached = branches.length >= MAX_BRANCHES
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -278,6 +310,9 @@ function BranchesContent() {
             <div className="flex items-center gap-8 text-sm text-gray-500">
               <span>{dashboard?.totalBranches || 0} Total Locations</span>
               <span>{dashboard?.activeBranches || 0} Active</span>
+              <span className={branchLimitReached ? 'font-medium text-orange-600' : ''}>
+                {branches.length} / {MAX_BRANCHES} branches used
+              </span>
             </div>
           </div>
 
@@ -302,9 +337,15 @@ function BranchesContent() {
                   router.push('/dashboard/subscription')
                   return
                 }
+                if (branchLimitReached) {
+                  alert(`You've reached the maximum of ${MAX_BRANCHES} branches.`)
+                  return
+                }
                 setShowAddModal(true)
               }}
-              className="dashboard-action-primary"
+              disabled={branchLimitReached}
+              title={branchLimitReached ? `You've reached the maximum of ${MAX_BRANCHES} branches.` : undefined}
+              className="dashboard-action-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <PlusIcon className="h-4 w-4 mr-2" />
               Add Branch
@@ -330,29 +371,36 @@ function BranchesContent() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <Card className="border-0 shadow-lg mb-6">
             <div className="p-2">
-              <TabsList className="grid w-full grid-cols-3 bg-gray-50 rounded-xl p-1">
-                <TabsTrigger
-                  value="dashboard"
-                  className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
-                >
-                  📊 Dashboard
-                </TabsTrigger>
+              {/* Network-wide aggregate views (Dashboard/Reports) are owner-only.
+                  Managers see just their branch list. */}
+              <TabsList className={`grid w-full ${isOwner ? 'grid-cols-3' : 'grid-cols-1'} bg-gray-50 rounded-xl p-1`}>
+                {isOwner && (
+                  <TabsTrigger
+                    value="dashboard"
+                    className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
+                  >
+                    📊 Dashboard
+                  </TabsTrigger>
+                )}
                 <TabsTrigger
                   value="branches"
                   className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
                 >
                   🏢 Branches
                 </TabsTrigger>
-                <TabsTrigger
-                  value="reports"
-                  className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
-                >
-                  📈 Reports
-                </TabsTrigger>
+                {isOwner && (
+                  <TabsTrigger
+                    value="reports"
+                    className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
+                  >
+                    📈 Reports
+                  </TabsTrigger>
+                )}
               </TabsList>
             </div>
           </Card>
 
+          {isOwner && (
           <TabsContent value="dashboard" className="space-y-8">
             {/* Key Metrics */}
             <motion.div
@@ -487,6 +535,7 @@ function BranchesContent() {
 
 
           </TabsContent>
+          )}
 
           <TabsContent value="branches" className="space-y-6">
             {/* Enhanced Filters */}
@@ -754,6 +803,7 @@ function BranchesContent() {
             )}
           </TabsContent>
 
+          {isOwner && (
           <TabsContent value="reports" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
               <Card className="dashboard-panel p-6">
@@ -886,6 +936,7 @@ function BranchesContent() {
               </Card>
             </div>
           </TabsContent>
+          )}
         </Tabs>
       )}
 

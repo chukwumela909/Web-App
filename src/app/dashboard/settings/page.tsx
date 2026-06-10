@@ -14,8 +14,11 @@ import {
   UserProfile, 
   NotificationSettings,
   DeviceSettings,
+  DeviceType,
+  DeviceConnectionType,
+  PairedDevice,
   DataSyncSettings,
-  getBusinessProfile, 
+  getBusinessProfile,
   getUserProfile, 
   getNotificationSettings,
   getDeviceSettings,
@@ -51,6 +54,7 @@ import {
   Shield,
   LogOut,
   Save,
+  Plus,
   Upload,
   Printer,
   Bluetooth,
@@ -153,6 +157,10 @@ export default function SettingsPage() {
     appData: 8,
     tempFiles: 3
   })
+  // Manual device entry (automatic discovery is not available yet)
+  const [newDeviceName, setNewDeviceName] = useState('')
+  const [newDeviceType, setNewDeviceType] = useState<DeviceType>('PRINTER')
+  const [newDeviceConnection, setNewDeviceConnection] = useState<DeviceConnectionType>('USB')
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -537,17 +545,28 @@ export default function SettingsPage() {
     }
   }
 
-  // Manual Sync Check
+  // Manual Sync — re-fetch the latest settings from the source-of-truth backend.
+  // (Previously this was a fake 3s timer that pretended to scan for desktop apps.)
   const handleManualSync = async () => {
+    if (!user) return
     setSyncChecking(true)
     try {
-      // Simulate checking for desktop apps
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      
-      setSyncChecking(false)
-      // Always show no desktop app found for now
+      const [up, bp, ns, ds, dss] = await Promise.all([
+        getUserProfile(user.uid),
+        getBusinessProfile(user.uid),
+        getNotificationSettings(user.uid),
+        getDeviceSettings(user.uid),
+        getDataSyncSettings(user.uid)
+      ])
+
+      if (up) setUserProfile(up)
+      if (bp) setBusinessProfile(bp)
+      if (ns) setNotificationSettings(ns)
+      if (ds) setDeviceSettings(ds)
+      if (dss) setDataSyncSettings(dss)
     } catch (error) {
-      console.error('Sync check error:', error)
+      console.error('Manual sync error:', error)
+    } finally {
       setSyncChecking(false)
     }
   }
@@ -952,45 +971,77 @@ export default function SettingsPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Device Discovery */}
-                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    {/* Manual Device Entry */}
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 space-y-3">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-blue-100 rounded-full">
                           <Smartphone className="h-4 w-4 text-blue-600" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-blue-900">Device Discovery</p>
-                          <p className="text-xs text-blue-600">Scan for nearby devices</p>
+                          <p className="text-sm font-medium text-blue-900">Add Device</p>
+                          <p className="text-xs text-blue-600">Manual entry — automatic discovery not available yet</p>
                         </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <input
+                          type="text"
+                          value={newDeviceName}
+                          onChange={(e) => setNewDeviceName(e.target.value)}
+                          placeholder="Device name"
+                          className="sm:col-span-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-transparent"
+                        />
+                        <select
+                          value={newDeviceType}
+                          onChange={(e) => setNewDeviceType(e.target.value as DeviceType)}
+                          className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-transparent bg-white"
+                        >
+                          <option value="PRINTER">Printer</option>
+                          <option value="SCANNER">Scanner</option>
+                          <option value="TERMINAL">Terminal</option>
+                          <option value="POS">POS</option>
+                          <option value="CASH_DRAWER">Cash Drawer</option>
+                          <option value="SCALE">Scale</option>
+                          <option value="DISPLAY">Display</option>
+                          <option value="TABLET">Tablet</option>
+                        </select>
+                        <select
+                          value={newDeviceConnection}
+                          onChange={(e) => setNewDeviceConnection(e.target.value as DeviceConnectionType)}
+                          className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-transparent bg-white"
+                        >
+                          <option value="USB">USB</option>
+                          <option value="BLUETOOTH">Bluetooth</option>
+                          <option value="NETWORK">Network</option>
+                          <option value="WIRELESS">Wireless</option>
+                        </select>
                       </div>
                       <Button
                         size="sm"
-                        className="bg-blue-600 hover:bg-blue-700"
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                        disabled={!newDeviceName.trim() || !deviceSettings}
                         onClick={() => {
-                          // Simulated device scan
-                          const mockDevices = [
-                            { id: '1', name: 'Thermal Printer TP-200', type: 'PRINTER', status: 'DISCONNECTED', connectionType: 'BLUETOOTH' },
-                            { id: '2', name: 'Barcode Scanner BS-100', type: 'SCANNER', status: 'DISCONNECTED', connectionType: 'USB' },
-                            { id: '3', name: 'POS Terminal PT-300', type: 'TERMINAL', status: 'DISCONNECTED', connectionType: 'NETWORK' }
-                          ]
-                          
-                          // Add discovered devices to paired devices
-                          if (deviceSettings) {
-                            const newPairedDevices = [
-                              ...deviceSettings.pairedDevices,
-                              ...mockDevices.filter(device => !deviceSettings.pairedDevices.find(d => d.id === device.id))
-                            ]
-                            setDeviceSettings({
-                              ...deviceSettings,
-                              pairedDevices: newPairedDevices,
-                              lastDeviceScan: Date.now()
-                            })
+                          if (!deviceSettings || !newDeviceName.trim()) return
+                          const newDevice: PairedDevice = {
+                            id: `device_${Date.now()}`,
+                            name: newDeviceName.trim(),
+                            type: newDeviceType,
+                            status: 'IDLE',
+                            connectionType: newDeviceConnection,
+                            lastSeen: Date.now()
                           }
+                          setDeviceSettings({
+                            ...deviceSettings,
+                            pairedDevices: [...deviceSettings.pairedDevices, newDevice]
+                          })
+                          setNewDeviceName('')
                         }}
                       >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Scan
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Device
                       </Button>
+                      <p className="text-xs text-blue-600">
+                        Remember to click &quot;Save&quot; to persist your device list.
+                      </p>
                     </div>
 
                     {/* Paired Devices List */}
@@ -1110,7 +1161,7 @@ export default function SettingsPage() {
                         <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
                           <Smartphone className="h-8 w-8 text-gray-400 mx-auto mb-3" />
                           <p className="text-sm text-gray-500">No paired devices</p>
-                          <p className="text-xs text-gray-400 mt-1">Click scan to discover nearby devices</p>
+                          <p className="text-xs text-gray-400 mt-1">Use &quot;Add Device&quot; above to add one manually</p>
                         </div>
                       )}
                     </div>
@@ -1166,64 +1217,34 @@ export default function SettingsPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Quick Actions */}
+                    {/* Quick Actions — pre-select a device type for the manual "Add Device" form */}
                     <div className="grid grid-cols-2 gap-3">
                       <Button
                         variant="outline"
                         className="h-auto p-4 flex flex-col items-center gap-2"
                         onClick={() => {
-                          // Add a mock printer
-                          if (deviceSettings) {
-                            const newPrinter = {
-                              id: `printer_${Date.now()}`,
-                              name: `Receipt Printer ${deviceSettings.pairedDevices.filter(d => d.type === 'PRINTER').length + 1}`,
-                              type: 'PRINTER' as const,
-                              status: 'DISCONNECTED' as const,
-                              connectionType: 'USB' as const,
-                              lastConnected: Date.now(),
-                              model: 'TP-200',
-                              manufacturer: 'Thermal Systems'
-                            }
-                            setDeviceSettings({
-                              ...deviceSettings,
-                              pairedDevices: [...deviceSettings.pairedDevices, newPrinter]
-                            })
-                          }
+                          setNewDeviceType('PRINTER')
+                          setNewDeviceConnection('USB')
                         }}
                       >
                         <Printer className="h-6 w-6 text-blue-600" />
                         <div className="text-center">
                           <p className="text-sm font-medium">Add Printer</p>
-                          <p className="text-xs text-gray-500">Configure new printer</p>
+                          <p className="text-xs text-gray-500">Enter name in &quot;Add Device&quot;</p>
                         </div>
                       </Button>
                       <Button
                         variant="outline"
                         className="h-auto p-4 flex flex-col items-center gap-2"
                         onClick={() => {
-                          // Add a mock scanner
-                          if (deviceSettings) {
-                            const newScanner = {
-                              id: `scanner_${Date.now()}`,
-                              name: `Barcode Scanner ${deviceSettings.pairedDevices.filter(d => d.type === 'SCANNER').length + 1}`,
-                              type: 'SCANNER' as const,
-                              status: 'DISCONNECTED' as const,
-                              connectionType: 'BLUETOOTH' as const,
-                              lastConnected: Date.now(),
-                              model: 'BS-100',
-                              manufacturer: 'Scan Tech'
-                            }
-                            setDeviceSettings({
-                              ...deviceSettings,
-                              pairedDevices: [...deviceSettings.pairedDevices, newScanner]
-                            })
-                          }
+                          setNewDeviceType('SCANNER')
+                          setNewDeviceConnection('BLUETOOTH')
                         }}
                       >
                         <QrCode className="h-6 w-6 text-green-600" />
                         <div className="text-center">
                           <p className="text-sm font-medium">Add Scanner</p>
-                          <p className="text-xs text-gray-500">Configure new scanner</p>
+                          <p className="text-xs text-gray-500">Enter name in &quot;Add Device&quot;</p>
                         </div>
                       </Button>
                     </div>
@@ -1231,7 +1252,7 @@ export default function SettingsPage() {
                     {/* Printer List */}
                     <div className="space-y-3">
                       <h4 className="text-sm font-medium text-gray-900">Configured Printers</h4>
-                      {deviceSettings?.pairedDevices?.filter(d => d.type === 'PRINTER').length > 0 ? (
+                      {deviceSettings && deviceSettings.pairedDevices.filter(d => d.type === 'PRINTER').length > 0 ? (
                         <div className="space-y-2">
                           {deviceSettings.pairedDevices
                             .filter(d => d.type === 'PRINTER')
@@ -1298,7 +1319,7 @@ export default function SettingsPage() {
                     {/* Scanner List */}
                     <div className="space-y-3">
                       <h4 className="text-sm font-medium text-gray-900">Configured Scanners</h4>
-                      {deviceSettings?.pairedDevices?.filter(d => d.type === 'SCANNER').length > 0 ? (
+                      {deviceSettings && deviceSettings.pairedDevices.filter(d => d.type === 'SCANNER').length > 0 ? (
                         <div className="space-y-2">
                           {deviceSettings.pairedDevices
                             .filter(d => d.type === 'SCANNER')
@@ -1923,9 +1944,8 @@ export default function SettingsPage() {
                       />
                     </div>
                     <div className="pt-2">
-                      <Button 
+                      <Button
                         onClick={() => {
-                          setShowSyncModal(true)
                           handleManualSync()
                         }}
                         className="w-full bg-[#004AAD] hover:bg-[#003875] text-white shadow-lg hover:shadow-xl transition-all duration-300"
@@ -1934,15 +1954,18 @@ export default function SettingsPage() {
                         {syncChecking ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Scanning for Desktop Apps...
+                            Refreshing...
                           </>
                         ) : (
                           <>
                             <RefreshCw className="h-4 w-4 mr-2" />
-                            Manual Sync
+                            Refresh Settings
                           </>
                         )}
                       </Button>
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        Reloads your latest settings from the server.
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -2620,127 +2643,6 @@ export default function SettingsPage() {
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Clear Cache
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </motion.div>
-            </div>
-          )}
-
-          {/* Manual Sync Modal */}
-          {showSyncModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden"
-              >
-                <div className="bg-gradient-to-r from-[#004AAD] to-[#0066CC] p-6 text-white">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white bg-opacity-20 rounded-full">
-                        <RefreshCw className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold">Manual Sync</h3>
-                        <p className="text-blue-100 text-sm">Desktop App Detection</p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-white hover:bg-white hover:bg-opacity-20"
-                      onClick={() => setShowSyncModal(false)}
-                    >
-                      <X className="h-5 w-5" />
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="p-6 space-y-6">
-                  {syncChecking ? (
-                    <div className="text-center space-y-4">
-                      <div className="relative">
-                        <div className="w-24 h-24 mx-auto">
-                          <div className="absolute inset-0 border-4 border-blue-200 rounded-full animate-ping"></div>
-                          <div className="relative w-full h-full border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
-                        </div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Monitor className="h-10 w-10 text-blue-500 animate-pulse" />
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-lg font-semibold text-gray-900">Scanning for Desktop Apps...</p>
-                        <p className="text-sm text-gray-600">Looking for FahamPesa desktop clients</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="text-center space-y-4">
-                        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                          <Monitor className="h-10 w-10 text-gray-400" />
-                        </div>
-                        <div>
-                          <h4 className="text-lg font-semibold text-gray-900">No Desktop Apps Found</h4>
-                          <p className="text-sm text-gray-600">We couldn't find any FahamPesa desktop applications on your network.</p>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                          <ShieldCheck className="h-5 w-5 text-blue-500 mt-0.5" />
-                          <div className="text-sm">
-                            <p className="font-medium text-blue-900 mb-1">Desktop Sync Requirements:</p>
-                            <ul className="text-blue-700 space-y-1 text-xs">
-                              <li>• FahamPesa Desktop App (Windows/Mac/Linux)</li>
-                              <li>• Same network connection</li>
-                              <li>• Sync service enabled on desktop</li>
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-3 text-center">
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <Monitor className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                          <p className="text-xs text-gray-600">Windows</p>
-                          <p className="text-xs text-red-500">Not Found</p>
-                        </div>
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <Laptop className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                          <p className="text-xs text-gray-600">Mac</p>
-                          <p className="text-xs text-red-500">Not Found</p>
-                        </div>
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <SmartphoneIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                          <p className="text-xs text-gray-600">Linux</p>
-                          <p className="text-xs text-red-500">Not Found</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-3">
-                        <Button
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => {
-                            setShowSyncModal(false)
-                            setSyncChecking(false)
-                          }}
-                        >
-                          Close
-                        </Button>
-                        <Button
-                          className="flex-1 bg-[#004AAD] hover:bg-[#003875]"
-                          onClick={() => {
-                            setSyncChecking(true)
-                            handleManualSync()
-                          }}
-                        >
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Scan Again
                         </Button>
                       </div>
                     </>
