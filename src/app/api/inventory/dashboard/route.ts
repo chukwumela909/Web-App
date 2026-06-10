@@ -1,6 +1,7 @@
 // API route for inventory dashboard data
 import { NextRequest, NextResponse } from 'next/server'
 import { getProducts } from '@/lib/firestore'
+import { getStockMovements } from '@/lib/inventory-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,17 +36,55 @@ export async function GET(request: NextRequest) {
       return sum + ((product.quantity || 0) * (product.costPrice || 0))
     }, 0)
 
+    // Expiry tracking: products expiring within the next 30 days
+    const now = Date.now()
+    const EXPIRY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+    const expiringProducts = products.filter(product =>
+      typeof product.expiryDate === 'number' &&
+      (product.quantity || 0) > 0 &&
+      product.expiryDate <= now + EXPIRY_WINDOW_MS
+    )
+
+    // Low-stock and expiring alerts
+    const lowStockAlerts = products
+      .filter(product => (product.quantity || 0) <= (product.minStockLevel || 0))
+      .map(product => ({
+        productId: product.id,
+        productName: product.name,
+        currentStock: product.quantity || 0,
+        minStockLevel: product.minStockLevel || 0
+      }))
+    const expiringAlerts = expiringProducts.map(product => ({
+      productId: product.id,
+      productName: product.name,
+      expiryDate: typeof product.expiryDate === 'number' ? new Date(product.expiryDate) : null,
+      quantity: product.quantity || 0
+    }))
+
+    // Recent stock movements for this branch (best-effort, enriched with product names)
+    const productNameMap = new Map(products.map(product => [product.id, product.name]))
+    let recentMovements: any[] = []
+    try {
+      const movementHistory = await getStockMovements(userId, { branchId }, { limit: 10 })
+      recentMovements = movementHistory.movements.map(movement => ({
+        ...movement,
+        productName: productNameMap.get(movement.productId) || 'Unknown product'
+      }))
+    } catch (movementError) {
+      console.error('Error loading recent stock movements:', movementError)
+    }
+
     const dashboard = {
       branchId,
       totalProducts,
       lowStockItems,
       outOfStockItems,
-      expiringItems: 0, // TODO: Implement expiry tracking
+      expiringItems: expiringProducts.length,
       totalInventoryValue,
-      recentMovements: [], // TODO: Implement movement tracking
+      recentMovements,
       alerts: {
-        lowStock: [], // TODO: Implement low stock alerts
-        expiring: [] // TODO: Implement expiry alerts
+        lowStock: lowStockAlerts,
+        expiring: expiringAlerts
       }
     }
 

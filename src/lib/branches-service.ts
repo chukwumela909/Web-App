@@ -48,11 +48,13 @@ import {
 } from '@/lib/branches-types'
 
 // Integration with existing inventory system
-import { 
-  getInventoryItems, 
+import {
+  getInventoryItems,
   getStockLevels,
-  createStockMovement 
+  createStockMovement,
+  getStockMovements
 } from '@/lib/inventory-service'
+import { getProducts, getMultiItemSales } from '@/lib/firestore'
 import { 
   checkStockLevels, 
   validateStockAvailability 
@@ -95,6 +97,14 @@ function removeUndefinedValues(obj: any): any {
   }
   
   return obj
+}
+
+// Coerce a Firestore Timestamp / ISO string / Date into a JS Date
+function coerceDate(value: any): Date {
+  if (!value) return new Date()
+  if (value instanceof Date) return value
+  if (typeof value?.toDate === 'function') return value.toDate()
+  return new Date(value)
 }
 
 type BranchInventoryTotals = Pick<Branch, 'totalProducts' | 'totalInventoryValue' | 'lowStockItemsCount'>
@@ -1079,9 +1089,59 @@ export async function getBranchInventorySummary(
   const outOfStockItems = inventoryItems.filter(item => 
     item.currentStock === 0).length
   
-  // Get recent stock movements for this branch
-  const recentMovements: any[] = [] // TODO: Implement with stock movements query
-  
+  // Enrich with product details (names, categories, expiry) for this branch
+  const products = await getProducts(userId, branchId)
+  const productMap = new Map(products.map(product => [product.id, product]))
+  const productNameFor = (productId: string) => productMap.get(productId)?.name || 'Unknown product'
+
+  // Inventory value grouped by product category
+  const categoryMap = new Map<string, { productCount: number; inventoryValue: number }>()
+  inventoryItems.forEach(item => {
+    const category = productMap.get(item.productId)?.category || 'Uncategorized'
+    const value = item.currentStock * (item.averageCostPrice || 0)
+    const entry = categoryMap.get(category) || { productCount: 0, inventoryValue: 0 }
+    entry.productCount += 1
+    entry.inventoryValue += value
+    categoryMap.set(category, entry)
+  })
+  const categoryBreakdown = Array.from(categoryMap.entries())
+    .map(([category, value]) => ({
+      category,
+      productCount: value.productCount,
+      inventoryValue: value.inventoryValue
+    }))
+    .sort((a, b) => b.inventoryValue - a.inventoryValue)
+
+  // Items expiring within the next 30 days
+  const now = Date.now()
+  const EXPIRY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+  const expiringAlerts = inventoryItems
+    .filter(item => item.currentStock > 0)
+    .map(item => ({ item, product: productMap.get(item.productId) }))
+    .filter(({ product }) => typeof product?.expiryDate === 'number' && (product!.expiryDate as number) <= now + EXPIRY_WINDOW_MS)
+    .map(({ item, product }) => ({
+      productId: item.productId,
+      productName: product!.name,
+      expiryDate: new Date(product!.expiryDate as number),
+      quantity: item.currentStock
+    }))
+    .sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
+
+  // Recent stock movements for this branch (best-effort; non-fatal on failure)
+  let recentMovements: BranchInventorySummary['recentMovements'] = []
+  try {
+    const movementHistory = await getStockMovements(userId, { branchId }, { limit: 10 })
+    recentMovements = movementHistory.movements.map(movement => ({
+      productId: movement.productId,
+      productName: productNameFor(movement.productId),
+      movementType: movement.movementType,
+      quantity: movement.quantity,
+      date: coerceDate(movement.createdAt)
+    }))
+  } catch (error) {
+    console.error('Error loading recent stock movements for branch summary:', error)
+  }
+
   return {
     branchId,
     branchName: branch.name,
@@ -1089,19 +1149,19 @@ export async function getBranchInventorySummary(
     totalInventoryValue,
     lowStockItems,
     outOfStockItems,
-    expiringItems: 0, // TODO: Implement expiry tracking
-    categoryBreakdown: [], // TODO: Calculate from products
+    expiringItems: expiringAlerts.length,
+    categoryBreakdown,
     recentMovements,
     alerts: {
       lowStock: inventoryItems
         .filter(item => item.currentStock <= item.minStockLevel)
         .map(item => ({
           productId: item.productId,
-          productName: item.productId, // TODO: Get product name
+          productName: productNameFor(item.productId),
           currentStock: item.currentStock,
           minStockLevel: item.minStockLevel
         })),
-      expiring: [] // TODO: Implement expiry alerts
+      expiring: expiringAlerts
     }
   }
 }
@@ -1122,6 +1182,10 @@ export async function getMultibranchStockSummary(
   const allInventoryItems = await Promise.all(
     activeBranches.map(branch => getInventoryItems(userId, branch.id))
   )
+
+  // Map product IDs to names for enrichment
+  const products = await getProducts(userId)
+  const productNameMap = new Map(products.map(product => [product.id, product.name]))
   
   // Group by product
   const productStockMap = new Map<string, {
@@ -1144,7 +1208,7 @@ export async function getMultibranchStockSummary(
       if (!productStockMap.has(item.productId)) {
         productStockMap.set(item.productId, {
           productId: item.productId,
-          productName: item.productId, // TODO: Get actual product name
+          productName: productNameMap.get(item.productId) || 'Unknown product',
           totalStock: 0,
           totalAvailable: 0,
           totalReserved: 0,
@@ -1314,27 +1378,140 @@ export async function getBranchPerformanceReport(
   const transfersOutCount = transfers.length
   const transferValue = transfers.reduce((sum, t) => sum + t.totalValue, 0)
   
-  // TODO: Calculate other metrics from inventory and stock movements
-  
+  // Current inventory snapshot for the branch (closing position)
+  const inventoryItems = await getInventoryItems(userId, branchId)
+  const closingStock = inventoryItems.reduce((sum, item) => sum + (item.currentStock || 0), 0)
+  const closingInventoryValue = inventoryItems.reduce(
+    (sum, item) => sum + (item.currentStock || 0) * (item.averageCostPrice || 0),
+    0
+  )
+  const totalProducts = inventoryItems.length
+  const stockOutIncidents = inventoryItems.filter(item => (item.currentStock || 0) === 0).length
+  const lowStockIncidents = inventoryItems.filter(
+    item => (item.currentStock || 0) > 0 && (item.currentStock || 0) <= item.minStockLevel
+  ).length
+
+  // Reconstruct stock flows from movements within the reporting period
+  let stockReceived = 0
+  let stockTransferred = 0
+  let netChange = 0
+  try {
+    const movementHistory = await getStockMovements(
+      userId,
+      { branchId, startDate, endDate },
+      { limit: 1000 }
+    )
+    movementHistory.movements.forEach(movement => {
+      netChange += (movement.newStock - movement.previousStock)
+      switch (movement.movementType) {
+        case 'PURCHASE':
+        case 'TRANSFER_IN':
+        case 'RETURN':
+        case 'INITIAL':
+          stockReceived += movement.quantity
+          break
+        case 'TRANSFER_OUT':
+          stockTransferred += movement.quantity
+          break
+      }
+    })
+  } catch (error) {
+    console.error('Error loading stock movements for performance report:', error)
+  }
+  // Opening = closing minus the net change recorded over the period
+  const openingStock = closingStock - netChange
+
+  // Units sold and cost of goods sold from sales within the period
+  let stockSold = 0
+  let costOfGoodsSold = 0
+  try {
+    const sales = await getMultiItemSales(userId, 2000, branchId)
+    const startMs = startDate.getTime()
+    const endMs = endDate.getTime()
+    sales
+      .filter(sale => !sale.isDeleted && sale.timestamp >= startMs && sale.timestamp <= endMs)
+      .forEach(sale => {
+        sale.items.forEach(item => {
+          if (item.saleType === 'PRODUCT') {
+            stockSold += item.quantity || 0
+            costOfGoodsSold += (item.costPrice || 0) * (item.quantity || 0)
+          }
+        })
+      })
+  } catch (error) {
+    console.error('Error loading sales for performance report:', error)
+  }
+
+  // Items expiring within the next 30 days
+  let expiryIncidents = 0
+  try {
+    const products = await getProducts(userId, branchId)
+    const productMap = new Map(products.map(product => [product.id, product]))
+    const now = Date.now()
+    const EXPIRY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+    expiryIncidents = inventoryItems.filter(item => {
+      const expiry = productMap.get(item.productId)?.expiryDate
+      return typeof expiry === 'number' && (item.currentStock || 0) > 0 && expiry <= now + EXPIRY_WINDOW_MS
+    }).length
+  } catch (error) {
+    console.error('Error evaluating expiry incidents for performance report:', error)
+  }
+
+  // Average transfer turnaround (request -> received) in days for completed transfers
+  const completedTransfers = [...transfers, ...transfersIn].filter(
+    transfer => transfer.status === 'RECEIVED' && transfer.receivedAt
+  )
+  const averageTransferTime = completedTransfers.length > 0
+    ? Number(
+        (
+          completedTransfers.reduce((sum, transfer) => {
+            const received = coerceDate(transfer.receivedAt).getTime()
+            const requested = coerceDate(transfer.requestedAt).getTime()
+            return sum + Math.max(0, received - requested)
+          }, 0) /
+          completedTransfers.length /
+          (1000 * 60 * 60 * 24)
+        ).toFixed(1)
+      )
+    : 0
+
+  // Inventory turnover for the period: cost of goods sold / closing inventory value
+  const stockTurnover = closingInventoryValue > 0
+    ? Number((costOfGoodsSold / closingInventoryValue).toFixed(2))
+    : 0
+
+  // Availability / fulfillment: share of products that are currently in stock
+  const fulfillmentRate = totalProducts > 0
+    ? Math.round(((totalProducts - stockOutIncidents) / totalProducts) * 100)
+    : 100
+
+  // Inventory accuracy from physical counts: counted items with no variance since their last count
+  const countedItems = inventoryItems.filter(item => typeof item.lastCountStock === 'number')
+  const inventoryAccuracy = countedItems.length > 0
+    ? Math.round(
+        (countedItems.filter(item => item.lastCountStock === item.currentStock).length / countedItems.length) * 100
+      )
+    : 100
+
   return {
     branchId,
     branchName: branch.name,
     reportPeriod: { start: startDate, end: endDate },
-    openingStock: 0, // TODO: Calculate
-    closingStock: 0, // TODO: Calculate
-    stockReceived: 0, // TODO: Calculate
-    stockTransferred: 0, // TODO: Calculate
-    stockSold: 0, // TODO: Calculate from sales integration
+    openingStock,
+    closingStock,
+    stockReceived,
+    stockTransferred,
+    stockSold,
     transfersIn: transfersInCount,
     transfersOut: transfersOutCount,
     transferValue,
-    averageTransferTime: 0, // TODO: Calculate
-    stockTurnover: 0, // TODO: Calculate
-    inventoryAccuracy: 0, // TODO: Calculate
-    fulfillmentRate: 0, // TODO: Calculate
-    lowStockIncidents: 0, // TODO: Calculate
-    stockOutIncidents: 0, // TODO: Calculate
-    expiryIncidents: 0 // TODO: Calculate
+    averageTransferTime,
+    stockTurnover,
+    inventoryAccuracy,
+    fulfillmentRate,
+    lowStockIncidents,
+    stockOutIncidents,
+    expiryIncidents
   }
 }
 

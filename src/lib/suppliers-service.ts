@@ -48,6 +48,7 @@ import {
 
 // Integration with inventory system
 import { processPurchaseInventoryUpdate } from '@/lib/inventory-hooks'
+import { getProducts } from '@/lib/firestore'
 import {
   approveBackendPurchaseOrder,
   cancelBackendPurchaseOrder,
@@ -926,19 +927,26 @@ export async function getSupplierDashboard(userId: string, branchId?: string): P
       where('userId', '==', userId)
     )
   )
-  let recentOrders = recentOrdersSnap.docs
+  const allOrders = recentOrdersSnap.docs
     .map(doc => ({ id: doc.id, ...doc.data() } as PurchaseOrder))
     .filter(order => !branchId || order.branchId === branchId)
-  
-  // Sort client-side and limit to 10
-  recentOrders = recentOrders
+
+  // Total spend per supplier across all purchase orders
+  const spendBySupplier = new Map<string, number>()
+  allOrders.forEach(order => {
+    if (!order.supplierId) return
+    spendBySupplier.set(order.supplierId, (spendBySupplier.get(order.supplierId) || 0) + (order.totalAmount || 0))
+  })
+
+  // Sort client-side and limit to 10 for recent activity
+  const recentOrders = [...allOrders]
     .sort((a, b) => {
       const aDate = a.createdAt instanceof Date ? a.createdAt : new Date(0)
       const bDate = b.createdAt instanceof Date ? b.createdAt : new Date(0)
       return bDate.getTime() - aDate.getTime()
     })
     .slice(0, 10)
-  
+
   // Get top suppliers by order value
   const topSuppliers = suppliers
     .filter(s => s.totalOrders > 0)
@@ -948,7 +956,7 @@ export async function getSupplierDashboard(userId: string, branchId?: string): P
       supplierId: s.id,
       supplierName: s.name,
       totalOrders: s.totalOrders,
-      totalAmount: 0, // Would need to calculate from POs
+      totalAmount: spendBySupplier.get(s.id) || 0,
       onTimeDeliveryRate: s.onTimeDeliveryRate
     }))
   
@@ -1009,12 +1017,31 @@ export async function getPurchaseOrderDashboard(userId: string): Promise<Purchas
       timestamp: (po.updatedAt as any)?.toDate() || new Date()
     }))
   
+  // Top spend categories derived from the product category on each order line
+  const products = await getProducts(userId)
+  const categoryByProduct = new Map(products.map(product => [product.id, product.category || 'Uncategorized']))
+  const categoryTotals = new Map<string, { totalAmount: number; orderIds: Set<string> }>()
+  orders.forEach(order => {
+    ;(order.items || []).forEach(item => {
+      const category = categoryByProduct.get(item.productId) || 'Uncategorized'
+      const lineTotal = item.totalCost || (item.quantityOrdered || 0) * (item.unitCost || 0)
+      const entry = categoryTotals.get(category) || { totalAmount: 0, orderIds: new Set<string>() }
+      entry.totalAmount += lineTotal
+      entry.orderIds.add(order.id)
+      categoryTotals.set(category, entry)
+    })
+  })
+  const topCategories = Array.from(categoryTotals.entries())
+    .map(([category, value]) => ({ category, totalAmount: value.totalAmount, orderCount: value.orderIds.size }))
+    .sort((a, b) => b.totalAmount - a.totalAmount)
+    .slice(0, 5)
+
   return {
     totalOrders,
     pendingOrders,
     overdueOrders,
     monthlySpend,
-    topCategories: [], // Would need to calculate from product categories
+    topCategories,
     recentActivity
   }
 }

@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useBranch } from '@/contexts/BranchContext'
 import { useStaff } from '@/contexts/StaffContext'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import {
   TruckIcon,
@@ -22,7 +22,10 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ClockIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  ChartBarIcon,
+  ArrowTrendingUpIcon,
+  TrophyIcon
 } from '@heroicons/react/24/outline'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -35,6 +38,18 @@ import {
   getSupplierDashboard,
   getSuppliers
 } from '@/lib/suppliers-service'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie
+} from 'recharts'
 
 interface Supplier {
   id: string
@@ -109,6 +124,494 @@ function normalizeSupplierForDisplay(supplier: Partial<Supplier> & { id: string 
     lastOrderDate: supplier.lastOrderDate,
     branchId: supplier.branchId || null
   }
+}
+
+const PERFORMANCE_COLORS = {
+  excellent: '#22c55e',
+  good: '#f59e0b',
+  needsAttention: '#ef4444'
+}
+
+function shortLabel(name: string) {
+  return name.length <= 14 ? name : `${name.slice(0, 13)}…`
+}
+
+function getRateColor(rate: number) {
+  if (rate >= 90) return PERFORMANCE_COLORS.excellent
+  if (rate >= 70) return PERFORMANCE_COLORS.good
+  return PERFORMANCE_COLORS.needsAttention
+}
+
+function getScoreColor(score: number) {
+  if (score >= 80) return 'bg-green-100 text-green-700'
+  if (score >= 60) return 'bg-amber-100 text-amber-700'
+  if (score >= 40) return 'bg-orange-100 text-orange-700'
+  return 'bg-red-100 text-red-700'
+}
+
+interface SupplierPerformanceTabProps {
+  suppliers: Supplier[]
+  renderStars: (rating: number) => ReactNode
+}
+
+function SupplierPerformanceTab({ suppliers, renderStars }: SupplierPerformanceTabProps) {
+  const analytics = useMemo(() => {
+    const withOrders = suppliers.filter(s => (s.totalOrders || 0) > 0)
+    const totalOrders = suppliers.reduce((sum, s) => sum + (s.totalOrders || 0), 0)
+    const totalCompleted = suppliers.reduce((sum, s) => sum + (s.completedOrders || 0), 0)
+    const fulfillmentRate = totalOrders > 0 ? Math.round((totalCompleted / totalOrders) * 100) : 0
+    const avgOnTime = withOrders.length > 0
+      ? Math.round(withOrders.reduce((sum, s) => sum + (s.onTimeDeliveryRate || 0), 0) / withOrders.length)
+      : 0
+
+    const ratingAverage = (key: 'qualityRating' | 'serviceRating' | 'pricingRating') => {
+      const values = suppliers
+        .map(s => s[key])
+        .filter((v): v is number => typeof v === 'number' && v > 0)
+      return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0
+    }
+    const avgQuality = ratingAverage('qualityRating')
+    const avgService = ratingAverage('serviceRating')
+    const avgPricing = ratingAverage('pricingRating')
+    const ratedValues = [avgQuality, avgService, avgPricing].filter(v => v > 0)
+    const avgOverall = ratedValues.length > 0
+      ? ratedValues.reduce((a, b) => a + b, 0) / ratedValues.length
+      : 0
+
+    const excellent = withOrders.filter(s => (s.onTimeDeliveryRate || 0) >= 90).length
+    const good = withOrders.filter(s => (s.onTimeDeliveryRate || 0) >= 70 && (s.onTimeDeliveryRate || 0) < 90).length
+    const needsAttention = withOrders.filter(s => (s.onTimeDeliveryRate || 0) < 70).length
+
+    const distribution = [
+      { name: 'Excellent', detail: '≥ 90% on-time', value: excellent, fill: PERFORMANCE_COLORS.excellent },
+      { name: 'Good', detail: '70–89% on-time', value: good, fill: PERFORMANCE_COLORS.good },
+      { name: 'Needs Attention', detail: '< 70% on-time', value: needsAttention, fill: PERFORMANCE_COLORS.needsAttention }
+    ]
+
+    const topByOrders = [...withOrders]
+      .sort((a, b) => (b.totalOrders || 0) - (a.totalOrders || 0))
+      .slice(0, 8)
+      .map(s => ({
+        name: shortLabel(s.name),
+        fullName: s.name,
+        onTime: Math.round(s.onTimeDeliveryRate || 0),
+        orders: s.totalOrders || 0,
+        fill: getRateColor(s.onTimeDeliveryRate || 0)
+      }))
+
+    const ranked = suppliers
+      .map(s => {
+        const orders = s.totalOrders || 0
+        const completed = s.completedOrders || 0
+        const hasOrders = orders > 0
+        const fulfillment = hasOrders ? Math.round((completed / orders) * 100) : 0
+        const ratingValues = [s.qualityRating, s.serviceRating, s.pricingRating]
+          .filter((v): v is number => typeof v === 'number' && v > 0)
+        const avgRating = ratingValues.length > 0
+          ? ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length
+          : 0
+        const effectiveOnTime = hasOrders ? (s.onTimeDeliveryRate || 0) : 0
+        const score = Math.round(effectiveOnTime * 0.45 + fulfillment * 0.3 + (avgRating / 5) * 100 * 0.25)
+        return { supplier: s, orders, fulfillment, avgRating, onTime: Math.round(s.onTimeDeliveryRate || 0), hasOrders, score }
+      })
+      .sort((a, b) => b.score - a.score)
+
+    return {
+      totalOrders,
+      fulfillmentRate,
+      avgOnTime,
+      avgQuality,
+      avgService,
+      avgPricing,
+      avgOverall,
+      distribution,
+      topByOrders,
+      ranked,
+      hasOrderData: withOrders.length > 0
+    }
+  }, [suppliers])
+
+  if (suppliers.length === 0) {
+    return (
+      <Card className="border-0 shadow-lg">
+        <div className="text-center py-16">
+          <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+            <ChartBarIcon className="h-12 w-12 text-gray-400" />
+          </div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-3">No Performance Data Yet</h3>
+          <p className="text-gray-600 max-w-md mx-auto">
+            Add suppliers and record purchase orders to start tracking delivery performance, fulfillment rates, and quality ratings here.
+          </p>
+        </div>
+      </Card>
+    )
+  }
+
+  const SupplierTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload
+      return (
+        <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-lg">
+          <p className="font-semibold text-gray-900">{data.fullName}</p>
+          <p className="text-sm text-gray-600">On-time delivery: <span className="font-medium text-gray-900">{data.onTime}%</span></p>
+          <p className="text-sm text-gray-600">Total orders: <span className="font-medium text-gray-900">{data.orders}</span></p>
+        </div>
+      )
+    }
+    return null
+  }
+
+  const ratingRows = [
+    { label: 'Quality', value: analytics.avgQuality, bar: 'bg-emerald-500' },
+    { label: 'Service', value: analytics.avgService, bar: 'bg-blue-500' },
+    { label: 'Pricing', value: analytics.avgPricing, bar: 'bg-violet-500' }
+  ]
+
+  const distributionWithValues = analytics.distribution.filter(d => d.value > 0)
+  const orderVolumeHeight = Math.max(240, analytics.topByOrders.length * 44)
+
+  return (
+    <div className="space-y-6">
+      {!analytics.hasOrderData && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <ClockIcon className="h-5 w-5 flex-shrink-0 mt-0.5" />
+          <span>
+            Delivery and fulfillment metrics will populate as purchase orders are recorded and received. Quality
+            ratings you enter are reflected below.
+          </span>
+        </div>
+      )}
+
+      {/* Key performance indicators */}
+      <motion.div
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        variants={staggerChildren}
+        initial="initial"
+        animate="animate"
+      >
+        <motion.div variants={fadeInUp}>
+          <Card className="dashboard-panel transition-all duration-200">
+            <div className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium">Avg On-Time Delivery</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.avgOnTime}%</p>
+                  <p className="text-xs text-gray-400 mt-1">Across suppliers with orders</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-3">
+                  <CheckCircleIcon className="h-6 w-6 text-green-600" />
+                </div>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+
+        <motion.div variants={fadeInUp}>
+          <Card className="dashboard-panel transition-all duration-200">
+            <div className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium">Order Fulfillment</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.fulfillmentRate}%</p>
+                  <p className="text-xs text-gray-400 mt-1">Completed of all orders</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-3">
+                  <ArrowTrendingUpIcon className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+
+        <motion.div variants={fadeInUp}>
+          <Card className="dashboard-panel transition-all duration-200">
+            <div className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium">Avg Rating</p>
+                  {analytics.avgOverall > 0 ? (
+                    <>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.avgOverall.toFixed(1)}<span className="text-base font-medium text-gray-400">/5</span></p>
+                      <div className="flex mt-1">{renderStars(analytics.avgOverall)}</div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">—</p>
+                      <p className="text-xs text-gray-400 mt-1">No ratings recorded</p>
+                    </>
+                  )}
+                </div>
+                <div className="bg-yellow-50 rounded-lg p-3">
+                  <StarIcon className="h-6 w-6 text-yellow-500" />
+                </div>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+
+        <motion.div variants={fadeInUp}>
+          <Card className="dashboard-panel transition-all duration-200">
+            <div className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium">Total Orders</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.totalOrders.toLocaleString()}</p>
+                  <p className="text-xs text-gray-400 mt-1">Lifetime purchase orders</p>
+                </div>
+                <div className="bg-indigo-50 rounded-lg p-3">
+                  <TruckIcon className="h-6 w-6 text-indigo-600" />
+                </div>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      </motion.div>
+
+      {/* On-time delivery + distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="border-0 shadow-lg lg:col-span-2">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">On-Time Delivery by Supplier</h2>
+                <p className="text-sm text-gray-500">Top suppliers ranked by order volume</p>
+              </div>
+              <div className="bg-green-50 rounded-lg p-2">
+                <CheckCircleIcon className="h-5 w-5 text-green-600" />
+              </div>
+            </div>
+            {analytics.topByOrders.length > 0 ? (
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analytics.topByOrders} margin={{ top: 8, right: 16, left: -8, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                    <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} interval={0} angle={-20} textAnchor="end" height={60} />
+                    <YAxis domain={[0, 100]} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+                    <Tooltip content={<SupplierTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                    <Bar dataKey="onTime" radius={[6, 6, 0, 0]} maxBarSize={56}>
+                      {analytics.topByOrders.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-72 flex flex-col items-center justify-center text-center">
+                <TruckIcon className="h-10 w-10 text-gray-300 mb-3" />
+                <p className="text-gray-500 text-sm">No delivery data yet</p>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        <Card className="border-0 shadow-lg">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Delivery Performance</h2>
+                <p className="text-sm text-gray-500">Reliability breakdown</p>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-2">
+                <ChartBarIcon className="h-5 w-5 text-blue-600" />
+              </div>
+            </div>
+            {distributionWithValues.length > 0 ? (
+              <>
+                <div className="relative h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={distributionWithValues}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={52}
+                        outerRadius={80}
+                        paddingAngle={3}
+                        stroke="none"
+                      >
+                        {distributionWithValues.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: any, name: any) => [`${value} supplier${value === 1 ? '' : 's'}`, name]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-bold text-gray-900">{analytics.avgOnTime}%</span>
+                    <span className="text-xs text-gray-400">avg on-time</span>
+                  </div>
+                </div>
+                <div className="space-y-2 mt-4">
+                  {analytics.distribution.map(item => (
+                    <div key={item.name} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.fill }} />
+                        <span className="text-gray-700">{item.name}</span>
+                        <span className="text-gray-400 text-xs">{item.detail}</span>
+                      </div>
+                      <span className="font-semibold text-gray-900">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-64 flex flex-col items-center justify-center text-center">
+                <ChartBarIcon className="h-10 w-10 text-gray-300 mb-3" />
+                <p className="text-gray-500 text-sm">No delivery data to chart yet</p>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Ratings + order volume */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="border-0 shadow-lg">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-gray-900">Service Quality</h2>
+              <div className="bg-yellow-50 rounded-lg p-2">
+                <StarIcon className="h-5 w-5 text-yellow-500" />
+              </div>
+            </div>
+            <div className="space-y-5">
+              {ratingRows.map(row => (
+                <div key={row.label}>
+                  <div className="flex items-center justify-between mb-1.5 text-sm">
+                    <span className="text-gray-600">{row.label}</span>
+                    <span className="font-semibold text-gray-900">
+                      {row.value > 0 ? `${row.value.toFixed(1)} / 5` : 'Not rated'}
+                    </span>
+                  </div>
+                  <div className="bg-gray-100 rounded-full h-2.5 w-full">
+                    <div
+                      className={`${row.bar} h-2.5 rounded-full transition-all duration-500`}
+                      style={{ width: `${(row.value / 5) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        <Card className="border-0 shadow-lg lg:col-span-2">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Order Volume by Supplier</h2>
+                <p className="text-sm text-gray-500">Most active supply relationships</p>
+              </div>
+              <div className="bg-indigo-50 rounded-lg p-2">
+                <TruckIcon className="h-5 w-5 text-indigo-600" />
+              </div>
+            </div>
+            {analytics.topByOrders.length > 0 ? (
+              <div style={{ height: orderVolumeHeight }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    layout="vertical"
+                    data={analytics.topByOrders}
+                    margin={{ top: 0, right: 24, left: 8, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                    <XAxis type="number" fontSize={12} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" width={110} fontSize={12} tickLine={false} axisLine={false} />
+                    <Tooltip content={<SupplierTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                    <Bar dataKey="orders" fill="#6366f1" radius={[0, 6, 6, 0]} maxBarSize={28} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-60 flex flex-col items-center justify-center text-center">
+                <TruckIcon className="h-10 w-10 text-gray-300 mb-3" />
+                <p className="text-gray-500 text-sm">No order volume to chart yet</p>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Performance leaderboard */}
+      <Card className="border-0 shadow-lg">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Supplier Performance Leaderboard</h2>
+              <p className="text-sm text-gray-500">Ranked by a blended score of on-time delivery, fulfillment, and ratings</p>
+            </div>
+            <div className="bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full p-2">
+              <TrophyIcon className="h-5 w-5 text-white" />
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500 border-b border-gray-100">
+                  <th className="py-3 pr-4 font-medium">#</th>
+                  <th className="py-3 pr-4 font-medium">Supplier</th>
+                  <th className="py-3 px-4 font-medium text-right">Orders</th>
+                  <th className="py-3 px-4 font-medium text-right">On-Time</th>
+                  <th className="py-3 px-4 font-medium text-right">Fulfillment</th>
+                  <th className="py-3 px-4 font-medium text-right">Rating</th>
+                  <th className="py-3 pl-4 font-medium text-right">Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.ranked.slice(0, 10).map((row, index) => (
+                  <tr key={row.supplier.id} className="border-b border-gray-50 hover:bg-gray-50/70 transition-colors">
+                    <td className="py-3 pr-4">
+                      <span className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold text-white ${
+                        index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' :
+                        index === 1 ? 'bg-gradient-to-r from-gray-400 to-gray-500' :
+                        index === 2 ? 'bg-gradient-to-r from-amber-600 to-amber-700' :
+                        'bg-gray-300'
+                      }`}>
+                        {index + 1}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <p className="font-semibold text-gray-900">{row.supplier.name}</p>
+                      {!row.hasOrders && <p className="text-xs text-gray-400">No orders yet</p>}
+                    </td>
+                    <td className="py-3 px-4 text-right text-gray-700">{row.orders}</td>
+                    <td className="py-3 px-4 text-right">
+                      {row.hasOrders ? (
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          row.onTime >= 90 ? 'bg-green-100 text-green-700' :
+                          row.onTime >= 70 ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {row.onTime}%
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-right text-gray-700">{row.hasOrders ? `${row.fulfillment}%` : <span className="text-gray-300">—</span>}</td>
+                    <td className="py-3 px-4 text-right text-gray-700">{row.avgRating > 0 ? row.avgRating.toFixed(1) : <span className="text-gray-300">—</span>}</td>
+                    <td className="py-3 pl-4 text-right">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getScoreColor(row.score)}`}>
+                        {row.score}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {analytics.ranked.length > 10 && (
+            <p className="text-xs text-gray-400 mt-4 text-center">
+              Showing top 10 of {analytics.ranked.length} suppliers
+            </p>
+          )}
+        </div>
+      </Card>
+    </div>
+  )
 }
 
 function SuppliersContent() {
@@ -803,15 +1306,7 @@ function SuppliersContent() {
           </TabsContent>
 
           <TabsContent value="performance" className="space-y-6">
-            <Card className="p-6">
-              <div className="text-center py-12">
-                <TruckIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-xl font-semibold text-gray-700 mb-2">Performance Analytics</h3>
-                <p className="text-gray-600 mb-6">
-                  Detailed supplier performance analytics and reports coming soon.
-                </p>
-              </div>
-            </Card>
+            <SupplierPerformanceTab suppliers={suppliers} renderStars={renderStars} />
           </TabsContent>
         </Tabs>
       )}
