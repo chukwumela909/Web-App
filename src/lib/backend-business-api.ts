@@ -1666,6 +1666,21 @@ export async function acceptBackendStaffInvitation(token: string) {
   })
 }
 
+export interface BackendInvitationLookup {
+  email: string
+  role: 'manager' | 'cashier' | string
+  sourceRole: string
+  status: 'pending' | 'accepted' | 'cancelled' | string
+  expiresAt: string
+  expired: boolean
+  businessName: string
+  branchNames: string[]
+}
+
+export async function lookupBackendStaffInvitation(token: string) {
+  return api<BackendInvitationLookup>(`/staff/invitations/lookup?token=${encodeURIComponent(token)}`)
+}
+
 export async function updateBackendUserProfile(profile: { fullName?: string; phone?: string }) {
   const payload: Record<string, string> = {}
   if (profile.fullName !== undefined) payload.fullName = profile.fullName

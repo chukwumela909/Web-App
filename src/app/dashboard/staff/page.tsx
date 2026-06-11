@@ -17,8 +17,10 @@ import {
 } from '@/lib/firestore'
 import {
   activateBackendStaffMember,
+  cancelBackendStaffInvitation,
   deactivateBackendStaffMember,
   getBackendStaff,
+  getBackendStaffInvitations,
   getBackendStaffLogs,
   updateBackendStaffMember
 } from '@/lib/backend-business-api'
@@ -153,6 +155,7 @@ export default function StaffPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('staff-list')
   const [staff, setStaff] = useState<Staff[]>([])
+  const [pendingInvitations, setPendingInvitations] = useState<Array<Record<string, unknown>>>([])
   const [activityLogs, setActivityLogs] = useState<StaffActivityLog[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
@@ -169,8 +172,29 @@ export default function StaffPage() {
       loadStaff()
       loadActivityLogs()
       loadBranches()
+      loadInvitations()
     }
   }, [user])
+
+  const loadInvitations = async () => {
+    try {
+      const invites = await getBackendStaffInvitations({ status: 'pending' })
+      setPendingInvitations(invites)
+    } catch (error) {
+      console.warn('Unable to load staff invitations:', error)
+      setPendingInvitations([])
+    }
+  }
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    if (!confirm('Cancel this invitation? The link will stop working.')) return
+    try {
+      await cancelBackendStaffInvitation(invitationId)
+      await loadInvitations()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to cancel invitation')
+    }
+  }
 
   // Check for success message from URL params
   useEffect(() => {
@@ -511,6 +535,44 @@ export default function StaffPage() {
 
             {/* Staff List Tab */}
             <TabsContent value="staff-list" className="space-y-6">
+              {/* Pending Invitations */}
+              {pendingInvitations.length > 0 && (
+                <Card className="dashboard-panel border-amber-200">
+                  <CardHeader>
+                    <CardTitle className="text-base">Pending Invitations ({pendingInvitations.length})</CardTitle>
+                    <CardDescription>
+                      These people have been invited but haven&apos;t accepted yet. They appear as staff once they accept.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {pendingInvitations.map((invite) => {
+                      const id = String(invite.id || invite._id || '')
+                      const role = String(invite.role || '')
+                      const expiresAt = invite.expiresAt ? new Date(String(invite.expiresAt)) : null
+                      return (
+                        <div key={id} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-100">
+                          <div>
+                            <p className="font-medium text-gray-900">{String(invite.email || '')}</p>
+                            <p className="text-xs text-gray-600">
+                              {role === 'manager' ? 'Manager' : 'Cashier'}
+                              {expiresAt && ` • expires ${expiresAt.toLocaleDateString()}`}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleCancelInvitation(id)}
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      )
+                    })}
+                  </CardContent>
+                </Card>
+              )}
+
                             {/* Consistent Filters */}
               <Card className="dashboard-panel">
                 <div className="p-6">

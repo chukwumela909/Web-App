@@ -11,6 +11,7 @@ import {
   StaffRole,
   STAFF_PERMISSIONS
 } from '@/lib/firestore'
+import { createBackendStaffInvitation } from '@/lib/backend-business-api'
 import { getBranches } from '@/lib/branches-service'
 import { Branch } from '@/lib/branches-types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -45,6 +46,8 @@ export default function AddStaffPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [branchSearchTerm, setBranchSearchTerm] = useState('')
   const [passwordError, setPasswordError] = useState('')
+  const [inviteResult, setInviteResult] = useState<{ inviteUrl: string; email: string; emailed: boolean } | null>(null)
+  const [copied, setCopied] = useState(false)
 
   // Form state for adding new staff
   const [newStaff, setNewStaff] = useState({
@@ -102,54 +105,64 @@ export default function AddStaffPage() {
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!user || !newStaff.fullName || !newStaff.email || !newStaff.password) {
-      alert('Please fill in all required fields')
+    const email = newStaff.email.trim()
+    if (!user || !email) {
+      alert("Please enter the staff member's email")
       return
     }
-
-    if (!validatePasswords()) {
+    if (newStaff.branchIds.length === 0) {
+      alert('Please assign at least one branch')
       return
     }
 
     setCreating(true)
     try {
-      // Set default permissions for cashiers (only sales module access)
-      const staffData = {
-        userId: user.uid,
-        fullName: newStaff.fullName,
-        email: newStaff.email,
-        password: newStaff.password,
-        phone: newStaff.phone,
+      // Cashiers get sales-only access; managers get their full permission set
+      const permissions = newStaff.role === 'cashier' ? ['sales'] : STAFF_PERMISSIONS[newStaff.role as StaffRole] || []
+      const invitation = await createBackendStaffInvitation({
+        email,
         role: newStaff.role,
         branchIds: newStaff.branchIds,
-        employeeId: newStaff.employeeId,
-        salary: newStaff.salary ? parseFloat(newStaff.salary) : undefined,
-        emergencyContact: newStaff.emergencyContact,
-        twoFactorEnabled: newStaff.twoFactorEnabled,
-        permissions: newStaff.role === 'cashier' ? ['sales'] : STAFF_PERMISSIONS[newStaff.role as StaffRole] || []
-      }
-
-      const response = await fetch('/api/staff', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(staffData)
+        permissions
       })
 
-      const result = await response.json()
+      // Build the invite link from THIS app's origin + token — the backend's inviteUrl
+      // host depends on its own env and may not point at the web app.
+      const rawUrl = String((invitation as { inviteUrl?: string })?.inviteUrl || '')
+      let token = ''
+      try { token = new URL(rawUrl).searchParams.get('token') || '' } catch { token = '' }
+      const inviteUrl = token ? `${window.location.origin}/staff/invite?token=${token}` : rawUrl
 
-      if (result.success) {
-        // Navigate back to staff list with success message
-        router.push('/dashboard/staff?created=true&name=' + encodeURIComponent(newStaff.fullName))
-      } else {
-        alert(`Error: ${result.error}`)
+      // Best-effort email delivery; the link is shown regardless so it can be shared manually
+      let emailed = false
+      try {
+        const res = await fetch('/api/staff/invite-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, inviteUrl, role: newStaff.role, businessName: user.displayName || undefined })
+        })
+        emailed = res.ok
+      } catch {
+        emailed = false
       }
+
+      setInviteResult({ inviteUrl, email, emailed })
     } catch (error) {
-      console.error('Error creating staff:', error)
-      alert('Failed to create staff member')
+      console.error('Error inviting staff:', error)
+      alert(error instanceof Error ? error.message : 'Failed to send invitation')
     } finally {
       setCreating(false)
+    }
+  }
+
+  const copyInviteLink = async () => {
+    if (!inviteResult) return
+    try {
+      await navigator.clipboard.writeText(inviteResult.inviteUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // ignore clipboard failures
     }
   }
 
@@ -159,7 +172,7 @@ export default function AddStaffPage() {
     (branch.branchCode && branch.branchCode.toLowerCase().includes(branchSearchTerm.toLowerCase()))
   )
 
-  const isFormValid = newStaff.fullName && newStaff.email && newStaff.password && newStaff.confirmPassword && !passwordError
+  const isFormValid = Boolean(newStaff.email && newStaff.branchIds.length > 0)
 
   return (
     <ProtectedRoute>
@@ -197,7 +210,54 @@ export default function AddStaffPage() {
               </motion.div>
             </div>
 
+            {inviteResult && (
+              <div className="dashboard-panel p-6 border border-green-200 bg-green-50">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-green-900">Invitation sent</h3>
+                    <p className="text-sm text-green-800 mt-1">
+                      {inviteResult.emailed
+                        ? `An invitation email was sent to ${inviteResult.email}.`
+                        : `Invitation created for ${inviteResult.email}. Email delivery could not be confirmed — share the link below.`}
+                    </p>
+                    <div className="mt-4 flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={inviteResult.inviteUrl}
+                        onFocus={(e) => e.currentTarget.select()}
+                        className="flex-1 px-3 py-2 text-sm border border-green-300 rounded-lg bg-white"
+                      />
+                      <Button type="button" variant="outline" onClick={copyInviteLink} className="px-4">
+                        {copied ? 'Copied!' : 'Copy link'}
+                      </Button>
+                    </div>
+                    <div className="mt-4 flex items-center gap-3">
+                      <Button
+                        type="button"
+                        onClick={() => router.push('/dashboard/staff')}
+                        className="bg-green-600 text-white hover:bg-green-700"
+                      >
+                        Done
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setInviteResult(null)
+                          setNewStaff(prev => ({ ...prev, email: '', fullName: '', branchIds: [] }))
+                        }}
+                      >
+                        Invite another
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Form */}
+            {!inviteResult && (
             <Card className="dashboard-panel">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -216,11 +276,10 @@ export default function AddStaffPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Full Name <span className="text-red-500">*</span>
+                          Full Name <span className="text-gray-400 text-xs">(optional, for your reference)</span>
                         </label>
                         <input
                           type="text"
-                          required
                           value={newStaff.fullName}
                           onChange={(e) => setNewStaff(prev => ({ ...prev, fullName: e.target.value }))}
                           className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -240,83 +299,12 @@ export default function AddStaffPage() {
                           placeholder="email@example.com"
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Password <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={showPassword ? "text" : "password"}
-                            required
-                            value={newStaff.password}
-                            onChange={(e) => {
-                              const newPassword = e.target.value
-                              setNewStaff(prev => ({ ...prev, password: newPassword }))
-                              if (newStaff.confirmPassword) {
-                                validatePasswords(newPassword, newStaff.confirmPassword)
-                              }
-                            }}
-                            className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                            placeholder="Create a secure password"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                          >
-                            {showPassword ? (
-                              <EyeOff className="h-5 w-5 text-gray-400" />
-                            ) : (
-                              <Eye className="h-5 w-5 text-gray-400" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Confirm Password <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={showConfirmPassword ? "text" : "password"}
-                            required
-                            value={newStaff.confirmPassword}
-                            onChange={(e) => {
-                              const newConfirmPassword = e.target.value
-                              setNewStaff(prev => ({ ...prev, confirmPassword: newConfirmPassword }))
-                              if (newConfirmPassword && newStaff.password) {
-                                validatePasswords(newStaff.password, newConfirmPassword)
-                              }
-                            }}
-                            className={`w-full px-4 py-3 pr-12 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                              passwordError ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                            }`}
-                            placeholder="Confirm your password"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                          >
-                            {showConfirmPassword ? (
-                              <EyeOff className="h-5 w-5 text-gray-400" />
-                            ) : (
-                              <Eye className="h-5 w-5 text-gray-400" />
-                            )}
-                          </button>
-                        </div>
-                        {passwordError && (
-                          <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                            <AlertCircle className="h-4 w-4" />
-                            {passwordError}
-                          </p>
-                        )}
-                        {!passwordError && newStaff.password && newStaff.confirmPassword && newStaff.password === newStaff.confirmPassword && (
-                          <p className="mt-1 text-sm text-green-600 flex items-center gap-1">
-                            <CheckCircle className="h-4 w-4" />
-                            Passwords match
-                          </p>
-                        )}
+                      <div className="md:col-span-2 bg-blue-50 rounded-xl p-4 border border-blue-200 flex items-start gap-3">
+                        <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-blue-900">
+                          An invitation link will be emailed to this address. The staff member sets
+                          their own password when they accept — you don&apos;t set a password here.
+                        </p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -364,7 +352,6 @@ export default function AddStaffPage() {
                         >
                           <option value="cashier">Cashier - Basic sales operations</option>
                           <option value="manager">Manager - Advanced management access</option>
-                          <option value="owner">Owner - Full system access</option>
                         </select>
                       </div>
                       <div>
@@ -556,12 +543,12 @@ export default function AddStaffPage() {
                         {creating ? (
                           <>
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            Creating...
+                            Sending...
                           </>
                         ) : (
                           <>
                             <UserPlus className="h-4 w-4" />
-                            Create Staff Member
+                            Send Invitation
                           </>
                         )}
                       </Button>
@@ -570,6 +557,7 @@ export default function AddStaffPage() {
                 </form>
               </CardContent>
             </Card>
+            )}
           </motion.div>
         </DashboardLayout>
       </StaffProtectedRoute>
