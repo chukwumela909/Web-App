@@ -666,6 +666,7 @@ export function mapSale(row: AnyRecord): Sale {
     customerPhone: row.customer?.phone || row.customerPhone || null,
     notes: row.notes || null,
     isDeleted: false,
+    isRefunded: Boolean(row.isRefunded),
     branchId: row.branchId || null,
     userId: row.userId || ''
   }
@@ -719,6 +720,7 @@ export function mapMultiItemSale(row: AnyRecord): MultiItemSale {
     notes: row.notes || null,
     createdBy: row.createdBy || null,
     isDeleted: false,
+    isRefunded: Boolean(row.isRefunded),
     deletedAt: null,
     lastModifiedAt: timestamp,
     userId: row.userId || '',
@@ -843,6 +845,24 @@ export async function updateBackendSale(saleId: string, data: Partial<Sale>, bra
 export async function deleteBackendSale(saleId: string, branchId?: string) {
   const targetBranch = branchId || await getSelectedBackendBranchId()
   await api(`/branches/${targetBranch}/sales/${saleId}`, { method: 'DELETE' })
+}
+
+/**
+ * Refund a full sale: restocks inventory, reverses any debtor balance, and records a
+ * durable refund for reporting/audit. Returns the created refund record.
+ */
+export async function refundBackendSale(saleId: string, reason?: string, branchId?: string) {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  const result = await api<AnyRecord>(`/branches/${targetBranch}/sales/${saleId}/refund`, {
+    method: 'POST',
+    body: JSON.stringify({ reason: reason || undefined })
+  })
+  return result?.refund ?? result
+}
+
+export async function getBackendRefunds(branchId?: string) {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  return listFrom<AnyRecord>(await api(`/branches/${targetBranch}/sales/refunds`), ['refunds'])
 }
 
 export function mapExpense(row: AnyRecord): Expense {

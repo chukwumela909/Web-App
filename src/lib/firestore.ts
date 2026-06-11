@@ -29,6 +29,7 @@ import {
   deleteBackendExpense,
   deleteBackendProduct,
   deleteBackendSale,
+  refundBackendSale,
   getBackendDebtors,
   getBackendExpenses,
   getBackendMultiItemSales,
@@ -218,6 +219,7 @@ export interface Sale {
   customerPhone?: string | null
   notes?: string | null
   isDeleted?: boolean
+  isRefunded?: boolean
   deletedAt?: number | null
   lastModifiedAt?: number
   branchId?: string | null
@@ -820,6 +822,14 @@ export async function deleteSale(saleId: string): Promise<void> {
     deletedAt: Date.now(),
     updatedAt: serverTimestamp() 
   })
+}
+
+/**
+ * Refund a full sale through the backend: restocks inventory, reverses any debtor
+ * balance, and records the refund for reporting/audit. Returns the refund record.
+ */
+export async function refundSale(saleId: string, reason?: string) {
+  return refundBackendSale(saleId, reason)
 }
 
 export async function getDebtors(userId: string, branchId?: string): Promise<Debtor[]> {

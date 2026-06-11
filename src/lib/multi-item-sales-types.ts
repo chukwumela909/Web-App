@@ -53,6 +53,7 @@ export interface MultiItemSale {
   // Tracking and Audit
   createdBy?: string | null // Staff member who created the sale
   isDeleted: boolean
+  isRefunded?: boolean
   deletedAt?: number | null
   lastModifiedAt: number
   

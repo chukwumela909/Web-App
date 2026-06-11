@@ -128,6 +128,7 @@ function SalesHistoryContent() {
       paymentMethod: multiSale.paymentMethod.name || multiSale.paymentMethod,
       notes: multiSale.notes,
       isDeleted: multiSale.isDeleted,
+      isRefunded: multiSale.isRefunded,
       userId: multiSale.userId,
       saleType: 'multi-item' as const,
       displayName: generateSaleDisplayName(multiSale.id, undefined, multiSale.items),
@@ -392,6 +393,11 @@ function SalesHistoryContent() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="font-semibold text-card-foreground">{sale.displayName}</h3>
+                          {sale.isRefunded && (
+                            <span className="px-2 py-0.5 text-xs font-semibold text-red-700 bg-red-100 rounded-full">
+                              Refunded
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
