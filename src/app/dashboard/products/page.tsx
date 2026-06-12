@@ -4,7 +4,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
-import { useEffect, useMemo, useState, Suspense } from 'react'
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import {
@@ -148,6 +148,10 @@ function ProductsPageContent() {
   const [currentStep, setCurrentStep] = useState<FormStep>('basic')
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([])
   const [isUploading, setIsUploading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  // Synchronous guard so a rapid double-click can't slip a second request through
+  // before the isSubmitting state has re-rendered.
+  const submitInProgressRef = useRef(false)
   const [showSellingValue, setShowSellingValue] = useState(false)
   const [showEnhancedDetail, setShowEnhancedDetail] = useState(false)
   const [selectedProductForDetail, setSelectedProductForDetail] = useState<FPProduct | null>(null)
@@ -415,6 +419,8 @@ function ProductsPageContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Block duplicate submissions from rapid clicks while a request is in flight.
+    if (submitInProgressRef.current) return
     if (!effectiveUserId) return
     if (!editingProduct && productForm.images.length === 0) {
       alert('Please upload at least one product image before adding this product.')
@@ -426,6 +432,18 @@ function ProductsPageContent() {
       return
     }
 
+    submitInProgressRef.current = true
+    setIsSubmitting(true)
+    try {
+      await submitProduct()
+    } finally {
+      submitInProgressRef.current = false
+      setIsSubmitting(false)
+    }
+  }
+
+  const submitProduct = async () => {
+    if (!effectiveUserId) return
     // Check product limit for new products only (not when editing)
     if (!editingProduct) {
       const limitCheck = await canAddProduct()
@@ -497,8 +515,11 @@ function ProductsPageContent() {
 
         // Clean the product data to remove any undefined values before saving to Firestore
         const cleanedProductData = cleanFirestoreData({ ...productData, id: productId })
+        // Defense-in-depth against double-submits: a stable key per submission lets the
+        // backend collapse retries/duplicates into a single product record.
+        const idempotencyKey = crypto.randomUUID()
         // Use effectiveUserId so products go to owner's account when staff adds them
-        await createProduct(effectiveUserId, cleanedProductData)
+        await createProduct(effectiveUserId, cleanedProductData, { idempotencyKey })
 
         // Add supplier links if any
         for (const link of supplierLinks) {
@@ -1270,17 +1291,38 @@ function ProductsPageContent() {
                             </div>
 
                             {/* Profit Margin Display (hidden from users who cannot see cost) */}
-                            {canSeeCost && productForm.costPrice && productForm.sellingPrice && (
-                              <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm font-medium text-green-800">Profit Margin:</span>
-                                  <span className="text-lg font-bold text-green-900">
-                                    {currencySymbol} {(Number(productForm.sellingPrice) - Number(productForm.costPrice)).toFixed(2)}
-                                    ({Math.round(((Number(productForm.sellingPrice) - Number(productForm.costPrice)) / Number(productForm.costPrice)) * 100)}%)
-                                  </span>
+                            {canSeeCost && productForm.costPrice && productForm.sellingPrice && (() => {
+                              const cost = Number(productForm.costPrice)
+                              const selling = Number(productForm.sellingPrice)
+                              const margin = selling - cost
+                              const marginPct = cost > 0 ? Math.round((margin / cost) * 100) : null
+                              const isLoss = margin < 0
+                              const isBreakeven = margin === 0
+                              const tone = isLoss
+                                ? { box: 'bg-red-50 border-red-200', label: 'text-red-800', value: 'text-red-900' }
+                                : isBreakeven
+                                  ? { box: 'bg-amber-50 border-amber-200', label: 'text-amber-800', value: 'text-amber-900' }
+                                  : { box: 'bg-green-50 border-green-200', label: 'text-green-800', value: 'text-green-900' }
+                              return (
+                                <div className={`mt-4 p-4 rounded-lg border ${tone.box}`}>
+                                  <div className="flex items-center justify-between">
+                                    <span className={`flex items-center text-sm font-medium ${tone.label}`}>
+                                      {isLoss && <ExclamationTriangleIcon className="h-4 w-4 mr-1" />}
+                                      {isLoss ? 'Loss Margin:' : isBreakeven ? 'Break-even:' : 'Profit Margin:'}
+                                    </span>
+                                    <span className={`text-lg font-bold ${tone.value}`}>
+                                      {currencySymbol} {margin.toFixed(2)}
+                                      {marginPct !== null ? ` (${marginPct}%)` : ''}
+                                    </span>
+                                  </div>
+                                  {isLoss && (
+                                    <p className="mt-1 text-xs text-red-700">
+                                      Selling price is below cost — this product will sell at a loss.
+                                    </p>
+                                  )}
                                 </div>
-                              </div>
-                            )}
+                              )
+                            })()}
                           </div>
                         </div>
                       )}
@@ -1427,15 +1469,26 @@ function ProductsPageContent() {
                           ) : (
                             <button
                               type="submit"
-                              disabled={isUploading || !hasRequiredProductImage}
+                              disabled={isUploading || isSubmitting || !hasRequiredProductImage}
                               className={`flex items-center px-6 py-2 rounded-lg transition-colors font-medium shadow-md ${
-                                isUploading || !hasRequiredProductImage
+                                isUploading || isSubmitting || !hasRequiredProductImage
                                   ? 'bg-gray-400 text-white cursor-not-allowed'
                                   : 'bg-[#004AAD] text-white hover:bg-[#003a8c]'
                               }`}
                             >
-                              <CheckIcon className="h-4 w-4 mr-2" />
-                              {isUploading ? 'Uploading...' : editingProduct ? 'Update Product' : 'Add Product'}
+                              {isSubmitting ? (
+                                <svg className="h-4 w-4 mr-2 animate-spin" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                              ) : (
+                                <CheckIcon className="h-4 w-4 mr-2" />
+                              )}
+                              {isUploading
+                                ? 'Uploading...'
+                                : isSubmitting
+                                  ? editingProduct ? 'Updating...' : 'Adding...'
+                                  : editingProduct ? 'Update Product' : 'Add Product'}
                             </button>
                           )}
                         </div>

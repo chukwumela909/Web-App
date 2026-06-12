@@ -534,11 +534,16 @@ export async function getBackendProduct(productId: string, branchId?: string): P
   return mapProduct(await api(`/branches/${targetBranch}/products/${productId}`))
 }
 
-export async function createBackendProduct(data: Partial<Product>, branchId?: string) {
+export async function createBackendProduct(
+  data: Partial<Product>,
+  branchId?: string,
+  options?: { idempotencyKey?: string }
+) {
   const targetBranch = branchId || String((data as AnyRecord).branchId || '') || await getSelectedBackendBranchId()
   const images = productImageUrls(data)
   await api(`/branches/${targetBranch}/products`, {
     method: 'POST',
+    headers: options?.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : undefined,
     body: JSON.stringify({
       name: optionalString(data.name),
       description: optionalString(data.description),

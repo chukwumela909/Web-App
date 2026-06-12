@@ -586,10 +586,14 @@ export async function getProducts(userId: string, branchId?: string): Promise<Pr
   }).filter(p => !branchId || p.branchId === branchId) as Product[]
 }
 
-export async function createProduct(userId: string, data: Partial<Product>): Promise<void> {
+export async function createProduct(
+  userId: string,
+  data: Partial<Product>,
+  options?: { idempotencyKey?: string }
+): Promise<void> {
   if (isBackendAvailable()) {
     try {
-      await createBackendProduct(data)
+      await createBackendProduct(data, undefined, options)
       return
     } catch (error) {
       throw error
