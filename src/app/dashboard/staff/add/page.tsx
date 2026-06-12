@@ -59,13 +59,7 @@ export default function AddStaffPage() {
     role: 'cashier' as StaffRole,
     branchIds: [] as string[],
     employeeId: '',
-    salary: '',
-    emergencyContact: {
-      name: '',
-      phone: '',
-      relationship: ''
-    },
-    twoFactorEnabled: false
+    salary: ''
   })
 
   useEffect(() => {
@@ -133,7 +127,9 @@ export default function AddStaffPage() {
       try { token = new URL(rawUrl).searchParams.get('token') || '' } catch { token = '' }
       const inviteUrl = token ? `${window.location.origin}/staff/invite?token=${token}` : rawUrl
 
-      // Best-effort email delivery; the link is shown regardless so it can be shared manually
+      // Best-effort email delivery; the link is shown regardless so it can be shared manually.
+      // The route returns HTTP 200 even when it couldn't send (e.g. no Brevo key), so trust the
+      // `emailed` flag in the body — not res.ok — or we'd falsely report success.
       let emailed = false
       try {
         const res = await fetch('/api/staff/invite-email', {
@@ -141,7 +137,8 @@ export default function AddStaffPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, inviteUrl, role: newStaff.role, businessName: user.displayName || undefined })
         })
-        emailed = res.ok
+        const data = await res.json().catch(() => null)
+        emailed = res.ok && data?.emailed === true
       } catch {
         emailed = false
       }
@@ -433,85 +430,6 @@ export default function AddStaffPage() {
                             </p>
                           </div>
                         )}
-                      </div>
-                    </div>
-
-                    {/* Security Options */}
-                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={newStaff.twoFactorEnabled}
-                          onChange={(e) => setNewStaff(prev => ({ ...prev, twoFactorEnabled: e.target.checked }))}
-                          className="rounded border-gray-300 text-blue-500 focus:ring-blue-500"
-                        />
-                        <div>
-                          <span className="text-sm font-medium text-gray-900">
-                            Enable Two-Factor Authentication
-                          </span>
-                          <p className="text-xs text-gray-600">
-                            Adds an extra layer of security to this account
-                          </p>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Emergency Contact */}
-                  <div className="space-y-6">
-                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Emergency Contact (Optional)</h3>
-                    <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Contact Name
-                          </label>
-                          <input
-                            type="text"
-                            value={newStaff.emergencyContact.name}
-                            onChange={(e) => setNewStaff(prev => ({
-                              ...prev,
-                              emergencyContact: { ...prev.emergencyContact, name: e.target.value }
-                            }))}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                            placeholder="Emergency contact name"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Contact Phone
-                          </label>
-                          <input
-                            type="tel"
-                            value={newStaff.emergencyContact.phone}
-                            onChange={(e) => setNewStaff(prev => ({
-                              ...prev,
-                              emergencyContact: { ...prev.emergencyContact, phone: e.target.value }
-                            }))}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                            placeholder="Phone number"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Relationship
-                          </label>
-                          <select
-                            value={newStaff.emergencyContact.relationship}
-                            onChange={(e) => setNewStaff(prev => ({
-                              ...prev,
-                              emergencyContact: { ...prev.emergencyContact, relationship: e.target.value }
-                            }))}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                          >
-                            <option value="">Select relationship</option>
-                            <option value="spouse">Spouse</option>
-                            <option value="parent">Parent</option>
-                            <option value="sibling">Sibling</option>
-                            <option value="friend">Friend</option>
-                            <option value="other">Other</option>
-                          </select>
-                        </div>
                       </div>
                     </div>
                   </div>

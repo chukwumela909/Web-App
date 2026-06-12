@@ -30,6 +30,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [isLoading, setIsLoading] = useState(true)
   const [isCompletingOnboarding, setIsCompletingOnboarding] = useState(false)
   const isStaffRoute = pathname.startsWith('/staff-dashboard')
+  // Staff accepting an invitation have no business of their own yet (hasBusiness === false);
+  // don't bounce them to /onboarding before they can accept.
+  const isInviteRoute = pathname.startsWith('/staff/invite')
   const isAuthRoute = pathname === '/login' || pathname === '/signup'
   const isOnboardingRoute = pathname.startsWith('/onboarding')
   const isSuperAdminRoute = pathname.startsWith('/super-admin')
@@ -72,7 +75,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     
     // Don't redirect if user is super admin
     // (Super admins might not need onboarding)
-    if (isSuperAdmin || isSuperAdminRoute || isStaffRoute) return
+    if (isSuperAdmin || isSuperAdminRoute || isStaffRoute || isInviteRoute) return
 
     if (!onboardingStatus.hasBusiness) {
       if (!isOnboardingRoute) {

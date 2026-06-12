@@ -15,6 +15,7 @@ const APP_PROVIDER_PREFIXES = [
   '/login',
   '/onboarding',
   '/sales',
+  '/staff',
   '/staff-dashboard',
   '/super-admin',
   '/unauthorized'
