@@ -1404,10 +1404,10 @@ export async function activateBackendSubscription(planType: BackendPlanType = 'm
   })
 }
 
-export async function startBackendMpesaCheckout(planType: BackendPlanType, phoneNumber: string): Promise<BackendMpesaCheckoutResponse> {
+export async function startBackendMpesaCheckout(planType: BackendPlanType, phoneNumber: string, country?: string): Promise<BackendMpesaCheckoutResponse> {
   const result = await api<AnyRecord>('/billing/mpesa/stk-push', {
     method: 'POST',
-    body: JSON.stringify({ planType, phoneNumber })
+    body: JSON.stringify({ planType, phoneNumber, ...(country ? { country } : {}) })
   })
   const subscription = normalizeSubscriptionRecord(result.subscription)
   if (!subscription) throw new Error('Backend did not return a subscription for M-Pesa checkout.')
@@ -1418,13 +1418,14 @@ export async function startBackendMpesaCheckout(planType: BackendPlanType, phone
   }
 }
 
-export async function startBackendStripeCheckout(planType: BackendPlanType, successUrl?: string, cancelUrl?: string): Promise<BackendStripeCheckoutResponse> {
+export async function startBackendStripeCheckout(planType: BackendPlanType, successUrl?: string, cancelUrl?: string, country?: string): Promise<BackendStripeCheckoutResponse> {
   const result = await api<AnyRecord>('/billing/stripe/checkout-session', {
     method: 'POST',
     body: JSON.stringify({
       planType,
       ...(successUrl ? { successUrl } : {}),
-      ...(cancelUrl ? { cancelUrl } : {})
+      ...(cancelUrl ? { cancelUrl } : {}),
+      ...(country ? { country } : {})
     })
   })
   const subscription = normalizeSubscriptionRecord(result.subscription)

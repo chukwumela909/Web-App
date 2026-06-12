@@ -127,7 +127,7 @@ function CheckoutContent() {
         setError('')
 
         try {
-            const data = await startBackendMpesaCheckout(plan, phoneNumber)
+            const data = await startBackendMpesaCheckout(plan, phoneNumber, country)
             const initiated = data.checkout.responseCode === '0' || Boolean(data.checkout.checkoutRequestId)
 
             if (initiated && data.subscription.id) {
@@ -218,7 +218,8 @@ function CheckoutContent() {
             const data = await startBackendStripeCheckout(
                 plan,
                 successUrl,
-                window.location.href
+                window.location.href,
+                country
             )
             const checkoutUrl = data.checkout.url
 
