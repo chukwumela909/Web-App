@@ -211,25 +211,29 @@ export default function StaffPage() {
   }, [])
 
   const loadStaff = async () => {
+    setLoading(true)
     try {
-      setLoading(true)
-      const backendStaff = await getBackendStaff({
-        branchId: selectedBranch === 'all' ? undefined : selectedBranch,
-        status: selectedStatus === 'all' ? undefined : selectedStatus
-      })
-      setStaff(backendStaff.map((member) => mapBackendStaff(member, user!.uid)))
-      return
-    } catch (backendError) {
-      console.warn('Unable to load backend staff, falling back to local staff:', backendError)
-    }
+      try {
+        const backendStaff = await getBackendStaff({
+          branchId: selectedBranch === 'all' ? undefined : selectedBranch,
+          status: selectedStatus === 'all' ? undefined : selectedStatus
+        })
+        setStaff(backendStaff.map((member) => mapBackendStaff(member, user!.uid)))
+        return
+      } catch (backendError) {
+        console.warn('Unable to load backend staff, falling back to local staff:', backendError)
+      }
 
-    try {
-      // Call getStaff directly from client-side to use authenticated user context
-      const staffData = await getStaff(user!.uid)
-      setStaff(staffData)
-    } catch (error) {
-      console.error('Error loading staff:', error)
+      try {
+        // Call getStaff directly from client-side to use authenticated user context
+        const staffData = await getStaff(user!.uid)
+        setStaff(staffData)
+      } catch (error) {
+        console.error('Error loading staff:', error)
+      }
     } finally {
+      // Always clear loading — the success path above returns early, so this must
+      // wrap both branches or the spinner hangs forever when the backend call works.
       setLoading(false)
     }
   }
