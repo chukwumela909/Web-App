@@ -10,7 +10,6 @@ import { getCurrencySymbol } from '@/hooks/useCurrency'
 import { useBillingLocation } from '@/hooks/useBillingLocation'
 import {
   getBackendBillingHistory,
-  getBackendBillingReceipt,
   getBackendSubscription,
   type BackendSubscriptionRecord,
 } from '@/lib/backend-business-api'
@@ -27,13 +26,6 @@ interface SubscriptionHistory {
   createdAt: Date
 }
 
-const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
-
-/** Escape a value before interpolating it into the receipt's document.write HTML. */
-function escapeHtml(value: string) {
-  return String(value).replace(/[&<>"']/g, (char) => HTML_ESCAPES[char])
-}
-
 function PaymentsPageContent() {
   const { user } = useAuth()
   const router = useRouter()
@@ -45,7 +37,6 @@ function PaymentsPageContent() {
   const [subscriptions, setSubscriptions] = useState<SubscriptionHistory[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentPlan, setCurrentPlan] = useState<'free' | 'monthly' | 'yearly'>('free')
-  const [receiptLoadingId, setReceiptLoadingId] = useState<string | null>(null)
 
   const parseDate = (value: any): Date | null => {
     if (!value) return null
@@ -121,60 +112,6 @@ function PaymentsPageContent() {
 
   const handleUpgradePlan = () => {
     router.push('/dashboard/pricing')
-  }
-
-  const handleViewReceipt = async (subscriptionId: string) => {
-    // Open the tab synchronously inside the click gesture. Doing it after the await
-    // (and previously with `noopener`, which makes window.open return null) is why this
-    // used to render a blank tab and bail out.
-    const receiptWindow = window.open('', '_blank')
-    if (!receiptWindow) {
-      console.error('Receipt popup was blocked by the browser')
-      window.alert('Please allow pop-ups for this site to view your receipt.')
-      return
-    }
-    receiptWindow.document.write(
-      '<!doctype html><title>Receipt</title><p style="font-family:Arial,sans-serif;padding:32px;">Loading receipt…</p>'
-    )
-
-    try {
-      setReceiptLoadingId(subscriptionId)
-      const receipt = await getBackendBillingReceipt(subscriptionId)
-      const rows: Array<[string, string]> = [
-        ['Receipt', receipt.receiptNumber || '-'],
-        ['Subscription', receipt.subscriptionId],
-        ['Plan', receipt.planType],
-        ['Amount', `${getCurrencySymbol(receipt.currency)} ${receipt.amount.toLocaleString()}`],
-        ['Status', receipt.status],
-        ['Transaction', receipt.transactionId || '-'],
-        ['Start', receipt.startDate ? new Date(receipt.startDate).toLocaleDateString() : '-'],
-        ['End', receipt.endDate ? new Date(receipt.endDate).toLocaleDateString() : '-'],
-      ]
-      receiptWindow.document.open()
-      receiptWindow.document.write(`
-        <html>
-          <head><title>Receipt ${escapeHtml(receipt.receiptNumber || receipt.subscriptionId)}</title></head>
-          <body style="font-family: Arial, sans-serif; padding: 32px; color: #111827;">
-            <h1>FahamPesa Subscription Receipt</h1>
-            ${rows.map(([label, value]) => `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>`).join('')}
-          </body>
-        </html>
-      `)
-      receiptWindow.document.close()
-    } catch (error) {
-      console.error('Error loading receipt:', error)
-      try {
-        receiptWindow.document.open()
-        receiptWindow.document.write(
-          '<!doctype html><title>Receipt</title><p style="font-family:Arial,sans-serif;padding:32px;color:#b42318;">Sorry, we couldn’t load this receipt. Please try again.</p>'
-        )
-        receiptWindow.document.close()
-      } catch {
-        receiptWindow.close()
-      }
-    } finally {
-      setReceiptLoadingId(null)
-    }
   }
 
   const formatDate = (date: Date | null) => {
@@ -371,11 +308,6 @@ function PaymentsPageContent() {
                   Status
                 </p>
               </div>
-              <div className="flex flex-1 gap-[10px] items-center p-[10px] rounded-[4px]">
-                <p className="font-dm-sans font-normal text-[16px] text-[#717171]">
-                  Receipt
-                </p>
-              </div>
             </div>
 
             {/* Loading State */}
@@ -433,15 +365,6 @@ function PaymentsPageContent() {
                         </p>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex flex-1 gap-[10px] items-center p-[10px] rounded-[4px]">
-                    <button
-                      onClick={() => handleViewReceipt(sub.id)}
-                      disabled={receiptLoadingId === sub.id}
-                      className="text-[#004AAD] text-sm font-semibold hover:underline disabled:text-[#717171]"
-                    >
-                      {receiptLoadingId === sub.id ? 'Loading...' : 'View'}
-                    </button>
                   </div>
                 </div>
               )
