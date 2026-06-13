@@ -10,12 +10,31 @@ import {
 } from '@/lib/backend-business-api'
 import { isBackendApiError } from '@/lib/backend-api'
 
-type Phase = 'loading' | 'needAuth' | 'ready' | 'accepting' | 'success' | 'error'
+type Phase = 'loading' | 'collect' | 'accepting' | 'success' | 'error'
 
 function roleLabel(role: string) {
   if (role === 'manager') return 'Manager'
   if (role === 'cashier') return 'Cashier'
   return role
+}
+
+function friendlyAuthError(err: unknown): string {
+  const code = (err as { code?: string })?.code || ''
+  switch (code) {
+    case 'auth/email-already-in-use':
+      return 'You already have an account. Enter your password to sign in.'
+    case 'auth/weak-password':
+      return 'Please choose a password with at least 6 characters.'
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'Incorrect password. Try again, or reset it from the sign-in page.'
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait a moment and try again.'
+    case 'auth/invalid-email':
+      return 'The invitation email looks invalid. Please ask for a new invite.'
+    default:
+      return err instanceof Error ? err.message : 'Something went wrong. Please try again.'
+  }
 }
 
 function StaffInviteContent() {
@@ -27,28 +46,28 @@ function StaffInviteContent() {
   const [phase, setPhase] = useState<Phase>('loading')
   const [invite, setInvite] = useState<BackendInvitationLookup | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
-  const [email, setEmail] = useState('')
+  const [mode, setMode] = useState<'create' | 'signin'>('create')
   const [password, setPassword] = useState('')
-  const [authBusy, setAuthBusy] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   const emailMatches = Boolean(
     user?.email && invite?.email && user.email.toLowerCase() === invite.email.toLowerCase()
   )
 
-  // Resolve the invitation once the user is signed in (lookup requires auth)
+  // Resolve the invitation up front. The lookup is public (token-gated), so this works even
+  // before the invitee has an account or is signed in — letting us show who invited them and
+  // pre-fill their email.
   const loadInvite = useCallback(async () => {
     if (!token) {
       setError('This invitation link is invalid or missing its token.')
       setPhase('error')
       return
     }
-    setPhase('loading')
     try {
       const data = await lookupBackendStaffInvitation(token)
       setInvite(data)
       if (data.status === 'accepted') {
-        setError('This invitation has already been accepted.')
+        setError('This invitation has already been accepted. Please sign in to continue.')
         setPhase('error')
         return
       }
@@ -62,7 +81,7 @@ function StaffInviteContent() {
         setPhase('error')
         return
       }
-      setPhase('ready')
+      setPhase('collect')
     } catch (err) {
       if (isBackendApiError(err) && err.status === 404) {
         setError('This invitation could not be found. The link may be incorrect.')
@@ -75,32 +94,11 @@ function StaffInviteContent() {
 
   useEffect(() => {
     if (authLoading) return
-    if (!user) {
-      setPhase('needAuth')
-      return
-    }
     loadInvite()
-  }, [authLoading, user, loadInvite])
+  }, [authLoading, loadInvite])
 
-  const handleAuth = async (event: React.FormEvent) => {
-    event.preventDefault()
-    setError(null)
-    setAuthBusy(true)
-    try {
-      if (mode === 'signin') {
-        await login(email.trim(), password)
-      } else {
-        await register(email.trim(), password)
-      }
-      // The auth state listener will flip `user`, re-running the effect → loadInvite()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed. Please try again.')
-    } finally {
-      setAuthBusy(false)
-    }
-  }
-
-  const handleAccept = async () => {
+  // Shared accept step — assumes the signed-in Firebase user's email matches the invite.
+  const acceptInvite = useCallback(async () => {
     if (!token) return
     setPhase('accepting')
     setError(null)
@@ -111,7 +109,7 @@ function StaffInviteContent() {
       setTimeout(() => router.push('/dashboard'), 1500)
     } catch (err) {
       if (isBackendApiError(err) && err.code === 'staff_already_exists') {
-        // Already a member — just send them in
+        // Already a member — just send them in.
         await refreshBackendSession().catch(() => undefined)
         setPhase('success')
         setTimeout(() => router.push('/dashboard'), 1200)
@@ -122,17 +120,42 @@ function StaffInviteContent() {
       } else {
         setError(err instanceof Error ? err.message : 'Could not accept the invitation.')
       }
-      setPhase('ready')
+      setPhase('collect')
+    }
+  }, [token, refreshBackendSession, router])
+
+  // New invitee (or returning one) sets/enters their password, then we accept immediately.
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!invite) return
+    setError(null)
+    setBusy(true)
+    try {
+      if (mode === 'create') {
+        await register(invite.email, password)
+      } else {
+        await login(invite.email, password)
+      }
+      // Firebase sets auth.currentUser synchronously once these resolve, so we can accept now.
+      await acceptInvite()
+    } catch (err) {
+      // If they already have an account, flip to sign-in instead of dead-ending on "create".
+      if ((err as { code?: string })?.code === 'auth/email-already-in-use') {
+        setMode('signin')
+        setPassword('')
+      }
+      setError(friendlyAuthError(err))
+    } finally {
+      setBusy(false)
     }
   }
 
   const handleSwitchAccount = async () => {
     await logout()
-    setEmail('')
     setPassword('')
-    setMode('signin')
+    setMode('create')
     setError(null)
-    setPhase('needAuth')
+    setPhase('collect')
   }
 
   return (
@@ -162,91 +185,103 @@ function StaffInviteContent() {
           </div>
         )}
 
-        {phase === 'needAuth' && (
-          <form onSubmit={handleAuth} className="space-y-4">
-            <p className="text-gray-600 text-sm">
-              {mode === 'signin' ? 'Sign in' : 'Create your account'} using the email address your
-              invitation was sent to, then accept the invitation.
-            </p>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="you@example.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="••••••••"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={authBusy}
-              className="w-full px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
-              {authBusy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null) }}
-              className="w-full text-sm text-blue-600 hover:underline"
-            >
-              {mode === 'signin' ? "Don't have an account? Create one" : 'Already have an account? Sign in'}
-            </button>
-          </form>
-        )}
-
-        {(phase === 'ready' || phase === 'accepting') && invite && (
+        {(phase === 'collect' || phase === 'accepting') && invite && (
           <div className="space-y-5">
             <div className="bg-blue-50 rounded-xl p-4 text-center">
-              <p className="text-gray-700">
-                You&apos;ve been invited to join
-              </p>
+              <p className="text-gray-700">You&apos;ve been invited to join</p>
               <p className="text-lg font-bold text-gray-900">{invite.businessName}</p>
               <p className="text-gray-700 mt-1">
                 as <span className="font-semibold">{roleLabel(invite.role)}</span>
-                {invite.branchNames.length > 0 && (
-                  <> for {invite.branchNames.join(', ')}</>
-                )}
+                {invite.branchNames.length > 0 && <> for {invite.branchNames.join(', ')}</>}
               </p>
             </div>
 
             {error && <p className="text-sm text-red-600 text-center">{error}</p>}
 
-            {emailMatches ? (
+            {/* Already signed in with the invited email → one-click accept */}
+            {user && emailMatches && (
               <button
-                onClick={handleAccept}
+                onClick={acceptInvite}
                 disabled={phase === 'accepting'}
                 className="w-full px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50"
               >
-                {phase === 'accepting' ? 'Accepting…' : 'Accept invitation'}
+                {phase === 'accepting' ? 'Setting up your access…' : 'Accept invitation'}
               </button>
-            ) : (
+            )}
+
+            {/* Signed in as a different account */}
+            {user && !emailMatches && (
               <div className="text-center space-y-3">
                 <p className="text-sm text-gray-600">
                   This invitation is for <span className="font-semibold">{invite.email}</span>, but you are
-                  signed in as <span className="font-semibold">{user?.email}</span>.
+                  signed in as <span className="font-semibold">{user.email}</span>.
                 </p>
                 <button
                   onClick={handleSwitchAccount}
                   className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
                 >
-                  Sign in with a different account
+                  Use a different account
                 </button>
               </div>
+            )}
+
+            {/* Not signed in → set a password (or sign in) to accept in one step */}
+            {!user && (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <p className="text-gray-600 text-sm text-center">
+                  {mode === 'create'
+                    ? 'Create a password to set up your account and accept the invitation.'
+                    : 'Enter your password to sign in and accept the invitation.'}
+                </p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={invite.email}
+                    readOnly
+                    aria-readonly="true"
+                    className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-600 rounded-xl cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {mode === 'create' ? 'Create a password' : 'Password'}
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    autoFocus
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder={mode === 'create' ? 'At least 6 characters' : '••••••••'}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={busy || phase === 'accepting'}
+                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {busy || phase === 'accepting'
+                    ? 'Please wait…'
+                    : mode === 'create'
+                      ? 'Create account & accept'
+                      : 'Sign in & accept'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode(mode === 'create' ? 'signin' : 'create')
+                    setError(null)
+                  }}
+                  className="w-full text-sm text-blue-600 hover:underline"
+                >
+                  {mode === 'create'
+                    ? 'Already have an account? Sign in'
+                    : 'Need to set a password? Create your account'}
+                </button>
+              </form>
             )}
           </div>
         )}

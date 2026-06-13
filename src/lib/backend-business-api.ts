@@ -1700,7 +1700,11 @@ export interface BackendInvitationLookup {
 }
 
 export async function lookupBackendStaffInvitation(token: string) {
-  return api<BackendInvitationLookup>(`/staff/invitations/lookup?token=${encodeURIComponent(token)}`)
+  // Public, token-gated endpoint: works whether or not a user is signed in, so a brand-new
+  // invitee can see the invite (and have their email pre-filled) before creating an account.
+  return request<BackendInvitationLookup>(`/staff/invitations/lookup?token=${encodeURIComponent(token)}`, {
+    user: auth.currentUser
+  })
 }
 
 export async function updateBackendUserProfile(profile: { fullName?: string; phone?: string }) {
