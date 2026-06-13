@@ -27,6 +27,13 @@ interface SubscriptionHistory {
   createdAt: Date
 }
 
+const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+
+/** Escape a value before interpolating it into the receipt's document.write HTML. */
+function escapeHtml(value: string) {
+  return String(value).replace(/[&<>"']/g, (char) => HTML_ESCAPES[char])
+}
+
 function PaymentsPageContent() {
   const { user } = useAuth()
   const router = useRouter()
@@ -117,30 +124,54 @@ function PaymentsPageContent() {
   }
 
   const handleViewReceipt = async (subscriptionId: string) => {
+    // Open the tab synchronously inside the click gesture. Doing it after the await
+    // (and previously with `noopener`, which makes window.open return null) is why this
+    // used to render a blank tab and bail out.
+    const receiptWindow = window.open('', '_blank')
+    if (!receiptWindow) {
+      console.error('Receipt popup was blocked by the browser')
+      window.alert('Please allow pop-ups for this site to view your receipt.')
+      return
+    }
+    receiptWindow.document.write(
+      '<!doctype html><title>Receipt</title><p style="font-family:Arial,sans-serif;padding:32px;">Loading receipt…</p>'
+    )
+
     try {
       setReceiptLoadingId(subscriptionId)
       const receipt = await getBackendBillingReceipt(subscriptionId)
-      const receiptWindow = window.open('', '_blank', 'noopener,noreferrer')
-      if (!receiptWindow) return
+      const rows: Array<[string, string]> = [
+        ['Receipt', receipt.receiptNumber || '-'],
+        ['Subscription', receipt.subscriptionId],
+        ['Plan', receipt.planType],
+        ['Amount', `${getCurrencySymbol(receipt.currency)} ${receipt.amount.toLocaleString()}`],
+        ['Status', receipt.status],
+        ['Transaction', receipt.transactionId || '-'],
+        ['Start', receipt.startDate ? new Date(receipt.startDate).toLocaleDateString() : '-'],
+        ['End', receipt.endDate ? new Date(receipt.endDate).toLocaleDateString() : '-'],
+      ]
+      receiptWindow.document.open()
       receiptWindow.document.write(`
         <html>
-          <head><title>Receipt ${receipt.receiptNumber || receipt.subscriptionId}</title></head>
+          <head><title>Receipt ${escapeHtml(receipt.receiptNumber || receipt.subscriptionId)}</title></head>
           <body style="font-family: Arial, sans-serif; padding: 32px; color: #111827;">
             <h1>FahamPesa Subscription Receipt</h1>
-            <p><strong>Receipt:</strong> ${receipt.receiptNumber || '-'}</p>
-            <p><strong>Subscription:</strong> ${receipt.subscriptionId}</p>
-            <p><strong>Plan:</strong> ${receipt.planType}</p>
-            <p><strong>Amount:</strong> ${receipt.currency} ${receipt.amount.toLocaleString()}</p>
-            <p><strong>Status:</strong> ${receipt.status}</p>
-            <p><strong>Transaction:</strong> ${receipt.transactionId || '-'}</p>
-            <p><strong>Start:</strong> ${receipt.startDate ? new Date(receipt.startDate).toLocaleDateString() : '-'}</p>
-            <p><strong>End:</strong> ${receipt.endDate ? new Date(receipt.endDate).toLocaleDateString() : '-'}</p>
+            ${rows.map(([label, value]) => `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>`).join('')}
           </body>
         </html>
       `)
       receiptWindow.document.close()
     } catch (error) {
       console.error('Error loading receipt:', error)
+      try {
+        receiptWindow.document.open()
+        receiptWindow.document.write(
+          '<!doctype html><title>Receipt</title><p style="font-family:Arial,sans-serif;padding:32px;color:#b42318;">Sorry, we couldn’t load this receipt. Please try again.</p>'
+        )
+        receiptWindow.document.close()
+      } catch {
+        receiptWindow.close()
+      }
     } finally {
       setReceiptLoadingId(null)
     }
