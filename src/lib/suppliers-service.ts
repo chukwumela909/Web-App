@@ -235,6 +235,7 @@ export async function createSupplier(
     address: data.address,
     paymentTerms: data.paymentTerms || 'NET_30',
     categories: data.categories,
+    productsSupplied: data.productsSupplied || [],
     notes: data.notes || '',
     
     // Initialize performance metrics

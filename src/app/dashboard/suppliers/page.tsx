@@ -6,119 +6,72 @@ import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useBranch } from '@/contexts/BranchContext'
 import { useStaff } from '@/contexts/StaffContext'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
+import { useEffect, useMemo, useState } from 'react'
 import {
   TruckIcon,
-  UserGroupIcon,
   PlusIcon,
   PencilIcon,
   TrashIcon,
-  EyeIcon,
   PhoneIcon,
   EnvelopeIcon,
   MapPinIcon,
-  StarIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  ClockIcon,
+  UserGroupIcon,
   ArrowPathIcon,
-  ChartBarIcon,
-  ArrowTrendingUpIcon,
-  TrophyIcon,
-  BanknotesIcon,
-  DocumentTextIcon,
-  ShoppingCartIcon,
-  CurrencyDollarIcon
+  CubeIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import {
   createSupplier as createSupplierRecord,
-  createPurchaseOrder,
-  getSupplierDashboard,
-  getSuppliers,
-  getPurchaseOrders,
-  getSupplierPaymentHistory,
-  getSupplierLedgerEntries
+  updateSupplier as updateSupplierRecord,
+  deleteSupplier as deleteSupplierRecord,
+  getSuppliers
 } from '@/lib/suppliers-service'
-import { getProducts, type Product } from '@/lib/firestore'
-import type { PurchaseOrder } from '@/lib/suppliers-types'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  PieChart,
-  Pie
-} from 'recharts'
 
+// Trimmed supplier shape: only the fields this simplified screen cares about.
 interface Supplier {
   id: string
   name: string
-  contactPerson?: string
-  email?: string
+  contactPerson: string
+  email: string
   phone: string
   address: string
   categories: string[]
-  status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED' | 'PENDING_VERIFICATION'
-  onTimeDeliveryRate: number
-  totalOrders: number
-  completedOrders: number
-  qualityRating?: number
-  serviceRating?: number
-  pricingRating?: number
-  paymentTerms: string
-  notes?: string
-  createdAt?: Date
-  lastOrderDate?: Date
+  productsSupplied: string[]
   branchId?: string | null
-  // Financial fields surfaced from the backend (via mapSupplier)
-  openingBalance?: number
-  totalPurchases?: number
-  totalPaid?: number
-  currentBalance?: number
-  outstandingBalance?: number
 }
 
-interface SupplierDashboard {
-  totalSuppliers: number
-  activeSuppliers: number
-  topSuppliers: {
-    supplierId: string
-    supplierName: string
-    totalOrders: number
-    totalAmount: number
-    onTimeDeliveryRate: number
-  }[]
-  recentOrders: any[]
-  pendingApprovals: number
-  overdueDeliveries: number
-}
+const CATEGORY_OPTIONS = [
+  'General Hardware',
+  'Plumbing',
+  'Electrical',
+  'Tools & Equipment',
+  'Building Materials',
+  'Paints & Finishes',
+  'Safety & Security',
+  'Garden & Outdoor',
+  'Fasteners & Fixings',
+  'Electronics',
+  'Food & Beverages',
+  'Clothing',
+  'Office Supplies',
+  'Raw Materials',
+  'Packaging',
+  'Equipment',
+  'Services',
+  'Other'
+]
 
 const fadeInUp = {
-  initial: { opacity: 0, y: 60 },
+  initial: { opacity: 0, y: 40 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.6 }
+  transition: { duration: 0.5 }
 }
 
-const staggerChildren = {
-  animate: {
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-}
-
-function normalizeSupplierForDisplay(supplier: Partial<Supplier> & { id: string }): Supplier {
+function normalizeSupplier(supplier: any): Supplier {
   return {
     id: supplier.id,
     name: supplier.name || 'Unnamed supplier',
@@ -127,531 +80,22 @@ function normalizeSupplierForDisplay(supplier: Partial<Supplier> & { id: string 
     phone: supplier.phone || '',
     address: supplier.address || '',
     categories: Array.isArray(supplier.categories) ? supplier.categories : [],
-    status: supplier.status || 'ACTIVE',
-    onTimeDeliveryRate: Number(supplier.onTimeDeliveryRate || 0),
-    totalOrders: Number(supplier.totalOrders || 0),
-    completedOrders: Number(supplier.completedOrders || 0),
-    qualityRating: supplier.qualityRating,
-    serviceRating: supplier.serviceRating,
-    pricingRating: supplier.pricingRating,
-    paymentTerms: supplier.paymentTerms || 'NET_30',
-    notes: supplier.notes || '',
-    createdAt: supplier.createdAt,
-    lastOrderDate: supplier.lastOrderDate,
-    branchId: supplier.branchId || null,
-    openingBalance: Number(supplier.openingBalance || 0),
-    totalPurchases: Number(supplier.totalPurchases || 0),
-    totalPaid: Number(supplier.totalPaid || 0),
-    currentBalance: Number(supplier.currentBalance ?? supplier.outstandingBalance ?? 0),
-    outstandingBalance: Number(supplier.outstandingBalance ?? supplier.currentBalance ?? 0)
+    productsSupplied: Array.isArray(supplier.productsSupplied) ? supplier.productsSupplied : [],
+    branchId: supplier.branchId ?? null
   }
-}
-
-const PERFORMANCE_COLORS = {
-  excellent: '#22c55e',
-  good: '#f59e0b',
-  needsAttention: '#ef4444'
-}
-
-function shortLabel(name: string) {
-  return name.length <= 14 ? name : `${name.slice(0, 13)}…`
-}
-
-function getRateColor(rate: number) {
-  if (rate >= 90) return PERFORMANCE_COLORS.excellent
-  if (rate >= 70) return PERFORMANCE_COLORS.good
-  return PERFORMANCE_COLORS.needsAttention
-}
-
-function getScoreColor(score: number) {
-  if (score >= 80) return 'bg-green-100 text-green-700'
-  if (score >= 60) return 'bg-amber-100 text-amber-700'
-  if (score >= 40) return 'bg-orange-100 text-orange-700'
-  return 'bg-red-100 text-red-700'
-}
-
-interface SupplierPerformanceTabProps {
-  suppliers: Supplier[]
-  renderStars: (rating: number) => ReactNode
-}
-
-function SupplierPerformanceTab({ suppliers, renderStars }: SupplierPerformanceTabProps) {
-  const analytics = useMemo(() => {
-    const withOrders = suppliers.filter(s => (s.totalOrders || 0) > 0)
-    const totalOrders = suppliers.reduce((sum, s) => sum + (s.totalOrders || 0), 0)
-    const totalCompleted = suppliers.reduce((sum, s) => sum + (s.completedOrders || 0), 0)
-    const fulfillmentRate = totalOrders > 0 ? Math.round((totalCompleted / totalOrders) * 100) : 0
-    const avgOnTime = withOrders.length > 0
-      ? Math.round(withOrders.reduce((sum, s) => sum + (s.onTimeDeliveryRate || 0), 0) / withOrders.length)
-      : 0
-
-    const ratingAverage = (key: 'qualityRating' | 'serviceRating' | 'pricingRating') => {
-      const values = suppliers
-        .map(s => s[key])
-        .filter((v): v is number => typeof v === 'number' && v > 0)
-      return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0
-    }
-    const avgQuality = ratingAverage('qualityRating')
-    const avgService = ratingAverage('serviceRating')
-    const avgPricing = ratingAverage('pricingRating')
-    const ratedValues = [avgQuality, avgService, avgPricing].filter(v => v > 0)
-    const avgOverall = ratedValues.length > 0
-      ? ratedValues.reduce((a, b) => a + b, 0) / ratedValues.length
-      : 0
-
-    const excellent = withOrders.filter(s => (s.onTimeDeliveryRate || 0) >= 90).length
-    const good = withOrders.filter(s => (s.onTimeDeliveryRate || 0) >= 70 && (s.onTimeDeliveryRate || 0) < 90).length
-    const needsAttention = withOrders.filter(s => (s.onTimeDeliveryRate || 0) < 70).length
-
-    const distribution = [
-      { name: 'Excellent', detail: '≥ 90% on-time', value: excellent, fill: PERFORMANCE_COLORS.excellent },
-      { name: 'Good', detail: '70–89% on-time', value: good, fill: PERFORMANCE_COLORS.good },
-      { name: 'Needs Attention', detail: '< 70% on-time', value: needsAttention, fill: PERFORMANCE_COLORS.needsAttention }
-    ]
-
-    const topByOrders = [...withOrders]
-      .sort((a, b) => (b.totalOrders || 0) - (a.totalOrders || 0))
-      .slice(0, 8)
-      .map(s => ({
-        name: shortLabel(s.name),
-        fullName: s.name,
-        onTime: Math.round(s.onTimeDeliveryRate || 0),
-        orders: s.totalOrders || 0,
-        fill: getRateColor(s.onTimeDeliveryRate || 0)
-      }))
-
-    const ranked = suppliers
-      .map(s => {
-        const orders = s.totalOrders || 0
-        const completed = s.completedOrders || 0
-        const hasOrders = orders > 0
-        const fulfillment = hasOrders ? Math.round((completed / orders) * 100) : 0
-        const ratingValues = [s.qualityRating, s.serviceRating, s.pricingRating]
-          .filter((v): v is number => typeof v === 'number' && v > 0)
-        const avgRating = ratingValues.length > 0
-          ? ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length
-          : 0
-        const effectiveOnTime = hasOrders ? (s.onTimeDeliveryRate || 0) : 0
-        const score = Math.round(effectiveOnTime * 0.45 + fulfillment * 0.3 + (avgRating / 5) * 100 * 0.25)
-        return { supplier: s, orders, fulfillment, avgRating, onTime: Math.round(s.onTimeDeliveryRate || 0), hasOrders, score }
-      })
-      .sort((a, b) => b.score - a.score)
-
-    return {
-      totalOrders,
-      fulfillmentRate,
-      avgOnTime,
-      avgQuality,
-      avgService,
-      avgPricing,
-      avgOverall,
-      distribution,
-      topByOrders,
-      ranked,
-      hasOrderData: withOrders.length > 0
-    }
-  }, [suppliers])
-
-  if (suppliers.length === 0) {
-    return (
-      <Card className="border-0 shadow-lg">
-        <div className="text-center py-16">
-          <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-            <ChartBarIcon className="h-12 w-12 text-gray-400" />
-          </div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-3">No Performance Data Yet</h3>
-          <p className="text-gray-600 max-w-md mx-auto">
-            Add suppliers and record purchase orders to start tracking delivery performance, fulfillment rates, and quality ratings here.
-          </p>
-        </div>
-      </Card>
-    )
-  }
-
-  const SupplierTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload
-      return (
-        <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-lg">
-          <p className="font-semibold text-gray-900">{data.fullName}</p>
-          <p className="text-sm text-gray-600">On-time delivery: <span className="font-medium text-gray-900">{data.onTime}%</span></p>
-          <p className="text-sm text-gray-600">Total orders: <span className="font-medium text-gray-900">{data.orders}</span></p>
-        </div>
-      )
-    }
-    return null
-  }
-
-  const ratingRows = [
-    { label: 'Quality', value: analytics.avgQuality, bar: 'bg-emerald-500' },
-    { label: 'Service', value: analytics.avgService, bar: 'bg-blue-500' },
-    { label: 'Pricing', value: analytics.avgPricing, bar: 'bg-violet-500' }
-  ]
-
-  const distributionWithValues = analytics.distribution.filter(d => d.value > 0)
-  const orderVolumeHeight = Math.max(240, analytics.topByOrders.length * 44)
-
-  return (
-    <div className="space-y-6">
-      {!analytics.hasOrderData && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          <ClockIcon className="h-5 w-5 flex-shrink-0 mt-0.5" />
-          <span>
-            Delivery and fulfillment metrics will populate as purchase orders are recorded and received. Quality
-            ratings you enter are reflected below.
-          </span>
-        </div>
-      )}
-
-      {/* Key performance indicators */}
-      <motion.div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-        variants={staggerChildren}
-        initial="initial"
-        animate="animate"
-      >
-        <motion.div variants={fadeInUp}>
-          <Card className="dashboard-panel transition-all duration-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium">Avg On-Time Delivery</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.avgOnTime}%</p>
-                  <p className="text-xs text-gray-400 mt-1">Across suppliers with orders</p>
-                </div>
-                <div className="bg-green-50 rounded-lg p-3">
-                  <CheckCircleIcon className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={fadeInUp}>
-          <Card className="dashboard-panel transition-all duration-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium">Order Fulfillment</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.fulfillmentRate}%</p>
-                  <p className="text-xs text-gray-400 mt-1">Completed of all orders</p>
-                </div>
-                <div className="bg-blue-50 rounded-lg p-3">
-                  <ArrowTrendingUpIcon className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={fadeInUp}>
-          <Card className="dashboard-panel transition-all duration-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium">Avg Rating</p>
-                  {analytics.avgOverall > 0 ? (
-                    <>
-                      <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.avgOverall.toFixed(1)}<span className="text-base font-medium text-gray-400">/5</span></p>
-                      <div className="flex mt-1">{renderStars(analytics.avgOverall)}</div>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-2xl font-bold text-gray-900 mt-1">—</p>
-                      <p className="text-xs text-gray-400 mt-1">No ratings recorded</p>
-                    </>
-                  )}
-                </div>
-                <div className="bg-yellow-50 rounded-lg p-3">
-                  <StarIcon className="h-6 w-6 text-yellow-500" />
-                </div>
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={fadeInUp}>
-          <Card className="dashboard-panel transition-all duration-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium">Total Orders</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.totalOrders.toLocaleString()}</p>
-                  <p className="text-xs text-gray-400 mt-1">Lifetime purchase orders</p>
-                </div>
-                <div className="bg-indigo-50 rounded-lg p-3">
-                  <TruckIcon className="h-6 w-6 text-indigo-600" />
-                </div>
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-      </motion.div>
-
-      {/* On-time delivery + distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="border-0 shadow-lg lg:col-span-2">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">On-Time Delivery by Supplier</h2>
-                <p className="text-sm text-gray-500">Top suppliers ranked by order volume</p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-2">
-                <CheckCircleIcon className="h-5 w-5 text-green-600" />
-              </div>
-            </div>
-            {analytics.topByOrders.length > 0 ? (
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analytics.topByOrders} margin={{ top: 8, right: 16, left: -8, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                    <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} interval={0} angle={-20} textAnchor="end" height={60} />
-                    <YAxis domain={[0, 100]} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
-                    <Tooltip content={<SupplierTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-                    <Bar dataKey="onTime" radius={[6, 6, 0, 0]} maxBarSize={56}>
-                      {analytics.topByOrders.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-72 flex flex-col items-center justify-center text-center">
-                <TruckIcon className="h-10 w-10 text-gray-300 mb-3" />
-                <p className="text-gray-500 text-sm">No delivery data yet</p>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        <Card className="border-0 shadow-lg">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Delivery Performance</h2>
-                <p className="text-sm text-gray-500">Reliability breakdown</p>
-              </div>
-              <div className="bg-blue-50 rounded-lg p-2">
-                <ChartBarIcon className="h-5 w-5 text-blue-600" />
-              </div>
-            </div>
-            {distributionWithValues.length > 0 ? (
-              <>
-                <div className="relative h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={distributionWithValues}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={52}
-                        outerRadius={80}
-                        paddingAngle={3}
-                        stroke="none"
-                      >
-                        {distributionWithValues.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: any, name: any) => [`${value} supplier${value === 1 ? '' : 's'}`, name]} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-2xl font-bold text-gray-900">{analytics.avgOnTime}%</span>
-                    <span className="text-xs text-gray-400">avg on-time</span>
-                  </div>
-                </div>
-                <div className="space-y-2 mt-4">
-                  {analytics.distribution.map(item => (
-                    <div key={item.name} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.fill }} />
-                        <span className="text-gray-700">{item.name}</span>
-                        <span className="text-gray-400 text-xs">{item.detail}</span>
-                      </div>
-                      <span className="font-semibold text-gray-900">{item.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="h-64 flex flex-col items-center justify-center text-center">
-                <ChartBarIcon className="h-10 w-10 text-gray-300 mb-3" />
-                <p className="text-gray-500 text-sm">No delivery data to chart yet</p>
-              </div>
-            )}
-          </div>
-        </Card>
-      </div>
-
-      {/* Ratings + order volume */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="border-0 shadow-lg">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">Service Quality</h2>
-              <div className="bg-yellow-50 rounded-lg p-2">
-                <StarIcon className="h-5 w-5 text-yellow-500" />
-              </div>
-            </div>
-            <div className="space-y-5">
-              {ratingRows.map(row => (
-                <div key={row.label}>
-                  <div className="flex items-center justify-between mb-1.5 text-sm">
-                    <span className="text-gray-600">{row.label}</span>
-                    <span className="font-semibold text-gray-900">
-                      {row.value > 0 ? `${row.value.toFixed(1)} / 5` : 'Not rated'}
-                    </span>
-                  </div>
-                  <div className="bg-gray-100 rounded-full h-2.5 w-full">
-                    <div
-                      className={`${row.bar} h-2.5 rounded-full transition-all duration-500`}
-                      style={{ width: `${(row.value / 5) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        <Card className="border-0 shadow-lg lg:col-span-2">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Order Volume by Supplier</h2>
-                <p className="text-sm text-gray-500">Most active supply relationships</p>
-              </div>
-              <div className="bg-indigo-50 rounded-lg p-2">
-                <TruckIcon className="h-5 w-5 text-indigo-600" />
-              </div>
-            </div>
-            {analytics.topByOrders.length > 0 ? (
-              <div style={{ height: orderVolumeHeight }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    layout="vertical"
-                    data={analytics.topByOrders}
-                    margin={{ top: 0, right: 24, left: 8, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                    <XAxis type="number" fontSize={12} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} allowDecimals={false} />
-                    <YAxis type="category" dataKey="name" width={110} fontSize={12} tickLine={false} axisLine={false} />
-                    <Tooltip content={<SupplierTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-                    <Bar dataKey="orders" fill="#6366f1" radius={[0, 6, 6, 0]} maxBarSize={28} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-60 flex flex-col items-center justify-center text-center">
-                <TruckIcon className="h-10 w-10 text-gray-300 mb-3" />
-                <p className="text-gray-500 text-sm">No order volume to chart yet</p>
-              </div>
-            )}
-          </div>
-        </Card>
-      </div>
-
-      {/* Performance leaderboard */}
-      <Card className="border-0 shadow-lg">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Supplier Performance Leaderboard</h2>
-              <p className="text-sm text-gray-500">Ranked by a blended score of on-time delivery, fulfillment, and ratings</p>
-            </div>
-            <div className="bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full p-2">
-              <TrophyIcon className="h-5 w-5 text-white" />
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-500 border-b border-gray-100">
-                  <th className="py-3 pr-4 font-medium">#</th>
-                  <th className="py-3 pr-4 font-medium">Supplier</th>
-                  <th className="py-3 px-4 font-medium text-right">Orders</th>
-                  <th className="py-3 px-4 font-medium text-right">On-Time</th>
-                  <th className="py-3 px-4 font-medium text-right">Fulfillment</th>
-                  <th className="py-3 px-4 font-medium text-right">Rating</th>
-                  <th className="py-3 pl-4 font-medium text-right">Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.ranked.slice(0, 10).map((row, index) => (
-                  <tr key={row.supplier.id} className="border-b border-gray-50 hover:bg-gray-50/70 transition-colors">
-                    <td className="py-3 pr-4">
-                      <span className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold text-white ${
-                        index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' :
-                        index === 1 ? 'bg-gradient-to-r from-gray-400 to-gray-500' :
-                        index === 2 ? 'bg-gradient-to-r from-amber-600 to-amber-700' :
-                        'bg-gray-300'
-                      }`}>
-                        {index + 1}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <p className="font-semibold text-gray-900">{row.supplier.name}</p>
-                      {!row.hasOrders && <p className="text-xs text-gray-400">No orders yet</p>}
-                    </td>
-                    <td className="py-3 px-4 text-right text-gray-700">{row.orders}</td>
-                    <td className="py-3 px-4 text-right">
-                      {row.hasOrders ? (
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          row.onTime >= 90 ? 'bg-green-100 text-green-700' :
-                          row.onTime >= 70 ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                          {row.onTime}%
-                        </span>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-right text-gray-700">{row.hasOrders ? `${row.fulfillment}%` : <span className="text-gray-300">—</span>}</td>
-                    <td className="py-3 px-4 text-right text-gray-700">{row.avgRating > 0 ? row.avgRating.toFixed(1) : <span className="text-gray-300">—</span>}</td>
-                    <td className="py-3 pl-4 text-right">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getScoreColor(row.score)}`}>
-                        {row.score}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {analytics.ranked.length > 10 && (
-            <p className="text-xs text-gray-400 mt-4 text-center">
-              Showing top 10 of {analytics.ranked.length} suppliers
-            </p>
-          )}
-        </div>
-      </Card>
-    </div>
-  )
 }
 
 function SuppliersContent() {
   const { user } = useAuth()
   const { staff } = useStaff()
-  const { selectedBranchId, selectedBranch } = useBranch()
-  const currency = useCurrency()
-  const currencySymbol = getCurrencySymbol(currency)
+  const { selectedBranchId } = useBranch()
+  const { canAddSupplier } = usePlanLimits()
+
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('dashboard')
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [dashboard, setDashboard] = useState<SupplierDashboard | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('ALL')
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState<Supplier | null>(null)
-  const [showDetailsModal, setShowDetailsModal] = useState<Supplier | null>(null)
-  const [showPurchaseModal, setShowPurchaseModal] = useState<Supplier | null>(null)
-  const [detailRefreshKey, setDetailRefreshKey] = useState(0)
+  const [formModal, setFormModal] = useState<{ mode: 'create' } | { mode: 'edit'; supplier: Supplier } | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [upgradeModalData, setUpgradeModalData] = useState<{
     feature: 'suppliers'
@@ -659,160 +103,94 @@ function SuppliersContent() {
     limit: number
     message: string
   } | null>(null)
-  const { canAddSupplier } = usePlanLimits()
+
   const effectiveUserId = staff ? staff.userId : user?.uid
   const activeBranchId = selectedBranchId || undefined
 
-  // Load dashboard data
-  const loadDashboard = async () => {
-    if (!effectiveUserId) return
-
-    try {
-      const data = await getSupplierDashboard(effectiveUserId, activeBranchId)
-      setDashboard(data as any)
-    } catch (error) {
-      console.error('Error loading suppliers dashboard:', error)
-    }
-  }
-
-  // Load suppliers
   const loadSuppliers = async () => {
     if (!effectiveUserId) return
-
     try {
-      const data = await getSuppliers(
-        effectiveUserId,
-        {
-          status: statusFilter && statusFilter !== 'ALL' ? [statusFilter as any] : undefined,
-          searchTerm: searchTerm.trim() || undefined
-        },
-        'name',
-        'asc',
-        undefined,
-        activeBranchId
-      )
-      setSuppliers(data.map((supplier: Supplier) => normalizeSupplierForDisplay(supplier)))
+      const data = await getSuppliers(effectiveUserId, undefined, 'name', 'asc', undefined, activeBranchId)
+      setSuppliers(data.map(normalizeSupplier))
     } catch (error) {
       console.error('Error loading suppliers:', error)
     }
   }
 
-  // Create supplier
-  const createSupplier = async (supplierData: any) => {
-    if (!effectiveUserId) return false
-
-    try {
-      await createSupplierRecord(effectiveUserId, supplierData, activeBranchId)
-      await loadSuppliers()
-      await loadDashboard()
-      setShowAddModal(false)
-      return true
-    } catch (error) {
-      console.error('Error creating supplier:', error)
-      alert('Failed to create supplier')
-      return false
-    }
-  }
-
-  // Record a purchase from a supplier. Uses receiveImmediately so the backend creates AND
-  // receives the purchase order at once: branch stock increases and the supplier
-  // balance/payable updates immediately.
-  const createPurchase = async (supplier: Supplier, purchaseData: any) => {
-    if (!effectiveUserId) return false
-    if (!selectedBranchId) {
-      alert('Please select a branch before recording a purchase.')
-      return false
-    }
-
-    try {
-      await createPurchaseOrder(effectiveUserId, {
-        supplierId: supplier.id,
-        branchId: selectedBranchId,
-        items: purchaseData.items,
-        expectedDeliveryDate: new Date(),
-        paymentTerms: (purchaseData.paymentTerms || supplier.paymentTerms || 'NET_30') as any,
-        amountPaid: purchaseData.amountPaid,
-        receiveImmediately: true
-      })
-      await Promise.all([loadSuppliers(), loadDashboard()])
-      // Bump the key so the detail modal tabs (if open) refetch their data.
-      setDetailRefreshKey((key) => key + 1)
-      setShowPurchaseModal(null)
-      return true
-    } catch (error) {
-      console.error('Error recording purchase:', error)
-      alert('Failed to record purchase')
-      return false
-    }
-  }
-
   useEffect(() => {
-    if (effectiveUserId) {
-      setLoading(true)
-      setDashboard(null)
-      setSuppliers([])
-      setShowDetailsModal(null)
-      setShowEditModal(null)
-      Promise.all([
-        loadDashboard(),
-        loadSuppliers()
-      ]).finally(() => setLoading(false))
-    }
+    if (!effectiveUserId) return
+    setLoading(true)
+    setSuppliers([])
+    loadSuppliers().finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveUserId, activeBranchId])
 
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (effectiveUserId) {
-        loadSuppliers()
+  const filteredSuppliers = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    if (!term) return suppliers
+    return suppliers.filter((s) =>
+      s.name.toLowerCase().includes(term) ||
+      s.contactPerson.toLowerCase().includes(term) ||
+      s.phone.toLowerCase().includes(term) ||
+      s.email.toLowerCase().includes(term) ||
+      s.categories.some((c) => c.toLowerCase().includes(term)) ||
+      s.productsSupplied.some((p) => p.toLowerCase().includes(term))
+    )
+  }, [suppliers, searchTerm])
+
+  const handleAddClick = async () => {
+    const limitCheck = await canAddSupplier()
+    if (!limitCheck.allowed) {
+      setUpgradeModalData({
+        feature: 'suppliers',
+        currentCount: limitCheck.currentCount,
+        limit: typeof limitCheck.limit === 'number' ? limitCheck.limit : 0,
+        message: limitCheck.message || 'Supplier limit reached'
+      })
+      setShowUpgradeModal(true)
+      return
+    }
+    setFormModal({ mode: 'create' })
+  }
+
+  const handleSave = async (data: {
+    name: string
+    contactPerson: string
+    email: string
+    phone: string
+    address: string
+    categories: string[]
+    productsSupplied: string[]
+  }): Promise<boolean> => {
+    if (!effectiveUserId || !formModal) return false
+    try {
+      if (formModal.mode === 'create') {
+        await createSupplierRecord(effectiveUserId, data as any, activeBranchId)
+      } else {
+        await updateSupplierRecord(formModal.supplier.id, { id: formModal.supplier.id, ...data } as any)
       }
-    }, 300)
-
-    return () => clearTimeout(timeoutId)
-  }, [searchTerm, statusFilter, effectiveUserId, activeBranchId])
-
-  // Keep figures current when the user returns to this tab/window after making changes
-  // elsewhere (e.g. recording payments or purchases on another screen).
-  useEffect(() => {
-    const refresh = () => {
-      if (!effectiveUserId) return
-      if (document.visibilityState === 'hidden') return
-      loadSuppliers()
-      loadDashboard()
-      setDetailRefreshKey((key) => key + 1)
-    }
-
-    window.addEventListener('focus', refresh)
-    document.addEventListener('visibilitychange', refresh)
-    return () => {
-      window.removeEventListener('focus', refresh)
-      document.removeEventListener('visibilitychange', refresh)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveUserId, activeBranchId, statusFilter, searchTerm])
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'bg-green-100 text-green-800'
-      case 'INACTIVE': return 'bg-gray-100 text-gray-800'
-      case 'BLOCKED': return 'bg-red-100 text-red-800'
-      case 'PENDING_VERIFICATION': return 'bg-yellow-100 text-yellow-800'
-      default: return 'bg-gray-100 text-gray-800'
+      await loadSuppliers()
+      setFormModal(null)
+      return true
+    } catch (error) {
+      console.error('Error saving supplier:', error)
+      alert('Failed to save supplier. Please try again.')
+      return false
     }
   }
 
-  const formatPaymentTerms = (terms?: string) => {
-    return (terms || 'NET_30').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
-  }
-
-  const formatCurrency = (amount: number) => `${currencySymbol} ${amount.toLocaleString()}`
-
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <StarIcon
-        key={i}
-        className={`h-4 w-4 ${i < Math.floor(rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-      />
-    ))
+  const handleDelete = async (supplier: Supplier) => {
+    if (!window.confirm(`Delete "${supplier.name}"? This removes the supplier from your list.`)) return
+    setDeletingId(supplier.id)
+    try {
+      await deleteSupplierRecord(supplier.id)
+      await loadSuppliers()
+    } catch (error) {
+      console.error('Error deleting supplier:', error)
+      alert('Failed to delete supplier. Please try again.')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   if (!user) return null
@@ -827,35 +205,25 @@ function SuppliersContent() {
         limit={upgradeModalData?.limit}
         message={upgradeModalData?.message}
       />
-      {/* Consistent Header */}
-      <div className="dashboard-panel p-8">
-        <motion.div {...fadeInUp} className="flex justify-between items-start">
-          <div>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="bg-blue-600 rounded-lg p-3">
-                <TruckIcon className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <h1 className="dashboard-page-title">Supplier Management</h1>
-                <p className="dashboard-page-subtitle mt-1">
-                  Manage your suppliers and vendor relationships
-                </p>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-8 text-sm text-gray-500">
-              <span>{dashboard?.totalSuppliers || 0} Suppliers</span>
-              <span>{dashboard?.activeSuppliers || 0} Active</span>
-              <span>{dashboard?.pendingApprovals || 0} Pending</span>
+      {/* Header */}
+      <div className="dashboard-panel p-8">
+        <motion.div {...fadeInUp} className="flex flex-wrap justify-between items-start gap-4">
+          <div className="flex items-center gap-4">
+            <div className="bg-blue-600 rounded-lg p-3">
+              <TruckIcon className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h1 className="dashboard-page-title">Suppliers</h1>
+              <p className="dashboard-page-subtitle mt-1">
+                {suppliers.length} {suppliers.length === 1 ? 'supplier' : 'suppliers'} on file
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             <Button
-              onClick={() => {
-                loadDashboard()
-                loadSuppliers()
-              }}
+              onClick={() => { setLoading(true); loadSuppliers().finally(() => setLoading(false)) }}
               variant="outline"
               size="sm"
               className="text-gray-600 hover:text-gray-900"
@@ -863,24 +231,7 @@ function SuppliersContent() {
               <ArrowPathIcon className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-
-            <Button
-              onClick={async () => {
-                const limitCheck = await canAddSupplier()
-                if (!limitCheck.allowed) {
-                  setUpgradeModalData({
-                    feature: 'suppliers',
-                    currentCount: limitCheck.currentCount,
-                    limit: typeof limitCheck.limit === 'number' ? limitCheck.limit : 0,
-                    message: limitCheck.message || 'Supplier limit reached'
-                  })
-                  setShowUpgradeModal(true)
-                } else {
-                  setShowAddModal(true)
-                }
-              }}
-              className="dashboard-action-primary"
-            >
+            <Button onClick={handleAddClick} className="dashboard-action-primary">
               <PlusIcon className="h-4 w-4 mr-2" />
               Add Supplier
             </Button>
@@ -888,1039 +239,267 @@ function SuppliersContent() {
         </motion.div>
       </div>
 
+      {/* Search */}
+      <Card className="border-0 shadow-lg">
+        <div className="p-4">
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by name, contact, category, or product..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="dashboard-field w-full py-3 pl-10 pr-4"
+            />
+          </div>
+        </div>
+      </Card>
+
       {loading ? (
         <Card className="border-0 shadow-lg">
           <div className="flex flex-col items-center justify-center py-16">
             <div className="relative mb-6">
-              <div className="animate-spin rounded-full h-16 w-16 border-4 border-green-100"></div>
-              <div className="animate-spin rounded-full h-16 w-16 border-4 border-green-600 border-t-transparent absolute top-0"></div>
+              <div className="animate-spin rounded-full h-14 w-14 border-4 border-green-100"></div>
+              <div className="animate-spin rounded-full h-14 w-14 border-4 border-green-600 border-t-transparent absolute top-0"></div>
             </div>
-            <div className="text-center">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Loading Suppliers Management</h3>
-              <p className="text-gray-600">Fetching your supplier data and performance metrics...</p>
+            <p className="text-gray-600">Loading suppliers...</p>
+          </div>
+        </Card>
+      ) : filteredSuppliers.length === 0 ? (
+        <Card className="border-0 shadow-lg">
+          <div className="text-center py-16">
+            <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+              <TruckIcon className="h-12 w-12 text-gray-400" />
             </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-3">
+              {searchTerm ? 'No Suppliers Match Your Search' : 'No Suppliers Yet'}
+            </h3>
+            <p className="text-gray-600 mb-8 max-w-md mx-auto">
+              {searchTerm
+                ? 'Try a different search term, or add a new supplier.'
+                : 'Add your suppliers to keep their contact details, categories, and the products they supply in one place.'}
+            </p>
+            {searchTerm ? (
+              <Button variant="outline" onClick={() => setSearchTerm('')}>Clear Search</Button>
+            ) : (
+              <Button onClick={handleAddClick} className="dashboard-action-primary px-8 py-3">
+                <PlusIcon className="h-5 w-5 mr-2" />
+                Add Your First Supplier
+              </Button>
+            )}
           </div>
         </Card>
       ) : (
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <Card className="border-0 shadow-lg mb-6">
-            <div className="p-2">
-              <TabsList className="grid w-full grid-cols-3 bg-gray-50 rounded-xl p-1">
-                <TabsTrigger
-                  value="dashboard"
-                  className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
-                >
-                  📊 Dashboard
-                </TabsTrigger>
-                <TabsTrigger
-                  value="suppliers"
-                  className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
-                >
-                  🚛 Suppliers
-                </TabsTrigger>
-                <TabsTrigger
-                  value="performance"
-                  className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium transition-all duration-200"
-                >
-                  📈 Performance
-                </TabsTrigger>
-              </TabsList>
-            </div>
-          </Card>
-
-          <TabsContent value="dashboard" className="space-y-8">
-            {/* Enhanced Key Metrics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredSuppliers.map((supplier) => (
             <motion.div
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-              variants={staggerChildren}
-              initial="initial"
-              animate="animate"
+              key={supplier.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
             >
-              <motion.div variants={fadeInUp}>
-                <Card className="dashboard-panel transition-all duration-200">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium">Total Suppliers</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{dashboard?.totalSuppliers || 0}</p>
-                        <p className="text-xs text-gray-400 mt-1">Supply Network</p>
-                      </div>
-                      <div className="bg-blue-50 rounded-lg p-3">
-                        <UserGroupIcon className="h-6 w-6 text-blue-600" />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-
-              <motion.div variants={fadeInUp}>
-                <Card className="dashboard-panel transition-all duration-200">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium">Active Suppliers</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{dashboard?.activeSuppliers || 0}</p>
-                        <div className="flex items-center mt-2">
-                          <div className="bg-gray-100 rounded-full h-1.5 w-12 mr-2">
-                            <div
-                              className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
-                              style={{
-                                width: `${dashboard?.totalSuppliers ? (dashboard.activeSuppliers / dashboard.totalSuppliers) * 100 : 0}%`
-                              }}
-                            />
-                          </div>
-                          <span className="text-xs text-gray-400">
-                            {dashboard?.totalSuppliers ? Math.round((dashboard.activeSuppliers / dashboard.totalSuppliers) * 100) : 0}%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="bg-green-50 rounded-lg p-3">
-                        <CheckCircleIcon className="h-6 w-6 text-green-600" />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-
-              <motion.div variants={fadeInUp}>
-                <Card className="dashboard-panel transition-all duration-200">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium">Pending Approvals</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{dashboard?.pendingApprovals || 0}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {(dashboard?.pendingApprovals || 0) > 0 ? 'Needs Review' : 'All Clear'}
-                        </p>
-                      </div>
-                      <div className="bg-amber-50 rounded-lg p-3">
-                        <ClockIcon className="h-6 w-6 text-amber-600" />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-
-              <motion.div variants={fadeInUp}>
-                <Card className="dashboard-panel transition-all duration-200">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium">Overdue Deliveries</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{dashboard?.overdueDeliveries || 0}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {(dashboard?.overdueDeliveries || 0) > 0 ? 'Action Required' : 'On Track'}
-                        </p>
-                      </div>
-                      <div className="bg-red-50 rounded-lg p-3">
-                        <XCircleIcon className="h-6 w-6 text-red-600" />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-            </motion.div>
-
-            {/* Enhanced Top Suppliers */}
-            <motion.div variants={fadeInUp}>
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow duration-300">
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-semibold text-gray-900">Top Performing Suppliers</h2>
-                    <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-full p-2">
-                      <TruckIcon className="h-5 w-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    {dashboard?.topSuppliers?.map((supplier, index) => (
-                      <div key={supplier.supplierId} className="relative group">
-                        <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 hover:from-green-50 hover:to-emerald-50 transition-all duration-200 cursor-pointer">
-                          <div className="flex items-center gap-4">
-                            <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold text-white text-sm ${
-                              index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' :
-                              index === 1 ? 'bg-gradient-to-r from-gray-400 to-gray-500' :
-                              index === 2 ? 'bg-gradient-to-r from-amber-600 to-amber-700' :
-                              'bg-gradient-to-r from-green-500 to-green-600'
-                            }`}>
-                              {index + 1}
-                            </div>
-                            <div>
-                              <p className="font-semibold text-gray-900 group-hover:text-green-700 transition-colors">
-                                {supplier.supplierName}
-                              </p>
-                              <div className="flex items-center gap-4 text-sm text-gray-600">
-                                <span className="flex items-center gap-1">
-                                  <TruckIcon className="h-3 w-3" />
-                                  {supplier.totalOrders} orders
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <CheckCircleIcon className="h-3 w-3" />
-                                  {supplier.onTimeDeliveryRate}% on-time
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-lg text-gray-900">{formatCurrency(supplier.totalAmount)}</p>
-                            <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                              <span className={`px-2 py-1 rounded-full ${
-                                supplier.onTimeDeliveryRate >= 90 ? 'bg-green-100 text-green-700' :
-                                supplier.onTimeDeliveryRate >= 70 ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-red-100 text-red-700'
-                              }`}>
-                                {supplier.onTimeDeliveryRate}% delivery
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )) || (
-                      <div className="text-center py-12">
-                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                          <TruckIcon className="h-8 w-8 text-gray-400" />
-                        </div>
-                        <p className="text-gray-500 font-medium">No supplier performance data available</p>
-                        <p className="text-gray-400 text-sm mt-1">Performance metrics will appear here once you have active suppliers</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          </TabsContent>
-
-          <TabsContent value="suppliers" className="space-y-6">
-            {/* Enhanced Filters */}
-            <Card className="border-0 shadow-lg">
-              <div className="bg-gradient-to-r from-slate-50 to-gray-50 p-6 rounded-lg">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1 relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <TruckIcon className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Search suppliers by name, contact, or categories..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="dashboard-field w-full py-3 pl-10 pr-4 transition-all duration-200"
-                    />
-                  </div>
-                  <div className="relative">
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="dashboard-field appearance-none px-4 py-3 pr-10 transition-all duration-200 cursor-pointer"
-                    >
-                      <option value="ALL">All Status</option>
-                      <option value="ACTIVE">Active</option>
-                      <option value="INACTIVE">Inactive</option>
-                      <option value="BLOCKED">Blocked</option>
-                      <option value="PENDING_VERIFICATION">Pending</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-                {(searchTerm || statusFilter !== 'ALL') && (
-                  <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
-                    <span>Active filters:</span>
-                    {searchTerm && (
-                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">"{searchTerm}"</span>
-                    )}
-                    {statusFilter !== 'ALL' && (
-                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">{statusFilter}</span>
-                    )}
-                    <button
-                      onClick={() => {
-                        setSearchTerm('')
-                        setStatusFilter('ALL')
-                      }}
-                      className="text-green-600 hover:text-green-800 font-medium ml-2"
-                    >
-                      Clear all
-                    </button>
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            {/* Enhanced Suppliers Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {suppliers.map((supplier) => (
-                <motion.div
-                  key={supplier.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 group cursor-pointer">
-                    <div className="p-6">
-                      {/* Header */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-2 rounded-xl">
-                            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                              <span className="text-white text-lg font-bold">
-                                {supplier.name.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900 group-hover:text-green-700 transition-colors">
-                              {supplier.name}
-                            </h3>
-                            {supplier.contactPerson && (
-                              <p className="text-sm text-gray-600 font-medium">{supplier.contactPerson}</p>
-                            )}
-                          </div>
-                        </div>
-                        <Badge className={`${getStatusColor(supplier.status)} border-0 font-medium`}>
-                          {supplier.status}
-                        </Badge>
-                      </div>
-
-                      {/* Contact Information */}
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-start gap-2 text-sm text-gray-600">
-                          <UserGroupIcon className="h-4 w-4 text-gray-400 mt-0.5" />
-                          <div>
-                            <p className="text-xs font-medium text-gray-500">Contact</p>
-                            <span className="font-medium text-gray-700">
-                              {supplier.contactPerson?.trim()
-                                ? `${supplier.contactPerson}${supplier.phone ? ` · ${supplier.phone}` : ''}`
-                                : (supplier.phone || 'No contact on file')}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <PhoneIcon className="h-4 w-4 text-gray-400" />
-                          <span className="font-medium">{supplier.phone || 'Not provided'}</span>
-                        </div>
-
-                        {supplier.email && (
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <EnvelopeIcon className="h-4 w-4 text-gray-400" />
-                            <span className="truncate">{supplier.email}</span>
-                          </div>
-                        )}
-
-                        <div className="flex items-start gap-2 text-sm text-gray-600">
-                          <MapPinIcon className="h-4 w-4 text-gray-400 mt-0.5" />
-                          <span className="font-medium">{supplier.address}</span>
-                        </div>
-                      </div>
-
-                      {/* Categories */}
-                      <div className="mb-4">
-                        <p className="text-sm font-medium text-gray-700 mb-2">Categories:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {supplier.categories.slice(0, 3).map(category => (
-                            <span key={category} className="inline-flex items-center px-2 py-1 rounded-lg text-xs bg-green-50 text-green-700 font-medium">
-                              {category}
-                            </span>
-                          ))}
-                          {supplier.categories.length > 3 && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs bg-gray-100 text-gray-600 font-medium">
-                              +{supplier.categories.length - 3} more
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Performance Metrics */}
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="bg-blue-50 rounded-lg p-3 text-center">
-                          <div className="flex items-center justify-center mb-1">
-                            <TruckIcon className="h-4 w-4 text-blue-600 mr-1" />
-                          </div>
-                          <p className="text-2xl font-bold text-blue-700">{supplier.totalOrders}</p>
-                          <p className="text-xs text-blue-600 font-medium">Orders</p>
-                        </div>
-
-                        <div className="bg-green-50 rounded-lg p-3 text-center">
-                          <div className="flex items-center justify-center mb-1">
-                            <CheckCircleIcon className="h-4 w-4 text-green-600 mr-1" />
-                          </div>
-                          <p className="text-xl font-bold text-green-700">{supplier.onTimeDeliveryRate}%</p>
-                          <p className="text-xs text-green-600 font-medium">On-Time</p>
-                        </div>
-                      </div>
-
-                      {/* Financials */}
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="bg-emerald-50 rounded-lg p-3">
-                          <div className="flex items-center gap-1 mb-1">
-                            <ShoppingCartIcon className="h-4 w-4 text-emerald-600" />
-                            <p className="text-xs text-emerald-600 font-medium">Total Purchases</p>
-                          </div>
-                          <p className="text-lg font-bold text-emerald-800 truncate">
-                            {formatCurrency(supplier.totalPurchases ?? 0)}
-                          </p>
-                        </div>
-
-                        <div className={`rounded-lg p-3 ${(supplier.currentBalance ?? supplier.outstandingBalance ?? 0) > 0 ? 'bg-red-50' : 'bg-gray-50'}`}>
-                          <div className="flex items-center gap-1 mb-1">
-                            <BanknotesIcon className={`h-4 w-4 ${(supplier.currentBalance ?? supplier.outstandingBalance ?? 0) > 0 ? 'text-red-600' : 'text-gray-500'}`} />
-                            <p className={`text-xs font-medium ${(supplier.currentBalance ?? supplier.outstandingBalance ?? 0) > 0 ? 'text-red-600' : 'text-gray-500'}`}>Outstanding</p>
-                          </div>
-                          <p className={`text-lg font-bold truncate ${(supplier.currentBalance ?? supplier.outstandingBalance ?? 0) > 0 ? 'text-red-700' : 'text-gray-800'}`}>
-                            {formatCurrency(supplier.currentBalance ?? supplier.outstandingBalance ?? 0)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Ratings */}
-                      {(supplier.qualityRating || supplier.serviceRating || supplier.pricingRating) && (
-                        <div className="space-y-2 mb-4">
-                          <p className="text-sm font-medium text-gray-700">Ratings:</p>
-                          <div className="space-y-1">
-                            {supplier.qualityRating && (
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">Quality:</span>
-                                <div className="flex">
-                                  {renderStars(supplier.qualityRating)}
-                                </div>
-                              </div>
-                            )}
-                            {supplier.serviceRating && (
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">Service:</span>
-                                <div className="flex">
-                                  {renderStars(supplier.serviceRating)}
-                                </div>
-                              </div>
-                            )}
-                            {supplier.pricingRating && (
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">Pricing:</span>
-                                <div className="flex">
-                                  {renderStars(supplier.pricingRating)}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Payment Terms */}
-                      <div className="mb-4">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-gray-100 text-gray-700 font-medium">
-                          {formatPaymentTerms(supplier.paymentTerms)}
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 h-full">
+                <div className="p-6 flex flex-col h-full">
+                  {/* Header */}
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-2 rounded-xl">
+                      <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                        <span className="text-white text-lg font-bold">
+                          {supplier.name.charAt(0).toUpperCase()}
                         </span>
                       </div>
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-lg font-bold text-gray-900 truncate">{supplier.name}</h3>
+                      {supplier.contactPerson && (
+                        <p className="text-sm text-gray-600 font-medium truncate">{supplier.contactPerson}</p>
+                      )}
+                    </div>
+                  </div>
 
-                      {/* Action Buttons */}
-                      <div className="space-y-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => setShowPurchaseModal(normalizeSupplierForDisplay(supplier))}
-                          className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
-                        >
-                          <ShoppingCartIcon className="h-4 w-4 mr-2" />
-                          Record Purchase
-                        </Button>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setShowDetailsModal(normalizeSupplierForDisplay(supplier))}
-                            className="flex-1 hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition-colors"
-                          >
-                            <EyeIcon className="h-4 w-4 mr-2" />
-                            View Details
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setShowEditModal(supplier)}
-                            className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </Button>
-                        </div>
+                  {/* Contact details */}
+                  <div className="space-y-2 mb-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <PhoneIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <span className="font-medium">{supplier.phone || 'No phone'}</span>
+                    </div>
+                    {supplier.email && (
+                      <div className="flex items-center gap-2">
+                        <EnvelopeIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <span className="truncate">{supplier.email}</span>
                       </div>
-                    </div>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
-
-            {suppliers.length === 0 && (
-              <Card className="border-0 shadow-lg">
-                <div className="text-center py-16">
-                  <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-                    <TruckIcon className="h-12 w-12 text-gray-400" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                    {(searchTerm || statusFilter !== 'ALL') ? 'No Suppliers Match Your Search' : 'No Suppliers Yet'}
-                  </h3>
-                  <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                    {(searchTerm || statusFilter !== 'ALL')
-                      ? 'Try adjusting your search filters or add a new supplier.'
-                      : 'Build your supply network by adding suppliers across different categories.'}
-                  </p>
-
-                  {(searchTerm || statusFilter !== 'ALL') ? (
-                    <div className="flex items-center justify-center gap-4">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setSearchTerm('')
-                          setStatusFilter('ALL')
-                        }}
-                        className="hover:bg-gray-50"
-                      >
-                        Clear Filters
-                      </Button>
-                      <Button
-                        onClick={() => setShowAddModal(true)}
-                        className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-                      >
-                        <PlusIcon className="h-5 w-5 mr-2" />
-                        Add Supplier
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <Button
-                        onClick={() => setShowAddModal(true)}
-                        className="bg-gradient-to-r from-green-500 via-emerald-600 to-teal-600 hover:from-green-600 hover:via-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl transition-all duration-300 px-8 py-3"
-                      >
-                        <PlusIcon className="h-5 w-5 mr-2" />
-                        Add Your First Supplier
-                      </Button>
-                      <div className="flex items-center justify-center gap-6 text-sm text-gray-500 mt-6">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span>Multiple categories</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                          <span>Performance tracking</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-                          <span>Rating system</span>
-                        </div>
+                    )}
+                    {supplier.address && (
+                      <div className="flex items-start gap-2">
+                        <MapPinIcon className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <span>{supplier.address}</span>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Categories */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <UserGroupIcon className="h-4 w-4 text-gray-400" />
+                      <p className="text-sm font-medium text-gray-700">Categories</p>
                     </div>
-                  )}
-                </div>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="performance" className="space-y-6">
-            <SupplierPerformanceTab suppliers={suppliers} renderStars={renderStars} />
-          </TabsContent>
-        </Tabs>
-      )}
-
-      {/* Add Supplier Modal */}
-      {showAddModal && (
-        <AddSupplierModal
-          onSave={createSupplier}
-          onCancel={() => setShowAddModal(false)}
-        />
-      )}
-
-      {showDetailsModal && (
-        <SupplierDetailsModal
-          supplier={showDetailsModal}
-          branchName={selectedBranch?.name}
-          branchId={selectedBranchId || undefined}
-          userId={effectiveUserId}
-          refreshKey={detailRefreshKey}
-          formatCurrency={formatCurrency}
-          formatPaymentTerms={formatPaymentTerms}
-          renderStars={renderStars}
-          onClose={() => setShowDetailsModal(null)}
-          onRecordPurchase={() => {
-            setShowPurchaseModal(showDetailsModal)
-          }}
-        />
-      )}
-
-      {showPurchaseModal && (
-        <RecordPurchaseModal
-          supplier={showPurchaseModal}
-          userId={effectiveUserId}
-          branchId={selectedBranchId || undefined}
-          branchName={selectedBranch?.name}
-          formatCurrency={formatCurrency}
-          onSave={(data) => createPurchase(showPurchaseModal, data)}
-          onCancel={() => setShowPurchaseModal(null)}
-        />
-      )}
-    </div>
-  )
-}
-
-interface SupplierDetailsModalProps {
-  supplier: Supplier
-  branchName?: string
-  branchId?: string
-  userId?: string
-  refreshKey?: number
-  formatCurrency: (amount: number) => string
-  formatPaymentTerms: (terms: string) => string
-  renderStars: (rating: number) => ReactNode
-  onClose: () => void
-  onRecordPurchase: () => void
-}
-
-function formatEntryDate(value: any): string {
-  if (!value) return '—'
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString()
-}
-
-function SupplierDetailsModal({
-  supplier,
-  branchName,
-  branchId,
-  userId,
-  refreshKey,
-  formatCurrency,
-  formatPaymentTerms,
-  renderStars,
-  onClose,
-  onRecordPurchase
-}: SupplierDetailsModalProps) {
-  const [detailTab, setDetailTab] = useState('overview')
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
-  const [payments, setPayments] = useState<Record<string, any>[]>([])
-  const [ledger, setLedger] = useState<Record<string, any>[]>([])
-  const [loadingPurchases, setLoadingPurchases] = useState(false)
-  const [loadingPayments, setLoadingPayments] = useState(false)
-  const [loadingLedger, setLoadingLedger] = useState(false)
-
-  const averageRating = [
-    supplier.qualityRating,
-    supplier.serviceRating,
-    supplier.pricingRating
-  ].filter((rating): rating is number => typeof rating === 'number')
-
-  const overallRating = averageRating.length > 0
-    ? averageRating.reduce((sum, rating) => sum + rating, 0) / averageRating.length
-    : null
-
-  const outstanding = supplier.currentBalance ?? supplier.outstandingBalance ?? 0
-
-  // Purchases tab: branch-scoped purchase orders filtered to this supplier.
-  useEffect(() => {
-    if (detailTab !== 'purchases' || !userId) return
-    let cancelled = false
-    setLoadingPurchases(true)
-    getPurchaseOrders(userId, { branchId, supplierId: supplier.id })
-      .then((orders) => { if (!cancelled) setPurchaseOrders(orders.filter((o) => o.supplierId === supplier.id)) })
-      .catch((error) => { console.error('Error loading supplier purchase orders:', error); if (!cancelled) setPurchaseOrders([]) })
-      .finally(() => { if (!cancelled) setLoadingPurchases(false) })
-    return () => { cancelled = true }
-  }, [detailTab, userId, branchId, supplier.id, refreshKey])
-
-  // Payments tab.
-  useEffect(() => {
-    if (detailTab !== 'payments') return
-    let cancelled = false
-    setLoadingPayments(true)
-    getSupplierPaymentHistory(supplier.id, branchId)
-      .then((rows) => { if (!cancelled) setPayments(rows) })
-      .catch((error) => { console.error('Error loading supplier payments:', error); if (!cancelled) setPayments([]) })
-      .finally(() => { if (!cancelled) setLoadingPayments(false) })
-    return () => { cancelled = true }
-  }, [detailTab, branchId, supplier.id, refreshKey])
-
-  // Ledger tab.
-  useEffect(() => {
-    if (detailTab !== 'ledger') return
-    let cancelled = false
-    setLoadingLedger(true)
-    getSupplierLedgerEntries(supplier.id, branchId)
-      .then((rows) => { if (!cancelled) setLedger(rows) })
-      .catch((error) => { console.error('Error loading supplier ledger:', error); if (!cancelled) setLedger([]) })
-      .finally(() => { if (!cancelled) setLoadingLedger(false) })
-    return () => { cancelled = true }
-  }, [detailTab, branchId, supplier.id, refreshKey])
-
-  const LoadingRow = ({ label }: { label: string }) => (
-    <div className="flex items-center justify-center gap-3 py-10 text-sm text-gray-500">
-      <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-400" />
-      {label}
-    </div>
-  )
-
-  const EmptyRow = ({ icon: Icon, label }: { icon: typeof DocumentTextIcon; label: string }) => (
-    <div className="flex flex-col items-center justify-center py-10 text-center">
-      <Icon className="h-10 w-10 text-gray-300 mb-3" />
-      <p className="text-sm text-gray-500">{label}</p>
-    </div>
-  )
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
-      >
-        <div className="flex items-start justify-between border-b px-6 py-5">
-          <div>
-            <h3 className="text-2xl font-semibold text-gray-900">{supplier.name}</h3>
-            <p className="text-sm text-gray-500">
-              {supplier.contactPerson || 'No contact person listed'}
-              {branchName ? ` - ${branchName}` : ''}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              onClick={onRecordPurchase}
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
-            >
-              <ShoppingCartIcon className="h-4 w-4 mr-2" />
-              Record Purchase
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={onClose}>
-              Close
-            </Button>
-          </div>
-        </div>
-
-        {/* Financial summary */}
-        <div className="grid grid-cols-2 gap-3 px-6 pt-6 md:grid-cols-4">
-          <div className="rounded-lg bg-emerald-50 p-3">
-            <p className="text-xs font-medium text-emerald-600">Total Purchases</p>
-            <p className="mt-1 text-lg font-bold text-emerald-800">{formatCurrency(supplier.totalPurchases ?? 0)}</p>
-          </div>
-          <div className="rounded-lg bg-blue-50 p-3">
-            <p className="text-xs font-medium text-blue-600">Total Paid</p>
-            <p className="mt-1 text-lg font-bold text-blue-800">{formatCurrency(supplier.totalPaid ?? 0)}</p>
-          </div>
-          <div className={`rounded-lg p-3 ${outstanding > 0 ? 'bg-red-50' : 'bg-gray-50'}`}>
-            <p className={`text-xs font-medium ${outstanding > 0 ? 'text-red-600' : 'text-gray-500'}`}>Outstanding Balance</p>
-            <p className={`mt-1 text-lg font-bold ${outstanding > 0 ? 'text-red-700' : 'text-gray-800'}`}>{formatCurrency(outstanding)}</p>
-          </div>
-          <div className="rounded-lg bg-gray-50 p-3">
-            <p className="text-xs font-medium text-gray-500">Opening Balance</p>
-            <p className="mt-1 text-lg font-bold text-gray-800">{formatCurrency(supplier.openingBalance ?? 0)}</p>
-          </div>
-        </div>
-
-        <Tabs value={detailTab} onValueChange={setDetailTab} className="p-6">
-          <TabsList className="grid w-full grid-cols-4 bg-gray-50 rounded-xl p-1 mb-6">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium">Overview</TabsTrigger>
-            <TabsTrigger value="purchases" className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium">Purchases</TabsTrigger>
-            <TabsTrigger value="payments" className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium">Payments</TabsTrigger>
-            <TabsTrigger value="ledger" className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium">Ledger</TabsTrigger>
-          </TabsList>
-
-          {/* Overview */}
-          <TabsContent value="overview">
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card className="p-4">
-                <h4 className="font-semibold text-gray-900 mb-4">Contact</h4>
-                <div className="space-y-3 text-sm text-gray-700">
-                  <div className="flex items-center gap-2">
-                    <UserGroupIcon className="h-4 w-4 text-gray-400" />
-                    <span>{supplier.contactPerson || 'No contact person'}</span>
+                    {supplier.categories.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {supplier.categories.map((category) => (
+                          <span key={category} className="inline-flex items-center px-2 py-1 rounded-lg text-xs bg-green-50 text-green-700 font-medium">
+                            {category}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400">None listed</p>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <PhoneIcon className="h-4 w-4 text-gray-400" />
-                    <span>{supplier.phone || 'Not provided'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <EnvelopeIcon className="h-4 w-4 text-gray-400" />
-                    <span>{supplier.email || 'Not provided'}</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <MapPinIcon className="h-4 w-4 text-gray-400 mt-0.5" />
-                    <span>{supplier.address || 'Not provided'}</span>
-                  </div>
-                </div>
-              </Card>
 
-              <Card className="p-4">
-                <h4 className="font-semibold text-gray-900 mb-4">Performance</h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-lg bg-blue-50 p-3">
-                    <p className="text-blue-600">Orders</p>
-                    <p className="text-2xl font-bold text-blue-800">{supplier.totalOrders}</p>
-                  </div>
-                  <div className="rounded-lg bg-green-50 p-3">
-                    <p className="text-green-600">On-time</p>
-                    <p className="text-2xl font-bold text-green-800">{supplier.onTimeDeliveryRate}%</p>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-gray-600">Completed</p>
-                    <p className="text-2xl font-bold text-gray-900">{supplier.completedOrders}</p>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-gray-600">Terms</p>
-                    <p className="font-semibold text-gray-900">{formatPaymentTerms(supplier.paymentTerms)}</p>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-4">
-                <h4 className="font-semibold text-gray-900 mb-4">Categories</h4>
-                <div className="flex flex-wrap gap-2">
-                  {supplier.categories.length > 0 ? supplier.categories.map((category) => (
-                    <span key={category} className="rounded-lg bg-green-50 px-3 py-1 text-sm font-medium text-green-700">
-                      {category}
-                    </span>
-                  )) : (
-                    <span className="text-sm text-gray-500">No categories listed</span>
-                  )}
-                </div>
-              </Card>
-
-              <Card className="p-4">
-                <h4 className="font-semibold text-gray-900 mb-4">Ratings</h4>
-                {overallRating ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Overall</span>
-                      <div className="flex">{renderStars(overallRating)}</div>
+                  {/* Products supplied */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <CubeIcon className="h-4 w-4 text-gray-400" />
+                      <p className="text-sm font-medium text-gray-700">Products Supplied</p>
                     </div>
-                    {supplier.qualityRating && <RatingRow label="Quality" rating={supplier.qualityRating} renderStars={renderStars} />}
-                    {supplier.serviceRating && <RatingRow label="Service" rating={supplier.serviceRating} renderStars={renderStars} />}
-                    {supplier.pricingRating && <RatingRow label="Pricing" rating={supplier.pricingRating} renderStars={renderStars} />}
+                    {supplier.productsSupplied.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {supplier.productsSupplied.map((product) => (
+                          <span key={product} className="inline-flex items-center px-2 py-1 rounded-lg text-xs bg-blue-50 text-blue-700 font-medium">
+                            {product}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400">None listed</p>
+                    )}
                   </div>
-                ) : (
-                  <span className="text-sm text-gray-500">No ratings recorded</span>
-                )}
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 mt-auto pt-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setFormModal({ mode: 'edit', supplier })}
+                      className="flex-1 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
+                    >
+                      <PencilIcon className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={deletingId === supplier.id}
+                      onClick={() => handleDelete(supplier)}
+                      className="flex-1 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
+                    >
+                      {deletingId === supplier.id ? (
+                        <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <TrashIcon className="h-4 w-4 mr-2" />
+                      )}
+                      Delete
+                    </Button>
+                  </div>
+                </div>
               </Card>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
-              <Card className="p-4 md:col-span-2">
-                <h4 className="font-semibold text-gray-900 mb-2">Notes</h4>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{supplier.notes || 'No notes recorded for this supplier.'}</p>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Purchases */}
-          <TabsContent value="purchases">
-            <Card className="p-0 overflow-hidden">
-              {loadingPurchases ? (
-                <LoadingRow label="Loading purchase orders..." />
-              ) : purchaseOrders.length === 0 ? (
-                <EmptyRow icon={ShoppingCartIcon} label="No purchase orders for this supplier in this branch yet." />
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-gray-500 border-b border-gray-100">
-                        <th className="py-3 px-4 font-medium">PO #</th>
-                        <th className="py-3 px-4 font-medium">Date</th>
-                        <th className="py-3 px-4 font-medium">Status</th>
-                        <th className="py-3 px-4 font-medium text-right">Total</th>
-                        <th className="py-3 px-4 font-medium text-right">Outstanding</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {purchaseOrders.map((po) => {
-                        const poOutstanding = Math.max(0, (po.totalAmount || 0) - ((po as any).amountPaid || 0))
-                        return (
-                          <tr key={po.id} className="border-b border-gray-50 hover:bg-gray-50/70">
-                            <td className="py-3 px-4 font-medium text-gray-900">{po.poNumber}</td>
-                            <td className="py-3 px-4 text-gray-600">{formatEntryDate(po.createdAt)}</td>
-                            <td className="py-3 px-4">
-                              <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
-                                {String(po.status).replace(/_/g, ' ')}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-right text-gray-900">{formatCurrency(po.totalAmount || 0)}</td>
-                            <td className={`py-3 px-4 text-right font-medium ${poOutstanding > 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                              {formatCurrency(poOutstanding)}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </Card>
-          </TabsContent>
-
-          {/* Payments */}
-          <TabsContent value="payments">
-            <Card className="p-0 overflow-hidden">
-              {loadingPayments ? (
-                <LoadingRow label="Loading payments..." />
-              ) : payments.length === 0 ? (
-                <EmptyRow icon={BanknotesIcon} label="No payments recorded for this supplier yet." />
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-gray-500 border-b border-gray-100">
-                        <th className="py-3 px-4 font-medium">Date</th>
-                        <th className="py-3 px-4 font-medium text-right">Amount</th>
-                        <th className="py-3 px-4 font-medium">Method</th>
-                        <th className="py-3 px-4 font-medium">Reference</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {payments.map((payment, index) => (
-                        <tr key={payment.id || index} className="border-b border-gray-50 hover:bg-gray-50/70">
-                          <td className="py-3 px-4 text-gray-600">{formatEntryDate(payment.date || payment.createdAt || payment.paidAt)}</td>
-                          <td className="py-3 px-4 text-right font-medium text-gray-900">{formatCurrency(Number(payment.amount || 0))}</td>
-                          <td className="py-3 px-4 text-gray-700">{String(payment.paymentMethod || payment.method || '—').replace(/_/g, ' ')}</td>
-                          <td className="py-3 px-4 text-gray-600">{payment.reference || payment.receiptNumber || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </Card>
-          </TabsContent>
-
-          {/* Ledger */}
-          <TabsContent value="ledger">
-            <Card className="p-0 overflow-hidden">
-              {loadingLedger ? (
-                <LoadingRow label="Loading ledger..." />
-              ) : ledger.length === 0 ? (
-                <EmptyRow icon={DocumentTextIcon} label="No ledger entries for this supplier yet." />
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-gray-500 border-b border-gray-100">
-                        <th className="py-3 px-4 font-medium">Date</th>
-                        <th className="py-3 px-4 font-medium">Entry</th>
-                        <th className="py-3 px-4 font-medium text-right">Debit</th>
-                        <th className="py-3 px-4 font-medium text-right">Credit</th>
-                        <th className="py-3 px-4 font-medium text-right">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ledger.map((entry, index) => (
-                        <tr key={entry.id || index} className="border-b border-gray-50 hover:bg-gray-50/70">
-                          <td className="py-3 px-4 text-gray-600">{formatEntryDate(entry.date || entry.createdAt)}</td>
-                          <td className="py-3 px-4 text-gray-700">
-                            {String(entry.entryType || entry.type || 'Entry').replace(/_/g, ' ')}
-                            {entry.reference ? <span className="text-gray-400"> · {entry.reference}</span> : null}
-                          </td>
-                          <td className="py-3 px-4 text-right text-gray-900">{Number(entry.debit || 0) ? formatCurrency(Number(entry.debit)) : '—'}</td>
-                          <td className="py-3 px-4 text-right text-gray-900">{Number(entry.credit || 0) ? formatCurrency(Number(entry.credit)) : '—'}</td>
-                          <td className="py-3 px-4 text-right font-medium text-gray-900">{formatCurrency(Number(entry.balanceAfter ?? entry.balance ?? 0))}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </motion.div>
+      {formModal && (
+        <SupplierFormModal
+          mode={formModal.mode}
+          initial={formModal.mode === 'edit' ? formModal.supplier : undefined}
+          onSave={handleSave}
+          onCancel={() => setFormModal(null)}
+        />
+      )}
     </div>
   )
 }
 
-function RatingRow({
-  label,
-  rating,
-  renderStars
-}: {
-  label: string
-  rating: number
-  renderStars: (rating: number) => ReactNode
-}) {
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-gray-600">{label}</span>
-      <div className="flex">{renderStars(rating)}</div>
-    </div>
-  )
+interface SupplierFormData {
+  name: string
+  contactPerson: string
+  email: string
+  phone: string
+  address: string
+  categories: string[]
+  productsSupplied: string[]
 }
 
-interface AddSupplierModalProps {
-  onSave: (data: any) => Promise<boolean>
+interface SupplierFormModalProps {
+  mode: 'create' | 'edit'
+  initial?: Supplier
+  onSave: (data: SupplierFormData) => Promise<boolean>
   onCancel: () => void
 }
 
-function AddSupplierModal({ onSave, onCancel }: AddSupplierModalProps) {
-  const [formData, setFormData] = useState({
-    name: '',
-    contactPerson: '',
-    email: '',
-    phone: '',
-    address: '',
-    categories: [] as string[],
-    paymentTerms: 'NET_30',
-    openingBalance: 0,
-    notes: ''
+function SupplierFormModal({ mode, initial, onSave, onCancel }: SupplierFormModalProps) {
+  const [formData, setFormData] = useState<SupplierFormData>({
+    name: initial?.name || '',
+    contactPerson: initial?.contactPerson || '',
+    email: initial?.email || '',
+    phone: initial?.phone || '',
+    address: initial?.address || '',
+    categories: initial?.categories ? [...initial.categories] : [],
+    productsSupplied: initial?.productsSupplied ? [...initial.productsSupplied] : []
   })
+  const [productInput, setProductInput] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-
-    const success = await onSave(formData)
-    if (success) {
-      setFormData({
-        name: '',
-        contactPerson: '',
-        email: '',
-        phone: '',
-        address: '',
-        categories: [],
-        paymentTerms: 'NET_30',
-        openingBalance: 0,
-        notes: ''
-      })
-    }
-    setSaving(false)
-  }
-
   const addCategory = (category: string) => {
-    if (category.trim() && !formData.categories.includes(category.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        categories: [...prev.categories, category.trim()]
-      }))
+    const value = category.trim()
+    if (value && !formData.categories.includes(value)) {
+      setFormData((prev) => ({ ...prev, categories: [...prev.categories, value] }))
     }
   }
 
   const removeCategory = (category: string) => {
-    setFormData(prev => ({
-      ...prev,
-      categories: prev.categories.filter(c => c !== category)
-    }))
+    setFormData((prev) => ({ ...prev, categories: prev.categories.filter((c) => c !== category) }))
+  }
+
+  const addProduct = () => {
+    const value = productInput.trim()
+    if (value && !formData.productsSupplied.includes(value)) {
+      setFormData((prev) => ({ ...prev, productsSupplied: [...prev.productsSupplied, value] }))
+    }
+    setProductInput('')
+  }
+
+  const removeProduct = (product: string) => {
+    setFormData((prev) => ({ ...prev, productsSupplied: prev.productsSupplied.filter((p) => p !== product) }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim() || saving) return
+    setSaving(true)
+    const success = await onSave({
+      ...formData,
+      name: formData.name.trim(),
+      contactPerson: formData.contactPerson.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+      address: formData.address.trim()
+    })
+    if (!success) setSaving(false)
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
       >
-        <h3 className="text-2xl font-semibold mb-6">Add New Supplier</h3>
+        <h3 className="text-2xl font-semibold mb-6">
+          {mode === 'create' ? 'Add New Supplier' : 'Edit Supplier'}
+        </h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1929,401 +508,118 @@ function AddSupplierModal({ onSave, onCancel }: AddSupplierModalProps) {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
                 className="w-full px-3 py-2 border rounded-md"
                 required
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium mb-2">Contact Person</label>
               <input
                 type="text"
                 value={formData.contactPerson}
-                onChange={(e) => setFormData(prev => ({ ...prev, contactPerson: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, contactPerson: e.target.value }))}
                 className="w-full px-3 py-2 border rounded-md"
               />
             </div>
-
             <div>
-              <label className="block text-sm font-medium mb-2">Phone Number *</label>
+              <label className="block text-sm font-medium mb-2">Phone Number</label>
               <input
                 type="tel"
                 value={formData.phone}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
                 className="w-full px-3 py-2 border rounded-md"
-                required
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium mb-2">Email</label>
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                 className="w-full px-3 py-2 border rounded-md"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Address *</label>
+            <label className="block text-sm font-medium mb-2">Address</label>
             <textarea
               value={formData.address}
-              onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
               className="w-full px-3 py-2 border rounded-md"
               rows={2}
-              required
             />
           </div>
 
+          {/* Categories */}
           <div>
-            <label className="block text-sm font-medium mb-2">Categories *</label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {formData.categories.map(category => (
-                <span key={category} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm flex items-center gap-1">
-                  {category}
-                  <button type="button" onClick={() => removeCategory(category)} className="text-blue-600 hover:text-blue-800">
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <select
-                onChange={(e) => {
-                  if (e.target.value) {
-                    addCategory(e.target.value)
-                    e.target.value = ''
-                  }
-                }}
-                className="flex-1 px-3 py-2 border rounded-md"
-              >
-                <option value="">Select a category</option>
-                <option value="General Hardware">General Hardware</option>
-                <option value="Plumbing">Plumbing</option>
-                <option value="Electrical">Electrical</option>
-                <option value="Tools & Equipment">Tools & Equipment</option>
-                <option value="Building Materials">Building Materials</option>
-                <option value="Paints & Finishes">Paints & Finishes</option>
-                <option value="Safety & Security">Safety & Security</option>
-                <option value="Garden & Outdoor">Garden & Outdoor</option>
-                <option value="Fasteners & Fixings">Fasteners & Fixings</option>
-                <option value="Electronics">Electronics</option>
-                <option value="Food & Beverages">Food & Beverages</option>
-                <option value="Clothing">Clothing</option>
-                <option value="Office Supplies">Office Supplies</option>
-                <option value="Raw Materials">Raw Materials</option>
-                <option value="Packaging">Packaging</option>
-                <option value="Equipment">Equipment</option>
-                <option value="Services">Services</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-            {formData.categories.length === 0 && (
-              <p className="text-red-500 text-sm mt-1">Please select at least one category</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Payment Terms</label>
-              <select
-                value={formData.paymentTerms}
-                onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md"
-              >
-                <option value="CASH_ON_DELIVERY">Cash on Delivery</option>
-                <option value="NET_7">Net 7 Days</option>
-                <option value="NET_15">Net 15 Days</option>
-                <option value="NET_30">Net 30 Days</option>
-                <option value="ADVANCE_PAYMENT">Advance Payment</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Opening Balance</label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={formData.openingBalance}
-                onChange={(e) => setFormData(prev => ({ ...prev, openingBalance: Number(e.target.value) || 0 }))}
-                className="w-full px-3 py-2 border rounded-md"
-                placeholder="0"
-              />
-              <p className="text-xs text-gray-400 mt-1">Amount already owed to this supplier when added.</p>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Notes</label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-md"
-              rows={3}
-              placeholder="Additional notes about this supplier..."
-            />
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="submit"
-              className="flex-1"
-              disabled={saving || formData.categories.length === 0}
-            >
-              {saving ? 'Creating...' : 'Create Supplier'}
-            </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </motion.div>
-    </div>
-  )
-}
-
-interface PurchaseLineItem {
-  productId: string
-  quantityOrdered: number
-  unitCost: number
-}
-
-interface RecordPurchaseModalProps {
-  supplier: Supplier
-  userId?: string
-  branchId?: string
-  branchName?: string
-  formatCurrency: (amount: number) => string
-  onSave: (data: { items: PurchaseLineItem[]; amountPaid: number; paymentTerms: string }) => Promise<boolean>
-  onCancel: () => void
-}
-
-function RecordPurchaseModal({
-  supplier,
-  userId,
-  branchId,
-  branchName,
-  formatCurrency,
-  onSave,
-  onCancel
-}: RecordPurchaseModalProps) {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loadingProducts, setLoadingProducts] = useState(true)
-  const [items, setItems] = useState<PurchaseLineItem[]>([])
-  const [amountPaid, setAmountPaid] = useState(0)
-  const [paymentTerms, setPaymentTerms] = useState(supplier.paymentTerms || 'NET_30')
-  const [saving, setSaving] = useState(false)
-
-  // Products must already exist in the selected branch to be purchased into stock.
-  useEffect(() => {
-    if (!userId || !branchId) {
-      setLoadingProducts(false)
-      return
-    }
-    let cancelled = false
-    setLoadingProducts(true)
-    getProducts(userId, branchId)
-      .then((rows) => { if (!cancelled) setProducts(rows) })
-      .catch((error) => { console.error('Error loading products for purchase:', error); if (!cancelled) setProducts([]) })
-      .finally(() => { if (!cancelled) setLoadingProducts(false) })
-    return () => { cancelled = true }
-  }, [userId, branchId])
-
-  const addLine = () => setItems(prev => [...prev, { productId: '', quantityOrdered: 1, unitCost: 0 }])
-  const removeLine = (index: number) => setItems(prev => prev.filter((_, i) => i !== index))
-  const updateLine = (index: number, patch: Partial<PurchaseLineItem>) =>
-    setItems(prev => prev.map((item, i) => {
-      if (i !== index) return item
-      const next = { ...item, ...patch }
-      // Default the unit cost from the product's cost price when a product is selected.
-      if (patch.productId) {
-        const product = products.find(p => p.id === patch.productId)
-        if (product && !item.unitCost) next.unitCost = Number(product.costPrice || 0)
-      }
-      return next
-    }))
-
-  const validItems = items.filter(item => item.productId && item.quantityOrdered > 0)
-  const total = validItems.reduce((sum, item) => sum + item.quantityOrdered * item.unitCost, 0)
-  const canSubmit = Boolean(branchId) && validItems.length > 0 && !saving
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!canSubmit) return
-    setSaving(true)
-    const success = await onSave({
-      items: validItems,
-      amountPaid: Number(amountPaid) || 0,
-      paymentTerms
-    })
-    if (!success) setSaving(false)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-lg max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto"
-      >
-        <div className="flex items-start justify-between border-b px-6 py-5">
-          <div>
-            <h3 className="text-2xl font-semibold text-gray-900">Record Purchase</h3>
-            <p className="text-sm text-gray-500">
-              From {supplier.name}{branchName ? ` · ${branchName}` : ''}
-            </p>
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-            Close
-          </Button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {!branchId && (
-            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-              <ClockIcon className="h-5 w-5 flex-shrink-0 mt-0.5" />
-              <span>Select a branch first. Purchases increase stock in the selected branch.</span>
-            </div>
-          )}
-
-          {/* Line items */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-700">Items</label>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={addLine}
-                disabled={!branchId || loadingProducts}
-              >
-                <PlusIcon className="h-4 w-4 mr-1" />
-                Add Item
-              </Button>
-            </div>
-
-            {loadingProducts ? (
-              <div className="flex items-center justify-center gap-3 py-8 text-sm text-gray-500">
-                <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-400" />
-                Loading products...
-              </div>
-            ) : products.length === 0 ? (
-              <p className="text-sm text-gray-500 py-4">
-                No products found in this branch. Add products to this branch before recording a purchase.
-              </p>
-            ) : items.length === 0 ? (
-              <p className="text-sm text-gray-500 py-4">No items yet. Click "Add Item" to start.</p>
-            ) : (
-              <div className="space-y-3">
-                {items.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2 items-end rounded-lg border p-3">
-                    <div className="col-span-12 md:col-span-5">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Product</label>
-                      <select
-                        value={item.productId}
-                        onChange={(e) => updateLine(index, { productId: e.target.value })}
-                        className="w-full px-3 py-2 border rounded-md text-sm"
-                        required
-                      >
-                        <option value="">Select product</option>
-                        {products.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name}{product.sku ? ` (${product.sku})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-span-4 md:col-span-2">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Qty</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={item.quantityOrdered}
-                        onChange={(e) => updateLine(index, { quantityOrdered: Number(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 border rounded-md text-sm"
-                        required
-                      />
-                    </div>
-                    <div className="col-span-5 md:col-span-3">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Unit Cost</label>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={item.unitCost}
-                        onChange={(e) => updateLine(index, { unitCost: Number(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 border rounded-md text-sm"
-                        required
-                      />
-                    </div>
-                    <div className="col-span-3 md:col-span-2 flex items-center justify-end">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => removeLine(index)}
-                        className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+            <label className="block text-sm font-medium mb-2">Categories</label>
+            {formData.categories.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.categories.map((category) => (
+                  <span key={category} className="bg-green-100 text-green-800 px-2 py-1 rounded-md text-sm flex items-center gap-1">
+                    {category}
+                    <button type="button" onClick={() => removeCategory(category)} className="text-green-600 hover:text-green-900">
+                      ×
+                    </button>
+                  </span>
                 ))}
               </div>
             )}
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) addCategory(e.target.value)
+              }}
+              className="w-full px-3 py-2 border rounded-md"
+            >
+              <option value="">Select a category to add</option>
+              {CATEGORY_OPTIONS.filter((c) => !formData.categories.includes(c)).map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Total */}
-          <div className="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3">
-            <span className="text-sm font-medium text-gray-600">Purchase Total</span>
-            <span className="text-lg font-bold text-gray-900">{formatCurrency(total)}</span>
-          </div>
-
-          {/* Payment */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Amount Paid Now</label>
-              <div className="relative">
-                <CurrencyDollarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  max={total || undefined}
-                  value={amountPaid}
-                  onChange={(e) => setAmountPaid(Number(e.target.value) || 0)}
-                  className="w-full pl-9 pr-3 py-2 border rounded-md"
-                  placeholder="0"
-                />
+          {/* Products supplied */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Products Supplied</label>
+            {formData.productsSupplied.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.productsSupplied.map((product) => (
+                  <span key={product} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm flex items-center gap-1">
+                    {product}
+                    <button type="button" onClick={() => removeProduct(product)} className="text-blue-600 hover:text-blue-900">
+                      ×
+                    </button>
+                  </span>
+                ))}
               </div>
-              <p className="text-xs text-gray-400 mt-1">
-                Unpaid amount ({formatCurrency(Math.max(0, total - (Number(amountPaid) || 0)))}) becomes outstanding payable.
-              </p>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={productInput}
+                onChange={(e) => setProductInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addProduct()
+                  }
+                }}
+                placeholder="e.g. Cement, 12mm Steel Rods"
+                className="flex-1 px-3 py-2 border rounded-md"
+              />
+              <Button type="button" variant="outline" onClick={addProduct} disabled={!productInput.trim()}>
+                Add
+              </Button>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Payment Terms</label>
-              <select
-                value={paymentTerms}
-                onChange={(e) => setPaymentTerms(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md"
-              >
-                <option value="CASH_ON_DELIVERY">Cash on Delivery</option>
-                <option value="NET_7">Net 7 Days</option>
-                <option value="NET_15">Net 15 Days</option>
-                <option value="NET_30">Net 30 Days</option>
-                <option value="ADVANCE_PAYMENT">Advance Payment</option>
-              </select>
-            </div>
+            <p className="text-xs text-gray-400 mt-1">Type a product name and press Enter or Add.</p>
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <Button type="submit" className="flex-1" disabled={!canSubmit}>
-              {saving ? 'Recording...' : 'Record Purchase'}
+          <div className="flex gap-3 pt-4">
+            <Button type="submit" className="flex-1" disabled={saving || !formData.name.trim()}>
+              {saving ? 'Saving...' : mode === 'create' ? 'Create Supplier' : 'Save Changes'}
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel

@@ -62,6 +62,7 @@ export interface Supplier {
   
   // Product Categories
   categories: string[] // What product categories they supply
+  productsSupplied?: string[] // Names of the products this supplier provides
   
   // Status and Metadata
   status: SupplierStatus
@@ -240,6 +241,7 @@ export interface CreateSupplierRequest {
   address: string
   paymentTerms?: PaymentTerms
   categories: string[]
+  productsSupplied?: string[]
   notes?: string
 }
 

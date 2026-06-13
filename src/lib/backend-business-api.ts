@@ -1056,6 +1056,7 @@ export function mapSupplier(row: AnyRecord): Supplier {
     completedOrders: Number(row.completedOrders || 0),
     averageDeliveryDays: Number(row.averageDeliveryDays || 0),
     categories: row.categories || [],
+    productsSupplied: row.productsSupplied || [],
     status: (row.status || 'ACTIVE').toUpperCase(),
     createdBy: row.createdBy || '',
     userId: row.userId || '',
@@ -1080,20 +1081,31 @@ export async function getBackendSupplier(supplierId: string, branchId?: string):
   return api<AnyRecord>(`/branches/${targetBranch}/suppliers/${supplierId}`)
 }
 
+// Whitelist of fields the suppliers backend accepts, normalized to the shapes its
+// validator expects (lowercase status/paymentTerms, array categories/products).
+// Only keys actually present on `data` are sent, so this serves both create and update.
+function toBackendSupplierPayload(data: Partial<Supplier>): AnyRecord {
+  const record = data as AnyRecord
+  const payload: AnyRecord = {}
+  if (data.name !== undefined) payload.name = data.name
+  if (data.contactPerson !== undefined) payload.contactPerson = data.contactPerson
+  if (data.phone !== undefined) payload.phone = data.phone
+  if (data.email !== undefined) payload.email = data.email || undefined
+  if (data.address !== undefined) payload.address = data.address
+  if (Array.isArray(data.categories)) payload.categories = data.categories
+  if (Array.isArray(record.productsSupplied)) payload.productsSupplied = record.productsSupplied
+  if (record.openingBalance !== undefined) payload.openingBalance = Number(record.openingBalance) || 0
+  if (data.paymentTerms !== undefined) payload.paymentTerms = String(data.paymentTerms).toLowerCase()
+  if (data.notes !== undefined) payload.notes = data.notes
+  if (data.status !== undefined) payload.status = String(data.status).toLowerCase()
+  return payload
+}
+
 export async function createBackendSupplier(data: Partial<Supplier>, branchId?: string) {
   const targetBranch = branchId || await getSelectedBackendBranchId()
   return idOf(await api<AnyRecord>(`/branches/${targetBranch}/suppliers`, {
     method: 'POST',
-    body: JSON.stringify({
-      name: data.name,
-      contactPerson: data.contactPerson,
-      phone: data.phone,
-      email: data.email,
-      address: data.address,
-      openingBalance: (data as AnyRecord).openingBalance || 0,
-      paymentTerms: String(data.paymentTerms || 'net_30').toLowerCase(),
-      notes: data.notes
-    })
+    body: JSON.stringify(toBackendSupplierPayload(data))
   }))
 }
 
@@ -1101,7 +1113,7 @@ export async function updateBackendSupplier(supplierId: string, data: Partial<Su
   const targetBranch = branchId || await getSelectedBackendBranchId()
   await api(`/branches/${targetBranch}/suppliers/${supplierId}`, {
     method: 'PATCH',
-    body: JSON.stringify(data)
+    body: JSON.stringify(toBackendSupplierPayload(data))
   })
 }
 
@@ -1613,6 +1625,10 @@ export async function updateBackendStaffMember(staffId: string, data: AnyRecord)
 
 export async function deactivateBackendStaffMember(staffId: string) {
   return api<AnyRecord>(`/staff/${staffId}`, { method: 'DELETE' })
+}
+
+export async function deleteBackendStaffMember(staffId: string) {
+  return api<AnyRecord>(`/staff/${staffId}?permanent=true`, { method: 'DELETE' })
 }
 
 export async function activateBackendStaffMember(staffId: string) {

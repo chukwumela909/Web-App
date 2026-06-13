@@ -19,11 +19,13 @@ import {
   activateBackendStaffMember,
   cancelBackendStaffInvitation,
   deactivateBackendStaffMember,
+  deleteBackendStaffMember,
   getBackendStaff,
   getBackendStaffInvitations,
   getBackendStaffLogs,
   updateBackendStaffMember
 } from '@/lib/backend-business-api'
+import { useBusinessRole } from '@/hooks/useBusinessRole'
 import { getBranches } from '@/lib/branches-service'
 import { Branch } from '@/lib/branches-types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -152,6 +154,7 @@ function mapBackendStaffLog(row: any, ownerId: string): StaffActivityLog {
 
 export default function StaffPage() {
   const { user } = useAuth()
+  const { isOwner } = useBusinessRole()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('staff-list')
   const [staff, setStaff] = useState<Staff[]>([])
@@ -319,6 +322,21 @@ export default function StaffPage() {
     } catch (error) {
       console.error('Error updating staff status:', error)
       alert('Failed to update staff status')
+    }
+  }
+
+  const handleDeleteStaff = async (member: Staff) => {
+    const confirmed = window.confirm(
+      `Permanently delete ${member.fullName}?\n\nThis removes their staff record and cannot be undone. ` +
+        `To temporarily revoke access instead, use Deactivate.`
+    )
+    if (!confirmed) return
+    try {
+      await deleteBackendStaffMember(member.id)
+      await loadStaff()
+      await loadActivityLogs()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to delete staff member')
     }
   }
 
@@ -780,6 +798,17 @@ export default function StaffPage() {
                               className="bg-green-600 hover:bg-green-700 text-white"
                             >
                               <UserCheck className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {isOwner && member.role !== 'owner' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteStaff(member)}
+                              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
+                              title="Delete permanently"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
