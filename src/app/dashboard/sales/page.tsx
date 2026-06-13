@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Clock,
   Loader2,
+  LogOut,
   Minus,
   Package,
   Plus,
@@ -188,12 +189,21 @@ function discountValidationMessage(value: number, discountType: DiscountType, fi
 
 function SalesPOSContent() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const { staff } = useStaff()
   const { selectedBranchId } = useBranch()
   const { currency } = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
   const { canRecordSale } = usePlanLimits()
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.replace('/login')
+    } catch (error) {
+      console.error('Error logging out:', error)
+    }
+  }
   const receiptRef = useRef<HTMLDivElement>(null)
 
   const effectiveUserId = staff ? staff.userId : user?.uid
@@ -704,6 +714,15 @@ function SalesPOSContent() {
                 title="Back to dashboard"
               >
                 <Power className="h-7 w-7" />
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center gap-2 rounded-xl bg-[#1a2547] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#e11d48]"
+                title="Log out"
+              >
+                <LogOut className="h-5 w-5" />
+                <span className="hidden sm:inline">Log out</span>
               </button>
             </div>
           </header>

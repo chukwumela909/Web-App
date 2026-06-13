@@ -3,6 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
 import { useStaffRedirect } from '@/hooks/useStaffRedirect'
+import { useBusinessRole } from '@/hooks/useBusinessRole'
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus'
 import { useNotifications } from '@/contexts/NotificationsContext'
 import { useBranch } from '@/contexts/BranchContext'
@@ -71,6 +72,9 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, logout } = useAuth()
   const { staff, hasPermission, loading: staffLoading } = useStaff()
+  // Authoritative business role from the backend session. Invited staff (manager/cashier)
+  // are exempt from phone verification — it's an owner/onboarding step, not theirs.
+  const { role: businessRole, loading: businessRoleLoading } = useBusinessRole()
   const { isSubscribed, isLoading: subscriptionLoading } = useSubscriptionStatus()
   const { notifications } = useNotifications()
   const {
@@ -175,7 +179,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const displayTitle = currentPageInfo.title.replace('{{username}}', displayName)
   const currentBranch = selectedBranch
   const isOnVerifyPhonePage = pathname === '/dashboard/verify-phone'
-  const needsPhoneVerification = user && !staff && phoneVerified === false && !phoneCheckLoading && !isOnVerifyPhonePage
+  // Invited staff (manager/cashier) never need to verify a phone number; only the
+  // business owner / not-yet-onboarded users do. Wait for the role to resolve so the
+  // modal doesn't flash for staff before their session loads.
+  const isInvitedStaff = businessRole === 'manager' || businessRole === 'cashier'
+  const needsPhoneVerification =
+    user &&
+    !staff &&
+    !isInvitedStaff &&
+    !businessRoleLoading &&
+    phoneVerified === false &&
+    !phoneCheckLoading &&
+    !isOnVerifyPhonePage
 
   return (
     <div className="h-screen flex bg-[#f6f8fb] font-dm-sans text-[#0f172a] chrome-flex-row chrome-gpu-acceleration">
