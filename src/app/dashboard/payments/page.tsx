@@ -6,7 +6,8 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import Image from 'next/image'
 import { useAuth } from '@/contexts/AuthContext'
-import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
+import { getCurrencySymbol } from '@/hooks/useCurrency'
+import { useBillingLocation } from '@/hooks/useBillingLocation'
 import {
   getBackendBillingHistory,
   getBackendBillingReceipt,
@@ -29,7 +30,10 @@ interface SubscriptionHistory {
 function PaymentsPageContent() {
   const { user } = useAuth()
   const router = useRouter()
-  const { currency } = useCurrency()
+  // Plan-card pricing follows the user's CURRENT location (IP), matching the rest of the
+  // billing flow. This hook returns exactly 'KSH' | 'USD', so the `=== 'KSH'` checks below
+  // work (useCurrency normalized KSH→KES, which made those checks always fall to USD).
+  const { currency } = useBillingLocation()
   const currencySymbol = getCurrencySymbol(currency)
   const [subscriptions, setSubscriptions] = useState<SubscriptionHistory[]>([])
   const [isLoading, setIsLoading] = useState(true)
