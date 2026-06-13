@@ -672,7 +672,8 @@ export function mapSale(row: AnyRecord): Sale {
     isDeleted: false,
     isRefunded: Boolean(row.isRefunded),
     branchId: row.branchId || null,
-    userId: row.userId || ''
+    userId: row.userId || '',
+    createdByName: row.createdByName || null
   }
 }
 
@@ -723,6 +724,7 @@ export function mapMultiItemSale(row: AnyRecord): MultiItemSale {
     date: dateString(timestamp),
     notes: row.notes || null,
     createdBy: row.createdBy || null,
+    createdByName: row.createdByName || null,
     isDeleted: false,
     isRefunded: Boolean(row.isRefunded),
     deletedAt: null,
@@ -1589,6 +1591,13 @@ export async function manuallyActivateBackendAdminSubscription(
     account: result.account ?? null,
     subscription: normalizeSubscriptionRecord(result.subscription)
   }
+}
+
+export async function deactivateBackendAdminSubscription(businessAccountId: string, reason?: string) {
+  return api<AnyRecord>(`/admin/businesses/${businessAccountId}/subscriptions/deactivate`, {
+    method: 'POST',
+    body: JSON.stringify(reason ? { reason } : {})
+  })
 }
 
 export async function retryBackendAdminPaymentEvent(eventId: string) {

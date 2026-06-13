@@ -123,7 +123,14 @@ function mapBackendStaff(row: any, ownerId: string): Staff {
     email: String(row.email || row.user?.email || ''),
     phone: String(row.phone || row.user?.phone || ''),
     role: String(row.role || 'cashier').toLowerCase() as StaffRole,
-    branchIds: Array.isArray(row.branchIds) ? row.branchIds.map(String) : [],
+    // Backend (Mongo) serializes the membership field as `assignedBranchIds`; fall back to
+    // `branchIds` only for legacy/Firestore-shaped rows. Reading the wrong key showed every
+    // staff member as "No branches assigned".
+    branchIds: Array.isArray(row.assignedBranchIds)
+      ? row.assignedBranchIds.map(String)
+      : Array.isArray(row.branchIds)
+        ? row.branchIds.map(String)
+        : [],
     status: String(row.status || 'active').toLowerCase() as StaffStatus,
     lastLogin: row.lastLoginAt ? toMillis(row.lastLoginAt) : undefined,
     twoFactorEnabled: Boolean(row.twoFactorEnabled),

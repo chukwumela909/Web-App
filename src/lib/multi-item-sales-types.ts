@@ -52,6 +52,7 @@ export interface MultiItemSale {
   
   // Tracking and Audit
   createdBy?: string | null // Staff member who created the sale
+  createdByName?: string | null // Name of the cashier who made the sale (for receipts)
   isDeleted: boolean
   isRefunded?: boolean
   deletedAt?: number | null

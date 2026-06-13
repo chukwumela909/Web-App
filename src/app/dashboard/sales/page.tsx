@@ -358,7 +358,7 @@ function SalesPOSContent() {
     saleNumber: sale.saleNumber,
     customerName: sale.customerName,
     paymentMethod: paymentLabel(sale.paymentMethod),
-    cashierName,
+    cashierName: sale.createdByName || cashierName,
     items: sale.items.map(item => ({
       productName: item.productName,
       quantity: item.quantity,
@@ -382,7 +382,7 @@ function SalesPOSContent() {
     id: sale.id,
     customerName: sale.customerName,
     paymentMethod: paymentLabel(sale.paymentMethod),
-    cashierName,
+    cashierName: sale.createdByName || cashierName,
     items: [{
       productName: sale.productName,
       quantity: sale.quantitySold,

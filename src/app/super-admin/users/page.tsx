@@ -48,6 +48,7 @@ import { useToast } from '@/hooks/use-toast'
 import { handleError } from '@/lib/error-handler'
 import {
   activateBackendSubscription,
+  deactivateBackendAdminSubscription,
   manuallyActivateBackendAdminSubscription,
   searchBackendAdminBusinesses,
   searchBackendAdminUsers,
@@ -553,6 +554,20 @@ export default function UsersPage() {
     )))
   }
 
+  const markUserSubscriptionInactive = (userId: string) => {
+    setUsers((currentUsers) => currentUsers.map((user) => (
+      user.id === userId
+        ? {
+            ...user,
+            isSubscribed: false,
+            subscriptionId: null,
+            subscriptionEndDate: null,
+            planType: null
+          }
+        : user
+    )))
+  }
+
   const activateUserSubscription = async (targetUser: User) => {
     const currentUser = auth.currentUser
     const isCurrentOwner = currentUser && (
@@ -701,18 +716,20 @@ export default function UsersPage() {
           })
           break
           
-        case 'revoke-subscription':
-          const revokeBusinessAccountId = getUserBusinessAccountId(selectedUser)
-          if (!revokeBusinessAccountId) {
-            throw new Error(`No backend business account was found for ${selectedUser.email}.`)
-          }
-          await setBackendAdminBusinessStatus(revokeBusinessAccountId, 'revoke')
+        case 'revoke-subscription': {
+          const businessAccount = await findBusinessAccountForUser(selectedUser)
+          await deactivateBackendAdminSubscription(
+            businessAccount.id,
+            `Pro access revoked by super admin for ${selectedUser.email}`
+          )
+          markUserSubscriptionInactive(selectedUser.id)
           toast({
             title: 'Success',
-            description: `Backend access revoked for ${selectedUser.email}`,
+            description: `Pro subscription revoked for ${selectedUser.email}`,
             variant: 'success'
           })
           break
+        }
           
         case 'delete':
           console.log('Attempting to delete user:', selectedUser.id, selectedUser.email)
@@ -827,14 +844,16 @@ export default function UsersPage() {
             await activateUserSubscription(user)
             shouldRefreshUsers = false
             break
-          case 'revoke-subscription':
-            const revokeBusinessAccountId = getUserBusinessAccountId(user)
-            if (!revokeBusinessAccountId) {
-              throw new Error(`No backend business account was found for ${user.email}.`)
-            }
-            await setBackendAdminBusinessStatus(revokeBusinessAccountId, 'revoke')
+          case 'revoke-subscription': {
+            const businessAccount = await findBusinessAccountForUser(user)
+            await deactivateBackendAdminSubscription(
+              businessAccount.id,
+              `Pro access revoked by super admin for ${user.email}`
+            )
+            markUserSubscriptionInactive(user.id)
             shouldRefreshUsers = true
             break
+          }
           case 'disable':
             const businessAccountId = getUserBusinessAccountId(user)
 

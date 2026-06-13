@@ -224,6 +224,7 @@ export interface Sale {
   lastModifiedAt?: number
   branchId?: string | null
   userId: string
+  createdByName?: string | null // Name of the cashier who made the sale (for receipts)
 }
 
 export type ExpenseCategory =
