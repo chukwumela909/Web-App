@@ -5,7 +5,8 @@ import { Check, X, Menu, ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
+import { getCurrencySymbol } from '@/hooks/useCurrency'
+import { useBillingLocation } from '@/hooks/useBillingLocation'
 import { useAuth } from '@/contexts/AuthContext'
 import { getBackendBillingPlans, type BackendBillingPlans } from '@/lib/backend-business-api'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -137,15 +138,16 @@ export default function SubscriptionPage() {
     const [activeTab, setActiveTab] = useState<'mobile' | 'web' | 'desktop'>('mobile')
     const [plans, setPlans] = useState<BackendBillingPlans | null>(null)
     const router = useRouter()
-    const { currency, isLoading} = useCurrency()
+    // Currency + provider follow the user's CURRENT location (IP), not their onboarding country.
+    const { currency, country, isLoading } = useBillingLocation()
     const { user } = useAuth()
 
     useEffect(() => {
-        if (!user) return
-        getBackendBillingPlans()
+        if (!user || isLoading) return
+        getBackendBillingPlans(country)
             .then(setPlans)
             .catch((error) => console.warn('Unable to load backend billing plans:', error))
-    }, [user])
+    }, [user, isLoading, country])
 
     const scrollToCompareFeatures = () => {
         const element = document.getElementById('compare-features')
@@ -163,10 +165,9 @@ export default function SubscriptionPage() {
         router.push(`/dashboard/subscription/checkout?plan=${plan}&currency=${currency}`)
     }
 
-    // pricing (display depends on toggle and currency)
+    // pricing (display depends on toggle); amount comes from the backend's location-resolved plan
     const getProPrice = () => {
-        const region = currency === 'KSH' ? 'kenya' : 'other'
-        const backendAmount = plans?.[isYearly ? 'yearly' : 'monthly']?.[region]?.amount
+        const backendAmount = plans?.[isYearly ? 'yearly' : 'monthly']?.amount
         if (typeof backendAmount === 'number') return backendAmount
 
         if (currency === 'KSH') {

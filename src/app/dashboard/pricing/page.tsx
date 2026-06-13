@@ -5,32 +5,33 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
-import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
+import { getCurrencySymbol } from '@/hooks/useCurrency'
+import { useBillingLocation } from '@/hooks/useBillingLocation'
 import { useAuth } from '@/contexts/AuthContext'
 import { getBackendBillingPlans, type BackendBillingPlans } from '@/lib/backend-business-api'
 
 function PricingPageContent() {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
     const [plans, setPlans] = useState<BackendBillingPlans | null>(null)
-    const { currency, isLoading } = useCurrency()
+    // Currency + provider follow the user's CURRENT location (IP), not their onboarding country.
+    const { currency, country, isLoading } = useBillingLocation()
     const { user } = useAuth()
     const router = useRouter()
 
     useEffect(() => {
-        if (!user) return
-        getBackendBillingPlans()
+        if (!user || isLoading) return
+        getBackendBillingPlans(country)
             .then(setPlans)
             .catch((error) => console.warn('Unable to load backend billing plans:', error))
-    }, [user])
+    }, [user, isLoading, country])
 
     const handleGetPro = () => {
         router.push(`/dashboard/subscription/checkout?plan=${billingCycle}&currency=${currency}`)
     }
 
-    // Get price based on currency and billing cycle
+    // Price comes from the backend's location-resolved plan; fall back to defaults until it loads.
     const getPrice = () => {
-        const region = currency === 'KSH' ? 'kenya' : 'other'
-        const backendAmount = plans?.[billingCycle]?.[region]?.amount
+        const backendAmount = plans?.[billingCycle]?.amount
         if (typeof backendAmount === 'number') return backendAmount.toLocaleString()
 
         if (currency === 'KSH') {

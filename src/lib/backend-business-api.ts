@@ -32,15 +32,14 @@ export interface BackendPlanPrice {
   currency: BackendBillingCurrency
 }
 
+// The backend resolves plans against the caller's CURRENT location (sent as ?country=),
+// so it returns a single currency + the single allowed provider, never both regions.
 export interface BackendBillingPlans {
-  monthly: {
-    kenya: BackendPlanPrice
-    other: BackendPlanPrice
-  }
-  yearly: {
-    kenya: BackendPlanPrice
-    other: BackendPlanPrice
-  }
+  region: 'KENYA' | 'OTHER'
+  currency: BackendBillingCurrency
+  provider: 'mpesa' | 'stripe'
+  monthly: BackendPlanPrice
+  yearly: BackendPlanPrice
 }
 
 export interface BackendSubscriptionRecord {
@@ -1378,8 +1377,12 @@ export async function getBackendSubscription(): Promise<BackendCurrentSubscripti
   }
 }
 
-export async function getBackendBillingPlans(): Promise<BackendBillingPlans> {
-  return api<BackendBillingPlans>('/billing/plans')
+export async function getBackendBillingPlans(country?: string): Promise<BackendBillingPlans> {
+  // Pass the IP-detected country so the backend prices in the user's current-location
+  // currency and reports the single allowed provider. Omitted/unknown → USD via card.
+  const trimmed = country?.trim()
+  const query = trimmed ? `?country=${encodeURIComponent(trimmed)}` : ''
+  return api<BackendBillingPlans>(`/billing/plans${query}`)
 }
 
 export async function getBackendBillingHistory(): Promise<BackendSubscriptionRecord[]> {

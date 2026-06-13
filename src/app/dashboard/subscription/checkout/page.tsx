@@ -4,7 +4,8 @@ import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/contexts/AuthContext'
-import { getCurrencySymbol, useCurrency } from '@/hooks/useCurrency'
+import { getCurrencySymbol } from '@/hooks/useCurrency'
+import { useBillingLocation } from '@/hooks/useBillingLocation'
 import {
     getBackendCheckoutStatus,
     startBackendMpesaCheckout,
@@ -26,7 +27,8 @@ function CheckoutContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const { user, refreshBackendSession } = useAuth()
-    const { country, isLoading: isCurrencyLoading } = useCurrency()
+    // Provider + currency are gated on the user's CURRENT location (IP), not onboarding.
+    const { country, currency, isLoading: isCurrencyLoading } = useBillingLocation()
 
     // Determine if user is in Kenya
     const isKenyan = country === 'KE'
@@ -40,10 +42,10 @@ function CheckoutContent() {
     const [pollCount, setPollCount] = useState(0)
     const MAX_POLL_ATTEMPTS = 30 // Poll for up to 60 seconds (30 attempts * 2 seconds)
 
-    // Get plan details from URL params
+    // Get plan details from URL params. Currency is derived from the detected location
+    // (above), not the URL, so it can't be spoofed or go stale via the query string.
     const requestedPlan = searchParams.get('plan')
     const plan = requestedPlan === 'monthly' || requestedPlan === 'yearly' ? requestedPlan : 'yearly'
-    const currency = searchParams.get('currency') || 'USD' // Default to USD
 
     // Calculate amount based on plan and currency
     const getAmount = () => {
