@@ -33,17 +33,8 @@ export function DownloadModal({ open, onOpenChange }: DownloadModalProps) {
 
   const handleWindowsDownload = () => {
     const link = document.createElement('a')
-    link.href = 'https://f005.backblazeb2.com/file/myapp-downloads/FahamPesa.exe'
-    link.download = 'FahamPesa.exe'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  const handleMacDownload = () => {
-    const link = document.createElement('a')
-    link.href = '/fahampesa.dmg'
-    link.download = 'fahampesa.dmg'
+    link.href = 'https://f005.backblazeb2.com/file/fahampesa/Fahampesa_0.1.0_x64-setup.exe'
+    link.download = 'Fahampesa_0.1.0_x64-setup.exe'
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -129,10 +120,11 @@ export function DownloadModal({ open, onOpenChange }: DownloadModalProps) {
                   MacOS
                 </p>
                 <button
-                  onClick={handleMacDownload}
-                  className="bg-[#004aad] text-white font-dm-sans font-semibold text-[16px] px-[24px] py-[10px] rounded-[12px] w-full hover:bg-[#003a8c] transition-colors"
+                  disabled
+                  aria-disabled="true"
+                  className="bg-[#e5e7eb] text-[#6b7280] font-dm-sans font-semibold text-[16px] px-[24px] py-[10px] rounded-[12px] w-full cursor-not-allowed"
                 >
-                  Download
+                  Coming Soon
                 </button>
               </div>
             </div>
