@@ -215,7 +215,6 @@ function SalesPOSContent() {
   const [customerName, setCustomerName] = useState('')
   const [discount, setDiscount] = useState('0')
   const [discountType, setDiscountType] = useState<DiscountType>('fixed')
-  const [tax, setTax] = useState('0')
   const [notes, setNotes] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodName>('CASH')
   const [resumedHeldSaleId, setResumedHeldSaleId] = useState<string | null>(null)
@@ -240,6 +239,8 @@ function SalesPOSContent() {
   const multiItemSales = posData?.multiItemSales || []
   const heldSales = posData?.heldSales || []
   const businessProfile = posData?.businessProfile || null
+  // Tax rate (%) configured in Settings → Pricing is applied automatically to every sale.
+  const taxRatePercent = Math.max(0, Number(businessProfile?.taxRate || 0))
   const receiptBusinessName = businessProfile?.businessName?.trim() || user?.displayName?.trim() || 'Business'
   const receiptBusinessPhone = businessProfile?.businessPhone?.trim()
   const receiptBusinessAddress = businessProfile?.businessAddress?.trim()
@@ -319,8 +320,8 @@ function SalesPOSContent() {
     [cartItems]
   )
   const taxAmount = useMemo(
-    () => Number(Math.max(0, numberFromInput(tax)).toFixed(2)),
-    [tax]
+    () => Number(Math.max(0, subtotal * (taxRatePercent / 100)).toFixed(2)),
+    [subtotal, taxRatePercent]
   )
   const discountAmount = useMemo(
     () => {
@@ -442,7 +443,6 @@ function SalesPOSContent() {
     setCustomerName('')
     setDiscount('0')
     setDiscountType('fixed')
-    setTax('0')
     setNotes('')
     setPaymentMethod('CASH')
     setResumedHeldSaleId(null)
@@ -591,7 +591,6 @@ function SalesPOSContent() {
     setCustomerName(heldSale.customerName || '')
     setDiscount(heldSale.discount ? String(heldSale.discount) : '0')
     setDiscountType(heldSale.discountType || 'fixed')
-    setTax(heldSale.tax ? String(heldSale.tax) : '0')
     setNotes(heldSale.notes || '')
     setPaymentMethod(paymentName(heldSale.paymentMethod))
     setResumedHeldSaleId(heldSale.id)
@@ -1009,10 +1008,12 @@ function SalesPOSContent() {
                         <span>Subtotal ({cartQuantity} items)</span>
                         <span>{formatMoney(subtotal)}</span>
                       </div>
-                      <div className="flex items-center justify-between text-[13px] font-semibold text-[#777e8b]">
-                        <span>Tax</span>
-                        <span>{formatMoney(taxAmount)}</span>
-                      </div>
+                      {taxRatePercent > 0 && (
+                        <div className="flex items-center justify-between text-[13px] font-semibold text-[#777e8b]">
+                          <span>Tax ({taxRatePercent}%)</span>
+                          <span>{formatMoney(taxAmount)}</span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between text-[13px] font-semibold text-[#d92d20]">
                         <span>Cart discount amount</span>
                         <span>-{formatMoney(discountAmount)}</span>
@@ -1022,19 +1023,6 @@ function SalesPOSContent() {
                         <span className="text-[24px] font-extrabold">{formatMoney(totalAmount).replace(' ', '')}</span>
                       </div>
                     </div>
-
-                    <label className="grid grid-cols-[105px_minmax(0,1fr)] items-center gap-3">
-                      <span className="text-[15px] font-semibold text-[#777e8b]">Tax</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={tax}
-                        onChange={event => setTax(event.target.value)}
-                        placeholder="0"
-                        className="dashboard-field h-10 px-4 text-[13px]"
-                      />
-                    </label>
 
                     <div className="space-y-2">
                       <span className="block text-[15px] font-semibold text-[#777e8b]">Cart discount</span>

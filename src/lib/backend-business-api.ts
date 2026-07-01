@@ -454,8 +454,31 @@ export async function createBackendBranch(data: Partial<Branch>) {
 export async function updateBackendBranch(branchId: string, data: Partial<Branch>) {
   await api(`/branches/${branchId}`, {
     method: 'PATCH',
-    body: JSON.stringify(data)
+    body: JSON.stringify(toBackendBranchUpdatePayload(data))
   })
+}
+
+// Whitelist + normalize to the shapes the branches validator expects. The edit
+// form carries UPPERCASE status ('ACTIVE'), but the backend enum is lowercase;
+// sending it verbatim fails validation ("Failed to update branch"). Stray keys
+// like `id` are dropped, and an empty contact email is omitted so the optional
+// email() check doesn't reject ''.
+function toBackendBranchUpdatePayload(data: Partial<Branch>): AnyRecord {
+  const record = data as AnyRecord
+  const payload: AnyRecord = {}
+  if (data.name !== undefined) payload.name = data.name
+  if (data.branchCode !== undefined) payload.branchCode = data.branchCode
+  if (data.branchType !== undefined) payload.branchType = data.branchType
+  if (data.description !== undefined) payload.description = data.description
+  if (record.currency !== undefined) payload.currency = record.currency
+  if (data.location !== undefined) payload.location = data.location
+  if (data.contact !== undefined) {
+    payload.contact = { ...data.contact, email: data.contact?.email || undefined }
+  }
+  if (data.openingHours !== undefined) payload.openingHours = data.openingHours
+  if (record.taxSettings !== undefined) payload.taxSettings = record.taxSettings
+  if (data.status !== undefined) payload.status = String(data.status).toLowerCase()
+  return payload
 }
 
 export async function disableBackendBranch(branchId: string) {
@@ -755,6 +778,22 @@ export async function getBackendMultiItemSales(branchId?: string): Promise<Multi
     .sort((a, b) => b.timestamp - a.timestamp)
 }
 
+// The POS form sends `taxRate` (a percentage), but the backend sale API only
+// accepts an absolute `tax` amount — so the entered percentage was being dropped
+// and every sale persisted with tax = 0. Derive the amount from `taxRate` (using
+// each line's subtotal) whenever an explicit `tax` isn't supplied, mirroring the
+// legacy Firestore path in createMultiItemSaleAndReturn.
+function resolveBackendSaleTax(saleData: AnyRecord, items: AnyRecord[]): number {
+  if (saleData.tax != null) return Number(saleData.tax) || 0
+  const rate = Number(saleData.taxRate || 0)
+  if (rate <= 0) return 0
+  const subtotal = items.reduce(
+    (sum, item) => sum + Number(item.lineSubtotal ?? Number(item.unitPrice || 0) * Number(item.quantity || 0)),
+    0
+  )
+  return Number((subtotal * (rate / 100)).toFixed(2))
+}
+
 export async function createBackendSale(data: Partial<Sale> | AnyRecord, branchId?: string) {
   const saleData = data as AnyRecord
   const targetBranch = branchId || String(saleData.branchId || '') || await getSelectedBackendBranchId()
@@ -789,7 +828,7 @@ export async function createBackendSale(data: Partial<Sale> | AnyRecord, branchI
         debtorId: saleData.debtorId || undefined
       },
       paymentMethod: toBackendPaymentMethod(saleData.paymentMethod),
-      tax: Number(saleData.tax || 0),
+      tax: resolveBackendSaleTax(saleData, items),
       discount: Number(saleData.discount || 0),
       discountType: discountTypeOf(saleData.discountType),
       notes: saleData.notes || undefined
@@ -824,7 +863,7 @@ export async function createBackendSaleAndReturn(data: AnyRecord, branchId?: str
         debtorId: saleData.debtorId || undefined
       },
       paymentMethod: toBackendPaymentMethod(saleData.paymentMethod),
-      tax: Number(saleData.tax || 0),
+      tax: resolveBackendSaleTax(saleData, items),
       discount: Number(saleData.discount || 0),
       discountType: discountTypeOf(saleData.discountType),
       notes: saleData.notes || undefined
