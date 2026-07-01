@@ -213,6 +213,8 @@ function SalesPOSContent() {
   const [isSaleActive, setIsSaleActive] = useState(false)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [customerName, setCustomerName] = useState('')
+  const [taxRateInput, setTaxRateInput] = useState('0')
+  const [taxRateTouched, setTaxRateTouched] = useState(false)
   const [discount, setDiscount] = useState('0')
   const [discountType, setDiscountType] = useState<DiscountType>('fixed')
   const [notes, setNotes] = useState('')
@@ -239,8 +241,10 @@ function SalesPOSContent() {
   const multiItemSales = posData?.multiItemSales || []
   const heldSales = posData?.heldSales || []
   const businessProfile = posData?.businessProfile || null
-  // Tax rate (%) configured in Settings → Pricing is applied automatically to every sale.
-  const taxRatePercent = Math.max(0, Number(businessProfile?.taxRate || 0))
+  // Tax rate (%) configured in Settings → Pricing pre-fills the POS tax field,
+  // but the cashier can override it per sale via the editable input below.
+  const configuredTaxRate = Math.max(0, Number(businessProfile?.taxRate || 0))
+  const taxRatePercent = Math.max(0, numberFromInput(taxRateInput))
   const receiptBusinessName = businessProfile?.businessName?.trim() || user?.displayName?.trim() || 'Business'
   const receiptBusinessPhone = businessProfile?.businessPhone?.trim()
   const receiptBusinessAddress = businessProfile?.businessAddress?.trim()
@@ -260,6 +264,14 @@ function SalesPOSContent() {
     await invalidateAllBusinessData()
     await refetchPOSData()
   }
+
+  // Keep the POS tax field in sync with the Settings-configured rate until the
+  // cashier manually edits it for the current sale.
+  useEffect(() => {
+    if (!taxRateTouched) {
+      setTaxRateInput(configuredTaxRate ? String(configuredTaxRate) : '0')
+    }
+  }, [configuredTaxRate, taxRateTouched])
 
   useEffect(() => {
     setOnline(typeof navigator === 'undefined' ? true : navigator.onLine)
@@ -441,6 +453,8 @@ function SalesPOSContent() {
   const resetSaleState = () => {
     setCartItems([])
     setCustomerName('')
+    setTaxRateInput(configuredTaxRate ? String(configuredTaxRate) : '0')
+    setTaxRateTouched(false)
     setDiscount('0')
     setDiscountType('fixed')
     setNotes('')
@@ -1022,6 +1036,22 @@ function SalesPOSContent() {
                         <span className="text-[16px] font-bold text-[#141925]">Total</span>
                         <span className="text-[24px] font-extrabold">{formatMoney(totalAmount).replace(' ', '')}</span>
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="block text-[15px] font-semibold text-[#777e8b]">Tax rate (%)</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={taxRateInput}
+                        onChange={event => {
+                          setTaxRateTouched(true)
+                          setTaxRateInput(event.target.value)
+                        }}
+                        placeholder="0"
+                        className="dashboard-field h-10 w-full px-3 text-[13px]"
+                      />
                     </div>
 
                     <div className="space-y-2">
