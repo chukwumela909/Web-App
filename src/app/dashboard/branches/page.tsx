@@ -31,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import {
   createBranch as createBranchRecord,
+  deactivateBranch as deactivateBranchRecord,
   getBranchDashboard,
   getBranches as getBranchRecords,
   updateBranch as updateBranchRecord
@@ -118,6 +119,8 @@ function BranchesContent() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState<Branch | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState<Branch | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Load dashboard data
   const loadDashboard = async () => {
@@ -209,6 +212,32 @@ function BranchesContent() {
       console.error('Error updating branch:', error)
       alert('Failed to update branch')
       return false
+    }
+  }
+
+  // Deactivate branch. The backend has no hard-delete — "delete" soft-disables the
+  // branch (POST /branches/:id/disable), which removes it from the active list and
+  // frees a branch slot. Owner-only and requires a recent login server-side.
+  const deleteBranch = async (branch: Branch) => {
+    if (!user) return
+
+    setDeleting(true)
+    try {
+      await deactivateBranchRecord(branch.id, 'Deactivated from branch list')
+      await loadBranches()
+      await loadDashboard()
+      setShowDeleteModal(null)
+    } catch (error) {
+      console.error('Error deactivating branch:', error)
+      if (isBackendApiError(error) && error.code === 'recent_reauth_required') {
+        alert('For security, please sign out and back in, then deactivate this branch again.')
+      } else if (isBackendApiError(error) && error.code === 'owner_required') {
+        alert('Only the account owner can deactivate a branch.')
+      } else {
+        alert(isBackendApiError(error) ? (error.message || 'Failed to deactivate branch') : 'Failed to deactivate branch')
+      }
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -729,6 +758,8 @@ function BranchesContent() {
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => setShowDeleteModal(branch)}
+                          title="Deactivate branch"
                           className="hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
                         >
                           <TrashIcon className="h-4 w-4" />
@@ -955,6 +986,49 @@ function BranchesContent() {
           onSave={(data) => updateBranch(showEditModal.id, data)}
           onCancel={() => setShowEditModal(null)}
         />
+      )}
+
+      {/* Deactivate Branch Confirmation */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-xl shadow-xl max-w-md w-full p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <TrashIcon className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Deactivate Branch</h3>
+                <p className="text-sm text-gray-600">Data is preserved, but the branch is removed from your list</p>
+              </div>
+            </div>
+
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to deactivate <strong>{showDeleteModal.name}</strong>? It will be removed
+              from your active branches and free up a branch slot. You can re-add a branch later.
+            </p>
+
+            <div className="flex gap-3">
+              <Button
+                onClick={() => deleteBranch(showDeleteModal)}
+                disabled={deleting}
+                className="flex-1 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deactivating...' : 'Yes, Deactivate'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteModal(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   )
