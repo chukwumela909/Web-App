@@ -489,6 +489,12 @@ export async function enableBackendBranch(branchId: string) {
   await api(`/branches/${branchId}/enable`, { method: 'POST' })
 }
 
+// Permanently delete a branch and cascade-remove all of its data on the backend
+// (inventory, sales, expenses, debtors, suppliers, POs, stock movements/transfers).
+export async function deleteBackendBranch(branchId: string) {
+  await api(`/branches/${branchId}`, { method: 'DELETE' })
+}
+
 export async function getBackendBranchDashboard(branchId: string): Promise<BranchDashboard> {
   const data = await api<AnyRecord>(`/branches/${branchId}/dashboard`)
   return {

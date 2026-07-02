@@ -62,6 +62,7 @@ import {
 import {
   createBackendBranch,
   createBackendTransfer,
+  deleteBackendBranch,
   disableBackendBranch,
   getBackendBranch,
   getBackendBranchDashboard,
@@ -506,6 +507,11 @@ export async function deactivateBranch(
 }
 
 export async function deleteBranch(branchId: string): Promise<void> {
+  if (isBackendAvailable()) {
+    await deleteBackendBranch(branchId)
+    return
+  }
+
   // Check for any transfers
   const transfersQuery = query(
     collection(db, 'branch_transfers'),

@@ -31,7 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import {
   createBranch as createBranchRecord,
-  deactivateBranch as deactivateBranchRecord,
+  deleteBranch as deleteBranchRecord,
   getBranchDashboard,
   getBranches as getBranchRecords,
   updateBranch as updateBranchRecord
@@ -121,6 +121,7 @@ function BranchesContent() {
   const [showEditModal, setShowEditModal] = useState<Branch | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState<Branch | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   // Load dashboard data
   const loadDashboard = async () => {
@@ -215,26 +216,29 @@ function BranchesContent() {
     }
   }
 
-  // Deactivate branch. The backend has no hard-delete — "delete" soft-disables the
-  // branch (POST /branches/:id/disable), which removes it from the active list and
-  // frees a branch slot. Owner-only and requires a recent login server-side.
+  // Permanently delete a branch. The backend cascade-removes all of the branch's
+  // data (inventory, sales, expenses, debtors, suppliers, POs, stock movements) and
+  // refuses to delete the only active branch. Owner-only.
   const deleteBranch = async (branch: Branch) => {
     if (!user) return
 
     setDeleting(true)
     try {
-      await deactivateBranchRecord(branch.id, 'Deactivated from branch list')
+      await deleteBranchRecord(branch.id)
       await loadBranches()
       await loadDashboard()
       setShowDeleteModal(null)
+      setDeleteConfirmText('')
     } catch (error) {
-      console.error('Error deactivating branch:', error)
-      if (isBackendApiError(error) && error.code === 'recent_reauth_required') {
-        alert('For security, please sign out and back in, then deactivate this branch again.')
+      console.error('Error deleting branch:', error)
+      if (isBackendApiError(error) && error.code === 'last_active_branch') {
+        alert('You cannot delete your only active branch. Create another branch first.')
       } else if (isBackendApiError(error) && error.code === 'owner_required') {
-        alert('Only the account owner can deactivate a branch.')
+        alert('Only the account owner can delete a branch.')
+      } else if (isBackendApiError(error) && error.code === 'recent_reauth_required') {
+        alert('For security, please sign out and back in, then delete this branch again.')
       } else {
-        alert(isBackendApiError(error) ? (error.message || 'Failed to deactivate branch') : 'Failed to deactivate branch')
+        alert(isBackendApiError(error) ? (error.message || 'Failed to delete branch') : 'Failed to delete branch')
       }
     } finally {
       setDeleting(false)
@@ -758,8 +762,8 @@ function BranchesContent() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setShowDeleteModal(branch)}
-                          title="Deactivate branch"
+                          onClick={() => { setDeleteConfirmText(''); setShowDeleteModal(branch) }}
+                          title="Delete branch permanently"
                           className="hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
                         >
                           <TrashIcon className="h-4 w-4" />
@@ -988,7 +992,7 @@ function BranchesContent() {
         />
       )}
 
-      {/* Deactivate Branch Confirmation */}
+      {/* Permanently Delete Branch Confirmation */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <motion.div
@@ -1001,27 +1005,40 @@ function BranchesContent() {
                 <TrashIcon className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Deactivate Branch</h3>
-                <p className="text-sm text-gray-600">Data is preserved, but the branch is removed from your list</p>
+                <h3 className="text-lg font-semibold text-gray-900">Delete Branch Permanently</h3>
+                <p className="text-sm text-gray-600">This cannot be undone</p>
               </div>
             </div>
 
-            <p className="text-gray-700 mb-6">
-              Are you sure you want to deactivate <strong>{showDeleteModal.name}</strong>? It will be removed
-              from your active branches and free up a branch slot. You can re-add a branch later.
+            <p className="text-gray-700 mb-4">
+              This permanently deletes <strong>{showDeleteModal.name}</strong> and <strong>all of its data</strong> —
+              stock, sales history, inventory, expenses, debtors, suppliers, and purchase orders for this branch.
+              This action is irreversible.
             </p>
+
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type <span className="font-semibold">{showDeleteModal.name}</span> to confirm
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder={showDeleteModal.name}
+              className="w-full px-3 py-2 border rounded-md mb-6"
+              autoFocus
+            />
 
             <div className="flex gap-3">
               <Button
                 onClick={() => deleteBranch(showDeleteModal)}
-                disabled={deleting}
-                className="flex-1 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                disabled={deleting || deleteConfirmText.trim() !== showDeleteModal.name.trim()}
+                className="flex-1 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {deleting ? 'Deactivating...' : 'Yes, Deactivate'}
+                {deleting ? 'Deleting...' : 'Delete Permanently'}
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setShowDeleteModal(null)}
+                onClick={() => { setShowDeleteModal(null); setDeleteConfirmText('') }}
                 disabled={deleting}
               >
                 Cancel
