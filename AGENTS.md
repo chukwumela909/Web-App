@@ -9,7 +9,7 @@ FahamPesa — a Next.js 15 (App Router, React 19) business management web app fo
 ## Commands
 
 ```bash
-npm install        # install dependencies
+npm install        # install dependencies.
 npm run dev        # local dev server (next dev)
 npm run build      # production build
 npm run start      # serve production build
