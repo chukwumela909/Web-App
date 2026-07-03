@@ -294,42 +294,6 @@ export default function StaffPage() {
       }
       await loadStaff()
       await loadActivityLogs()
-      return
-    } catch (backendError) {
-      console.warn('Unable to update backend staff status, falling back to local route:', backendError)
-    }
-
-    try {
-      let url = `/api/staff/${staffId}`
-      let method = 'PUT'
-      let body = JSON.stringify({
-        userId: user?.uid,
-        status
-      })
-
-      // Special case for activation
-      if (status === 'active') {
-        url = `/api/staff/${staffId}/activate`
-        method = 'POST'
-        body = JSON.stringify({ userId: user?.uid })
-      }
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        await loadStaff()
-        await loadActivityLogs()
-      } else {
-        alert(`Error: ${result.error}`)
-      }
     } catch (error) {
       console.error('Error updating staff status:', error)
       alert('Failed to update staff status')

@@ -11,6 +11,11 @@ import { getBranches } from '@/lib/branches-service'
 import { Branch } from '@/lib/branches-types'
 import { Staff, StaffRole, STAFF_PERMISSIONS } from '@/lib/firestore'
 import {
+  getBackendStaffMember,
+  updateBackendStaffMember,
+  deactivateBackendStaffMember,
+} from '@/lib/backend-business-api'
+import {
   ArrowLeft,
   Edit,
   Trash2,
@@ -181,11 +186,35 @@ export default function StaffDetailsPage({}: StaffDetailsPageProps) {
   const loadStaffDetails = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/staff/${params.id}`)
-      if (response.ok) {
-        const { data } = await response.json()
+      // Read from the backend (never Firestore). Identity is nested under `user`,
+      // and the login timestamp under `user.lastLoginAt`.
+      const row: any = await getBackendStaffMember(String(params.id))
+      if (row) {
+        const branchIds = Array.isArray(row.assignedBranchIds)
+          ? row.assignedBranchIds.map(String)
+          : Array.isArray(row.branchIds) ? row.branchIds.map(String) : []
+        const lastLoginRaw = row.lastLoginAt ?? row.user?.lastLoginAt
+        const data = {
+          id: String(row.id || row._id || params.id),
+          authId: String(row.firebaseUid || row.authId || row.user?.firebaseUid || ''),
+          userId: user!.uid,
+          fullName: String(row.fullName || row.user?.fullName || row.email || row.user?.email || 'Staff member'),
+          email: String(row.email || row.user?.email || ''),
+          phone: String(row.phone || row.user?.phone || ''),
+          role: String(row.role || 'cashier').toLowerCase(),
+          status: String(row.status || 'active').toLowerCase(),
+          branchIds,
+          permissions: Array.isArray(row.permissions) ? row.permissions : [],
+          lastLogin: lastLoginRaw ? (new Date(lastLoginRaw).getTime() || undefined) : undefined,
+          twoFactorEnabled: Boolean(row.twoFactorEnabled),
+          employeeId: row.employeeId || '',
+          salary: row.salary !== undefined ? Number(row.salary) : 0,
+          emergencyContact: row.emergencyContact || { name: '', phone: '', relationship: '' },
+          managerName: row.managerName || undefined,
+          createdBy: String(row.createdBy || user!.uid),
+        } as unknown as Staff
         setStaff(data)
-        setStaffPermissions(data.permissions || STAFF_PERMISSIONS[data.role as StaffRole] || [])
+        setStaffPermissions(data.permissions?.length ? data.permissions : STAFF_PERMISSIONS[data.role as StaffRole] || [])
         setSelectedModules(getModuleFromPermissions(data.permissions || []))
         
         // Initialize edit form
@@ -234,25 +263,11 @@ export default function StaffDetailsPage({}: StaffDetailsPageProps) {
     try {
       const structuredPermissions = getPermissionsFromModules(selectedModules)
       
-      const response = await fetch(`/api/staff/${staff.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId: staff.userId,
-          permissions: structuredPermissions 
-        })
-      })
-
-      if (response.ok) {
-        setStaffPermissions(structuredPermissions)
-        setEditingPermissions(false)
-        await loadStaffDetails() // Refresh data
-        alert('Permissions updated successfully!')
-      } else {
-        const errorData = await response.json()
-        console.error('Error response:', errorData)
-        alert(`Failed to update permissions: ${errorData.error || 'Unknown error'}`)
-      }
+      await updateBackendStaffMember(staff.id, { permissions: structuredPermissions })
+      setStaffPermissions(structuredPermissions)
+      setEditingPermissions(false)
+      await loadStaffDetails() // Refresh data
+      alert('Permissions updated successfully!')
     } catch (error) {
       console.error('Error updating permissions:', error)
       alert('Failed to update permissions')
@@ -263,24 +278,10 @@ export default function StaffDetailsPage({}: StaffDetailsPageProps) {
     if (!staff) return
     
     try {
-      const response = await fetch(`/api/staff/${staff.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId: staff.userId,
-          ...editForm
-        })
-      })
-
-      if (response.ok) {
-        setEditingDetails(false)
-        await loadStaffDetails() // Refresh data
-        alert('Staff details updated successfully!')
-      } else {
-        const errorData = await response.json()
-        console.error('Error response:', errorData)
-        alert(`Failed to update details: ${errorData.error || 'Unknown error'}`)
-      }
+      await updateBackendStaffMember(staff.id, { ...editForm })
+      setEditingDetails(false)
+      await loadStaffDetails() // Refresh data
+      alert('Staff details updated successfully!')
     } catch (error) {
       console.error('Error updating details:', error)
       alert('Failed to update details')
@@ -291,20 +292,9 @@ export default function StaffDetailsPage({}: StaffDetailsPageProps) {
     if (!staff) return
     
     try {
-      const response = await fetch(`/api/staff/${staff.id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: staff.userId })
-      })
-
-      if (response.ok) {
-        alert('Staff member deactivated successfully!')
-        router.push('/dashboard/staff')
-      } else {
-        const errorData = await response.json()
-        console.error('Error response:', errorData)
-        alert(`Failed to deactivate staff: ${errorData.error || 'Unknown error'}`)
-      }
+      await deactivateBackendStaffMember(staff.id)
+      alert('Staff member deactivated successfully!')
+      router.push('/dashboard/staff')
     } catch (error) {
       console.error('Error deactivating staff:', error)
       alert('Failed to deactivate staff')
@@ -317,23 +307,9 @@ export default function StaffDetailsPage({}: StaffDetailsPageProps) {
     try {
       const updatedBranchIds = staff.branchIds.filter(id => id !== branchIdToRemove)
       
-      const response = await fetch(`/api/staff/${staff.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId: staff.userId,
-          branchIds: updatedBranchIds
-        })
-      })
-
-      if (response.ok) {
-        await loadStaffDetails() // Refresh data
-        alert('Branch removed successfully!')
-      } else {
-        const errorData = await response.json()
-        console.error('Error response:', errorData)
-        alert(`Failed to remove branch: ${errorData.error || 'Unknown error'}`)
-      }
+      await updateBackendStaffMember(staff.id, { branchIds: updatedBranchIds })
+      await loadStaffDetails() // Refresh data
+      alert('Branch removed successfully!')
     } catch (error) {
       console.error('Error removing branch:', error)
       alert('Failed to remove branch')
@@ -344,24 +320,10 @@ export default function StaffDetailsPage({}: StaffDetailsPageProps) {
     if (!staff) return
     
     try {
-      const response = await fetch(`/api/staff/${staff.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId: staff.userId,
-          branchIds: selectedBranchIds
-        })
-      })
-
-      if (response.ok) {
-        await loadStaffDetails() // Refresh data
-        setShowBranchManager(false)
-        alert('Branch assignments updated successfully!')
-      } else {
-        const errorData = await response.json()
-        console.error('Error response:', errorData)
-        alert(`Failed to update branches: ${errorData.error || 'Unknown error'}`)
-      }
+      await updateBackendStaffMember(staff.id, { branchIds: selectedBranchIds })
+      await loadStaffDetails() // Refresh data
+      setShowBranchManager(false)
+      alert('Branch assignments updated successfully!')
     } catch (error) {
       console.error('Error updating branches:', error)
       alert('Failed to update branches')
