@@ -161,7 +161,7 @@ export default function ReceiptModal({
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold">Receipt</h2>
-              <p className="text-green-100 text-sm">Sale #{sale.id.slice(-8)}</p>
+              <p className="text-green-100 text-sm">{sale.saleNumber ?? `Sale #${sale.id.slice(-8)}`}</p>
             </div>
             <button
               onClick={onClose}
@@ -191,7 +191,7 @@ export default function ReceiptModal({
               </div>
               <div className="flex justify-between">
                 <span>Receipt #:</span>
-                <span>{sale.id.slice(-8)}</span>
+                <span>{sale.saleNumber ?? sale.id.slice(-8)}</span>
               </div>
               {sale.customerName && (
                 <div className="flex justify-between">

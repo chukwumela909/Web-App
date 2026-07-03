@@ -93,8 +93,8 @@ function SalesHistoryContent() {
   }, [effectiveUserId])
 
   // Helper function to generate sale display names
-  const generateSaleDisplayName = (saleId: string, productName?: string, items?: any[]) => {
-    const shortId = saleId.slice(-4)
+  const generateSaleDisplayName = (saleNumber: string | undefined, saleId: string, productName?: string, items?: any[]) => {
+    const label = saleNumber ?? `Sale #${saleId.slice(-4)}`
 
     if (items && items.length > 0) {
       // Multi-item sale
@@ -102,11 +102,11 @@ function SalesHistoryContent() {
       const additionalCount = items.length - 1
 
       return additionalCount > 0
-        ? `Sale #${shortId} – ${topItem} + ${additionalCount} more items`
-        : `Sale #${shortId} – ${topItem}`
+        ? `${label} – ${topItem} + ${additionalCount} more items`
+        : `${label} – ${topItem}`
     } else {
       // Single-item sale
-      return `Sale #${shortId} – ${productName || 'Unknown'}`
+      return `${label} – ${productName || 'Unknown'}`
     }
   }
 
@@ -115,7 +115,7 @@ function SalesHistoryContent() {
     const singleItemSales = sales.map(sale => ({
       ...sale,
       saleType: 'single-item' as const,
-      displayName: generateSaleDisplayName(sale.id, sale.productName),
+      displayName: generateSaleDisplayName(sale.saleNumber, sale.id, sale.productName),
       itemCount: 1
     }))
 
@@ -131,7 +131,7 @@ function SalesHistoryContent() {
       isRefunded: multiSale.isRefunded,
       userId: multiSale.userId,
       saleType: 'multi-item' as const,
-      displayName: generateSaleDisplayName(multiSale.id, undefined, multiSale.items),
+      displayName: generateSaleDisplayName(multiSale.saleNumber, multiSale.id, undefined, multiSale.items),
       itemCount: multiSale.items.length,
       items: multiSale.items,
       saleNumber: multiSale.saleNumber

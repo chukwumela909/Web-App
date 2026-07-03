@@ -703,7 +703,7 @@ export default function DashboardPage() {
                   <div className="flex flex-col gap-3">
                     {allSales.slice(0, 5).map((sale) => {
                       const saleDate = new Date(sale.timestamp)
-                      const shortId = sale.id?.slice(0, 5) || 'N/A'
+                      const saleLabel = sale.saleNumber ?? `Sale #${sale.id?.slice(0, 5) || 'N/A'}`
                       const productName = sale.displayName || sale.productName || 'Unknown Product'
                       const itemCount = sale.itemCount || sale.quantitySold || 1
 
@@ -716,7 +716,7 @@ export default function DashboardPage() {
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
                               <span className="font-dm-sans font-semibold text-[14px] text-[#004aad]">
-                                Sale #{shortId}
+                                {saleLabel}
                               </span>
                               <span className="font-dm-sans font-medium text-[14px] text-black">
                                 - {productName}

@@ -143,11 +143,14 @@ export default function SubscriptionPage() {
     const { user } = useAuth()
 
     useEffect(() => {
-        if (!user || isLoading) return
+        // Wait only for IP/region detection — NOT for auth. Anonymous visitors arriving from the
+        // landing page must also get the backend's region-resolved plan amounts, otherwise the page
+        // falls back to hardcoded USD/KSH constants and can show a wrong/stale regional price.
+        if (isLoading) return
         getBackendBillingPlans(country)
             .then(setPlans)
             .catch((error) => console.warn('Unable to load backend billing plans:', error))
-    }, [user, isLoading, country])
+    }, [isLoading, country])
 
     const scrollToCompareFeatures = () => {
         const element = document.getElementById('compare-features')

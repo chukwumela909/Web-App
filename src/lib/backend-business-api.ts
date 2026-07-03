@@ -686,6 +686,7 @@ export function mapSale(row: AnyRecord): Sale {
   const total = Number(row.totalAmount ?? row.total ?? unitPrice * quantity)
   return {
     id: idOf(row),
+    saleNumber: row.saleNumber || idOf(row),
     productId: item.productId || row.productId || null,
     productName: item.productName || item.name || row.productName || row.name || 'Sale',
     saleType: 'PRODUCT',
