@@ -23,7 +23,8 @@ import {
   ClockIcon,
   ArrowPathIcon,
   CheckCircleIcon,
-  CubeIcon
+  CubeIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -1288,89 +1289,94 @@ interface EditBranchModalProps {
 }
 
 function EditBranchModal({ branch, onSave, onCancel }: EditBranchModalProps) {
-  const [formData, setFormData] = useState({
-    name: branch.name,
-    branchCode: branch.branchCode || '',
-    branchType: branch.branchType,
-    status: branch.status,
-    location: branch.location,
-    contact: branch.contact,
-    description: branch.description || ''
-  })
+  const [name, setName] = useState(branch.name || '')
+  const [code, setCode] = useState(branch.branchCode || '')
+  const [city, setCity] = useState(branch.location?.city || '')
+  const [type, setType] = useState<Branch['branchType']>(branch.branchType || 'BRANCH')
+  const [phone, setPhone] = useState(branch.contact?.phone || '')
+  const [email, setEmail] = useState(branch.contact?.email || '')
+  const [manager, setManager] = useState(branch.managerName || '')
   const [saving, setSaving] = useState(false)
+  const valid = name.trim().length > 0
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSave = async () => {
+    if (!valid || saving) return
     setSaving(true)
-
-    const success = await onSave(formData)
+    // Preserve the fields this compact form doesn't expose (address, region,
+    // coordinates, alternate contacts) by spreading the existing objects.
+    await onSave({
+      name: name.trim(),
+      branchCode: code.trim() || undefined,
+      branchType: type,
+      location: { ...branch.location, city: city.trim() },
+      contact: { ...branch.contact, phone: phone.trim(), email: email.trim() },
+      managerName: manager.trim() || undefined
+    })
     setSaving(false)
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}
+    >
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[16px] bg-white shadow-2xl"
       >
-        <h3 className="text-2xl font-semibold mb-6">Edit Branch</h3>
+        <div className="flex items-start justify-between bg-gradient-to-r from-[#004AAD] to-[#0056CC] p-6 text-white">
+          <h2 className="text-xl font-bold">Edit branch</h2>
+          <button onClick={onCancel} className="rounded-lg p-2 transition-colors hover:bg-white/20" aria-label="Close">
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Branch Name *</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Status</label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
-                className="w-full px-3 py-2 border rounded-md"
-              >
-                <option value="ACTIVE">Active</option>
-                <option value="INACTIVE">Inactive</option>
-                <option value="UNDER_MAINTENANCE">Under Maintenance</option>
-                <option value="TEMPORARILY_CLOSED">Temporarily Closed</option>
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-gray-700">Branch name</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Karen Outlet" className="dashboard-field w-full px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-gray-700">Branch code</span>
+              <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Auto if blank" className="dashboard-field w-full px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-gray-700">City</span>
+              <input value={city} onChange={(e) => setCity(e.target.value)} className="dashboard-field w-full px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-gray-700">Type</span>
+              <select value={type} onChange={(e) => setType(e.target.value as Branch['branchType'])} className="dashboard-field w-full px-3 py-2 text-sm">
+                <option value="MAIN">MAIN</option>
+                <option value="BRANCH">BRANCH</option>
+                <option value="OUTLET">OUTLET</option>
+                <option value="WAREHOUSE">WAREHOUSE</option>
+                <option value="KIOSK">KIOSK</option>
               </select>
-            </div>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-gray-700">Phone</span>
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254 …" className="dashboard-field w-full px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-gray-700">Email</span>
+              <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="branch@business.co.ke" className="dashboard-field w-full px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-gray-700">Manager</span>
+              <input value={manager} onChange={(e) => setManager(e.target.value)} placeholder="Manager name" className="dashboard-field w-full px-3 py-2 text-sm" />
+            </label>
           </div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Address *</label>
-            <textarea
-              value={formData.location.address}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                location: { ...prev.location, address: e.target.value }
-              }))}
-              className="w-full px-3 py-2 border rounded-md"
-              rows={2}
-              required
-            />
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="submit"
-              className="flex-1"
-              disabled={saving}
-            >
-              {saving ? 'Updating...' : 'Update Branch'}
-            </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-          </div>
-        </form>
+        <div className="flex items-center justify-end gap-3 border-t border-[#eef2f7] p-4">
+          <button type="button" onClick={onCancel} disabled={saving} className="dashboard-action-muted">Cancel</button>
+          <button type="button" onClick={handleSave} disabled={!valid || saving} className="dashboard-action-primary disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save branch'}
+          </button>
+        </div>
       </motion.div>
     </div>
   )
