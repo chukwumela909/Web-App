@@ -132,7 +132,11 @@ function mapBackendStaff(row: any, ownerId: string): Staff {
         ? row.branchIds.map(String)
         : [],
     status: String(row.status || 'active').toLowerCase() as StaffStatus,
-    lastLogin: row.lastLoginAt ? toMillis(row.lastLoginAt) : undefined,
+    // The backend nests the timestamp under `user.lastLoginAt` (older/Firestore shapes
+    // put it top-level). Reading only the top-level key showed every member as "Never".
+    lastLogin: (row.lastLoginAt ?? row.user?.lastLoginAt)
+      ? toMillis(row.lastLoginAt ?? row.user?.lastLoginAt)
+      : undefined,
     twoFactorEnabled: Boolean(row.twoFactorEnabled),
     permissions: Array.isArray(row.permissions) ? row.permissions : [],
     employeeId: row.employeeId,
