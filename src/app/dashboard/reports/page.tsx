@@ -427,7 +427,8 @@ export default function ReportsPage() {
         totalSales: Number(backendDashboardReport.totalSales || 0),
         totalProfit: Number(backendDashboardReport.totalProfit || 0),
         totalTransactions: Number(backendDashboardReport.salesCount || 0),
-        debt: totalDebt
+        debt: totalDebt,
+        expenses: Number(backendDashboardReport.totalExpenses || 0)
       }
     }
 
@@ -453,7 +454,8 @@ export default function ReportsPage() {
       totalSales,
       totalProfit,
       totalTransactions,
-      debt: totalDebt
+      debt: totalDebt,
+      expenses: 0
     }
   }, [allSalesData, backendDashboardReport, debtors, selectedPeriod])
 
@@ -952,7 +954,7 @@ export default function ReportsPage() {
         ['Total Sales', `${currencySymbol} ${metrics.totalSales.toLocaleString()}`],
         ['Total Profit', `${currencySymbol} ${metrics.totalProfit.toLocaleString()}`],
         ['Transactions', metrics.totalTransactions.toString()],
-        ['Debt', `${currencySymbol} ${metrics.debt.toLocaleString()}`]
+        ['Expenses', `${currencySymbol} ${metrics.expenses.toLocaleString()}`]
       ].map(row => row.join(',')).join('\n')
 
       const blob = new Blob([csvContent], { type: 'text/csv' })
@@ -1109,8 +1111,8 @@ export default function ReportsPage() {
                 trendColor="red"
               />
               <StatCard
-                title="Debt"
-                value={`${currencySymbol} ${metrics.debt.toLocaleString()}`}
+                title="Expenses"
+                value={`${currencySymbol} ${metrics.expenses.toLocaleString()}`}
                 trend={null}
               />
             </motion.div>

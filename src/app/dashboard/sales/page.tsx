@@ -147,10 +147,16 @@ function paymentName(method: unknown): PaymentMethodName {
   return 'CASH'
 }
 
-function saleTitle(id: string, productName?: string, items?: SaleItem[]): string {
-  const shortId = id.slice(-5)
+function saleTitle(saleNumber: string | undefined, id: string, productName?: string, items?: SaleItem[]): string {
+  const label = saleNumber ?? `Sale #${id.slice(-5)}`
   const firstItem = items?.[0]?.productName || productName || 'Sale'
-  return `Sale #${shortId} - ${firstItem}`
+  return `${label} - ${firstItem}`
+}
+
+// Receipt reference — the backend sale number when present (matches the desktop app),
+// otherwise a short id. Kept in sync with saleTitle's labelling.
+function saleRef(id: string, saleNumber?: string): string {
+  return saleNumber && saleNumber !== id ? saleNumber : id.slice(-8).toUpperCase()
 }
 
 function normaliseFixedDiscount(value: number, maximum: number): number {
@@ -393,6 +399,7 @@ function SalesPOSContent() {
 
   const receiptFromSingleSale = useCallback((sale: Sale): ReceiptSnapshot => ({
     id: sale.id,
+    saleNumber: sale.saleNumber,
     customerName: sale.customerName,
     paymentMethod: paymentLabel(sale.paymentMethod),
     cashierName: sale.createdByName || cashierName,
@@ -423,7 +430,7 @@ function SalesPOSContent() {
     const multiEntries: RecentEntry[] = multiItemSales.map(sale => ({
       kind: 'sale',
       id: sale.id,
-      title: saleTitle(sale.id, undefined, sale.items),
+      title: saleTitle(sale.saleNumber, sale.id, undefined, sale.items),
       itemCount: sale.items.length,
       timestamp: sale.timestamp,
       totalAmount: sale.totalAmount,
@@ -433,7 +440,7 @@ function SalesPOSContent() {
     const singleEntries: RecentEntry[] = singleSales.map(sale => ({
       kind: 'sale',
       id: sale.id,
-      title: saleTitle(sale.id, sale.productName),
+      title: saleTitle(sale.saleNumber, sale.id, sale.productName),
       itemCount: 1,
       timestamp: sale.timestamp,
       totalAmount: sale.totalAmount,
@@ -664,7 +671,7 @@ function SalesPOSContent() {
     printWindow.document.write(`
       <html>
         <head>
-          <title>Receipt - ${receiptSale.id.slice(-8)}</title>
+          <title>Receipt - ${saleRef(receiptSale.id, receiptSale.saleNumber)}</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 0; padding: 24px; color: #06112b; }
             .receipt-print { max-width: 440px; margin: 0 auto; }
@@ -1290,7 +1297,7 @@ function SalesPOSContent() {
                   <div className="space-y-5 border-b border-[#cfd4dd] py-6">
                     <div className="flex justify-between gap-5 text-[16px]">
                       <span className="text-[#7a818f]">Receipt #:</span>
-                      <span className="font-semibold">#{receiptSale.id.slice(-8).toUpperCase()}</span>
+                      <span className="font-semibold">{saleRef(receiptSale.id, receiptSale.saleNumber)}</span>
                     </div>
                     <div className="flex justify-between gap-5 text-[16px]">
                       <span className="text-[#7a818f]">Payment Method:</span>
