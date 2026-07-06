@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import { authedFetch } from '@/lib/authed-fetch'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   Staff,
@@ -57,7 +58,7 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
         // If not found in old system, try the new super-admin staff system
         if (!staffData) {
           try {
-            const response = await fetch(`/api/admin/staff/${user.uid}`)
+            const response = await authedFetch(`/api/admin/staff/${user.uid}`)
             const data = await response.json()
             
             if (data.success) {

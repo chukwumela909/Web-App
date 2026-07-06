@@ -47,15 +47,13 @@ function CheckoutContent() {
     const requestedPlan = searchParams.get('plan')
     const plan = requestedPlan === 'monthly' || requestedPlan === 'yearly' ? requestedPlan : 'yearly'
 
-    // Calculate amount based on plan and currency
+    // Calculate amount based on plan and currency. Must mirror the backend PLAN_PRICES
+    // (billing.service.ts): Kenya → KSH 2,000/20,000 via M-Pesa; elsewhere → USD 10/100 via card.
     const getAmount = () => {
         if (currency === 'KSH') {
             return plan === 'yearly' ? 20000 : 2000
         } else {
-            // TEST: USD reduced to Stripe's minimum ($0.50) to verify card payments.
-            // The actual charge is set by the backend (PLAN_PRICES.OTHER); this keeps the
-            // confirmation screen in sync. Revert to `plan === 'yearly' ? 100 : 10` for production.
-            return 0.5
+            return plan === 'yearly' ? 100 : 10
         }
     }
 

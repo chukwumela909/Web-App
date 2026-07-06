@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStaff } from '@/lib/firestore'
+import { requireUser } from '@/lib/api-auth'
 
 // GET /api/staff - List all staff for a user
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireUser(request)
+    if ('response' in authResult) return authResult.response
+
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const branchId = searchParams.get('branchId')

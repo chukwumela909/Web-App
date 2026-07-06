@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { authedFetch } from '@/lib/authed-fetch'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -123,7 +124,7 @@ export default function StaffDashboardPage() {
       setLoading(true)
       
       // Fetch staff data by Firebase Auth UID
-      const response = await fetch(`/api/admin/staff/${user?.uid}`)
+      const response = await authedFetch(`/api/admin/staff/${user?.uid}`)
       const data = await response.json()
       
       if (data.success) {

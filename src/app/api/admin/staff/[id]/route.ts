@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuth } from 'firebase-admin/auth'
 import { adminApp, adminDb } from '@/lib/firebase-admin-server'
+import { requirePlatformAdmin, requireUser } from '@/lib/api-auth'
 
 // Mock staff data for development - starting with empty list
 const mockStaffMembers: any[] = []
@@ -11,7 +12,14 @@ export async function GET(
 ) {
   try {
     const { id: staffId } = await params
-    
+
+    // A signed-in user may read their own staff record (login flow); anyone else must be a platform admin.
+    const authResult = await requireUser(request)
+    if ('response' in authResult) return authResult.response
+    if (authResult.context.uid !== staffId && !authResult.context.isPlatformAdmin) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+    }
+
     if (!adminDb) {
       return NextResponse.json({
         success: false,
@@ -63,6 +71,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requirePlatformAdmin(request)
+    if ('response' in authResult) return authResult.response
+
     const { id: staffId } = await params
     const body = await request.json()
     const { name, email, role, permissions, status } = body
@@ -113,8 +124,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requirePlatformAdmin(request)
+    if ('response' in authResult) return authResult.response
+
     const { id: staffId } = await params
-    
+
     if (!adminDb || !adminApp) {
       return NextResponse.json({
         success: false,

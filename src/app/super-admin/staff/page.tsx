@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { authedFetch } from '@/lib/authed-fetch'
 import AdminRoute from '@/components/auth/AdminRoute'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -162,7 +163,7 @@ export default function StaffManagementPage() {
     try {
       setLoading(true)
       
-      const response = await fetch('/api/admin/staff')
+      const response = await authedFetch('/api/admin/staff')
       const data = await response.json()
       
       if (data.success) {
@@ -236,7 +237,7 @@ export default function StaffManagementPage() {
         password: password
       }
 
-      const response = await fetch('/api/admin/staff', {
+      const response = await authedFetch('/api/admin/staff', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

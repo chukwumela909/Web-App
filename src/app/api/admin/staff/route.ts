@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuth } from 'firebase-admin/auth'
 import { adminApp, adminDb } from '@/lib/firebase-admin-server'
 import { FieldValue } from 'firebase-admin/firestore'
+import { requirePlatformAdmin } from '@/lib/api-auth'
 
 // Mock staff data for development - starting with empty list
 const mockStaffMembers: any[] = []
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requirePlatformAdmin(request)
+    if ('response' in authResult) return authResult.response
+
     if (!adminDb) {
       return NextResponse.json({
         success: false,
@@ -82,8 +86,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requirePlatformAdmin(request)
+    if ('response' in authResult) return authResult.response
+
     const body = await request.json()
-    
+
     // Validate required fields
     const { name, email, role, permissions, password } = body
     
@@ -245,6 +252,9 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const authResult = await requirePlatformAdmin(request)
+    if ('response' in authResult) return authResult.response
+
     const body = await request.json()
     const { id, name, email, role, permissions, status } = body
     
@@ -297,6 +307,9 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const authResult = await requirePlatformAdmin(request)
+    if ('response' in authResult) return authResult.response
+
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')
     

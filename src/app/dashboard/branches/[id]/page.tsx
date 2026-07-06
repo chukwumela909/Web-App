@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { authedFetch } from '@/lib/authed-fetch'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
@@ -14,6 +15,8 @@ import {
   updateBranch,
 } from '@/lib/branches-service'
 import { Staff } from '@/lib/firestore'
+import { getBackendStaff } from '@/lib/backend-business-api'
+import { isBackendApiError } from '@/lib/backend-api'
 import {
   ArrowLeft,
   Edit,
@@ -198,30 +201,21 @@ export default function BranchDetailsPage({}: BranchDetailsPageProps) {
   }
 
   const loadBranchStaff = async () => {
-    if (!user?.uid || !params.id) return
-    
+    if (!params.id) return
+
     try {
-      // Get staff assigned to this branch
-      const response = await fetch(`/api/staff?userId=${user.uid}&branchId=${params.id}`)
-      if (response.ok) {
-        const { data } = await response.json()
-        setStaff(data)
-      }
+      // Staff come from the backend (source of truth) so invited staff are included.
+      const data = await getBackendStaff({ branchId: String(params.id) })
+      setStaff(data as unknown as Staff[])
     } catch (error) {
       console.error('Error loading branch staff:', error)
     }
   }
 
   const loadAllStaff = async () => {
-    if (!user?.uid) return
-    
     try {
-      // Get all staff for manager assignment
-      const response = await fetch(`/api/staff?userId=${user.uid}`)
-      if (response.ok) {
-        const { data } = await response.json()
-        setAllStaff(data)
-      }
+      const data = await getBackendStaff()
+      setAllStaff(data as unknown as Staff[])
     } catch (error) {
       console.error('Error loading all staff:', error)
     }
@@ -255,20 +249,21 @@ export default function BranchDetailsPage({}: BranchDetailsPageProps) {
       router.push('/dashboard/branches')
     } catch (error) {
       console.error('Error deactivating branch:', error)
-      alert('Failed to deactivate branch')
+      // Disabling a branch requires a recent login (backend requireRecentAuth, 5 min).
+      if (isBackendApiError(error) && error.code === 'recent_reauth_required') {
+        alert('For security, disabling a branch requires a recent sign-in. Please log out and back in, then try again.')
+      } else {
+        alert('Failed to deactivate branch')
+      }
     }
   }
 
-  const handleAssignManager = async (managerId: string) => {
+  const handleAssignManager = async (managerUserId: string) => {
     if (!branch) return
-    
+
     try {
-      const selectedStaff = allStaff.find(s => s.id === managerId)
-      await updateBranch(branch.id, {
-        userId: branch.userId,
-        managerId: managerId,
-        managerName: selectedStaff?.fullName || ''
-      } as any)
+      // managerUserId is the manager's backend User id (staff.userId), which is what the branch stores.
+      await updateBranch(branch.id, { managerUserId } as any)
 
       setShowManagerModal(false)
       await loadBranchDetails() // Refresh data
@@ -309,6 +304,12 @@ export default function BranchDetailsPage({}: BranchDetailsPageProps) {
       </ProtectedRoute>
     )
   }
+
+  // The backend stores only managerUserId; resolve the display name from the loaded staff list.
+  const branchManager = branch.managerId
+    ? allStaff.find((s) => String((s as unknown as { userId?: string }).userId || s.id) === branch.managerId)
+    : undefined
+  const branchManagerName = branchManager?.fullName || branch.managerName || ''
 
   return (
     <ProtectedRoute>
@@ -845,13 +846,13 @@ export default function BranchDetailsPage({}: BranchDetailsPageProps) {
                     </button>
                   </div>
 
-                  {branch.managerId && branch.managerName ? (
+                  {branch.managerId && branchManagerName ? (
                     <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-lg">
                       <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-medium">
-                        {branch.managerName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                        {branchManagerName.split(' ').map(n => n[0]).join('').toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{branch.managerName}</p>
+                        <p className="font-medium text-gray-900">{branchManagerName}</p>
                         <p className="text-sm text-gray-600">Branch Manager</p>
                       </div>
                     </div>
@@ -1222,10 +1223,10 @@ function ManagerAssignmentModal({ branch, allStaff, onAssign, onClose }: Manager
           <div className="max-h-80 overflow-y-auto space-y-2">
             {eligibleStaff.length > 0 ? (
               eligibleStaff.map(staff => (
-                <div 
-                  key={staff.id} 
+                <div
+                  key={staff.id}
                   className="p-4 rounded-lg border-2 border-gray-200 hover:border-blue-300 transition-all cursor-pointer"
-                  onClick={() => handleAssign(staff.id)}
+                  onClick={() => handleAssign(String((staff as unknown as { userId?: string }).userId || staff.id))}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -1243,7 +1244,7 @@ function ManagerAssignmentModal({ branch, allStaff, onAssign, onClose }: Manager
                           }`}>
                             {staff.role}
                           </span>
-                          {staff.id === branch.managerId && (
+                          {String((staff as unknown as { userId?: string }).userId || staff.id) === branch.managerId && (
                             <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               Current Manager
                             </span>
@@ -1254,7 +1255,7 @@ function ManagerAssignmentModal({ branch, allStaff, onAssign, onClose }: Manager
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleAssign(staff.id)
+                        handleAssign(String((staff as unknown as { userId?: string }).userId || staff.id))
                       }}
                       disabled={saving}
                       className="px-3 py-1 bg-[#004AAD] text-white rounded text-sm hover:bg-blue-700 transition-colors disabled:opacity-50"

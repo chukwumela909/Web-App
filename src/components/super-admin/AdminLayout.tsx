@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { authedFetch } from '@/lib/authed-fetch'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -20,6 +21,7 @@ import {
   X,
   LogOut,
   Shield,
+  ShieldCheck,
   ChevronLeft,
   ChevronRight,
   CreditCard
@@ -39,6 +41,7 @@ const navigationItems = [
   { name: 'Dashboard', href: '/super-admin', icon: LayoutDashboard, permission: 'dashboard' },
   { name: 'Users', href: '/super-admin/users', icon: Users, permission: 'user_management' },
   { name: 'Staff', href: '/super-admin/staff', icon: UserCog, permission: 'staff_management' },
+  { name: 'Admins', href: '/super-admin/admins', icon: ShieldCheck, permission: 'admin_management' },
   { name: 'Reports', href: '/super-admin/reports', icon: FileText, permission: 'reports_exports' },
   { name: 'Audit Logs', href: '/super-admin/audit-logs', icon: ScrollText, permission: 'audit_logs' },
   { name: 'System Health', href: '/super-admin/system-health', icon: Monitor, permission: 'system_health' },
@@ -80,7 +83,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       }
 
       // Fetch staff data
-      const response = await fetch(`/api/admin/staff/${user.uid}`)
+      const response = await authedFetch(`/api/admin/staff/${user.uid}`)
       const data = await response.json()
       
       if (data.success) {

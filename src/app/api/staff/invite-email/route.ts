@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUser } from '@/lib/api-auth'
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY || ''
 
@@ -11,6 +12,9 @@ function roleLabel(role: string) {
 // POST /api/staff/invite-email — email a staff invitation link via Brevo
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireUser(request)
+    if ('response' in authResult) return authResult.response
+
     const { email, inviteUrl, role, businessName } = await request.json()
 
     if (!email || !inviteUrl) {

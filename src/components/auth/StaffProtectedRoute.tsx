@@ -1,8 +1,8 @@
 'use client'
 
 import React from 'react'
-import { useStaff } from '@/contexts/StaffContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { useBusinessRole, BusinessRole } from '@/hooks/useBusinessRole'
 import { StaffRole } from '@/lib/firestore'
 import { Shield, AlertCircle } from 'lucide-react'
 
@@ -15,6 +15,28 @@ interface StaffProtectedRouteProps {
   showUnauthorized?: boolean
 }
 
+// Backend roles carry no granular permission list, so gate legacy `resource:action` permissions
+// by role. Owners/managers/admins get everything; cashiers get only the read/POS surface. This
+// mirrors the backend's own enforcement (manager_required etc.) so the UI never dead-ends a cashier
+// on a screen whose writes the server would 403 anyway — and, critically, no longer fails OPEN for
+// invited staff (who are absent from the legacy Firestore staff collection).
+const CASHIER_ALLOWED_PERMISSIONS = new Set([
+  'dashboard:read',
+  'sales:read',
+  'sales:create',
+  'pos:read',
+  'pos:use'
+])
+
+function isElevated(role: BusinessRole): boolean {
+  return role === 'owner' || role === 'manager' || role === 'admin'
+}
+
+function permissionAllowedForRole(permission: string, role: BusinessRole): boolean {
+  if (isElevated(role)) return true
+  return CASHIER_ALLOWED_PERMISSIONS.has(permission)
+}
+
 export default function StaffProtectedRoute({
   children,
   requiredPermission,
@@ -24,7 +46,19 @@ export default function StaffProtectedRoute({
   showUnauthorized = true
 }: StaffProtectedRouteProps) {
   const { user } = useAuth()
-  const { staff, loading, hasPermission, canViewBranch } = useStaff()
+  const { role, assignedBranchIds, loading } = useBusinessRole()
+
+  const deny = (title: string, message: string) => {
+    if (fallback) return <>{fallback}</>
+    if (!showUnauthorized) return null
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-6">
+        <Shield className="h-16 w-16 text-red-400 mb-4" />
+        <h2 className="text-xl font-semibold text-gray-700 mb-2">{title}</h2>
+        <p className="text-gray-500 text-center">{message}</p>
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -34,95 +68,44 @@ export default function StaffProtectedRoute({
     )
   }
 
-  // If no staff data but user is logged in, they are the OWNER - allow full access
-  if (!staff && user) {
-    return <>{children}</>
-  }
-
-  // If no staff data and no user, show unauthorized 
-  if (!staff && !user) {
+  if (!user) {
     if (fallback) return <>{fallback}</>
     if (!showUnauthorized) return null
-    
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] p-6">
         <AlertCircle className="h-16 w-16 text-gray-400 mb-4" />
         <h2 className="text-xl font-semibold text-gray-700 mb-2">Access Required</h2>
-        <p className="text-gray-500 text-center">
-          You need to be logged in to access this area.
-        </p>
+        <p className="text-gray-500 text-center">You need to be logged in to access this area.</p>
       </div>
     )
   }
 
-  // Check if staff is active
-  if (staff.status !== 'active') {
-    if (fallback) return <>{fallback}</>
-    if (!showUnauthorized) return null
-    
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] p-6">
-        <Shield className="h-16 w-16 text-red-400 mb-4" />
-        <h2 className="text-xl font-semibold text-gray-700 mb-2">Account Inactive</h2>
-        <p className="text-gray-500 text-center">
-          Your staff account is currently inactive. Please contact your administrator.
-        </p>
-      </div>
-    )
+  // No resolved business role (no active membership) → deny. The backend would 403 every action
+  // here anyway; failing closed is correct for invited staff whose role IS known.
+  if (!role) {
+    return deny('Access Required', 'Your account is not linked to a business yet.')
   }
 
-  // Check required permission
-  if (requiredPermission && !hasPermission(requiredPermission)) {
-    if (fallback) return <>{fallback}</>
-    if (!showUnauthorized) return null
-    
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] p-6">
-        <Shield className="h-16 w-16 text-red-400 mb-4" />
-        <h2 className="text-xl font-semibold text-gray-700 mb-2">Insufficient Permissions</h2>
-        <p className="text-gray-500 text-center">
-          You don't have the required permission: {requiredPermission}
-        </p>
-      </div>
-    )
+  if (requiredPermission && !permissionAllowedForRole(requiredPermission, role)) {
+    return deny('Insufficient Permissions', "You don't have access to this area.")
   }
 
-  // Check required role
   if (requiredRole) {
     const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole]
-    if (!roles.includes(staff.role)) {
-      if (fallback) return <>{fallback}</>
-      if (!showUnauthorized) return null
-      
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[400px] p-6">
-          <Shield className="h-16 w-16 text-red-400 mb-4" />
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Role Required</h2>
-          <p className="text-gray-500 text-center">
-            This area requires {Array.isArray(requiredRole) ? requiredRole.join(' or ') : requiredRole} role.
-          </p>
-        </div>
+    // 'admin' is elevated and passes any staff-role gate.
+    const roleMatches = role === 'admin' || roles.includes(role as StaffRole)
+    if (!roleMatches) {
+      return deny(
+        'Role Required',
+        `This area requires ${Array.isArray(requiredRole) ? requiredRole.join(' or ') : requiredRole} role.`
       )
     }
   }
 
-  // Check branch access
-  if (requiredBranchAccess && !canViewBranch(requiredBranchAccess)) {
-    if (fallback) return <>{fallback}</>
-    if (!showUnauthorized) return null
-    
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] p-6">
-        <Shield className="h-16 w-16 text-red-400 mb-4" />
-        <h2 className="text-xl font-semibold text-gray-700 mb-2">Branch Access Required</h2>
-        <p className="text-gray-500 text-center">
-          You don't have access to this branch.
-        </p>
-      </div>
-    )
+  if (requiredBranchAccess && !isElevated(role) && !assignedBranchIds.includes(requiredBranchAccess)) {
+    return deny('Branch Access Required', "You don't have access to this branch.")
   }
 
-  // All checks passed, render children
   return <>{children}</>
 }
 
@@ -154,17 +137,19 @@ export function withStaffRole(
   }
 }
 
-// Hook for conditional rendering based on permissions
+// Hook for conditional rendering based on permissions (backend-role backed).
 export function usePermissionCheck() {
-  const { hasPermission, staff } = useStaff()
-  
+  const { role, assignedBranchIds } = useBusinessRole()
+
   return {
-    canRender: (permission: string) => hasPermission(permission),
-    canRenderRole: (role: StaffRole | StaffRole[]) => {
-      if (!staff) return false
-      const roles = Array.isArray(role) ? role : [role]
-      return roles.includes(staff.role)
+    canRender: (permission: string) => (role ? permissionAllowedForRole(permission, role) : false),
+    canRenderRole: (requiredRole: StaffRole | StaffRole[]) => {
+      if (!role) return false
+      if (role === 'admin') return true
+      const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole]
+      return roles.includes(role as StaffRole)
     },
-    canRenderBranch: (branchId: string) => canViewBranch(branchId)
+    canRenderBranch: (branchId: string) =>
+      role ? role === 'owner' || role === 'admin' || assignedBranchIds.includes(branchId) : false
   }
 }

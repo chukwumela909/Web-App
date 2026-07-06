@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { authedFetch } from '@/lib/authed-fetch'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStaff } from '@/contexts/StaffContext'
 import { useRouter } from 'next/navigation'
@@ -86,7 +87,7 @@ export default function LoginPage() {
 
   const checkStaffStatus = async () => {
     try {
-      const response = await fetch(`/api/admin/staff/${user?.uid}`)
+      const response = await authedFetch(`/api/admin/staff/${user?.uid}`)
       const data = await response.json()
       
       if (data.success) {

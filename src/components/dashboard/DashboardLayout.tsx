@@ -71,7 +71,7 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, logout } = useAuth()
-  const { staff, hasPermission, loading: staffLoading } = useStaff()
+  const { staff, loading: staffLoading } = useStaff()
   // Authoritative business role from the backend session. Invited staff (manager/cashier)
   // are exempt from phone verification — it's an owner/onboarding step, not theirs.
   const { role: businessRole, loading: businessRoleLoading } = useBusinessRole()
@@ -129,13 +129,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     checkPhoneVerification()
   }, [user])
 
-  // Filter navigation items based on staff permissions
+  // Cashiers (whether direct or invited) only get the sales/POS surface. Everyone else — owner,
+  // manager, admin, or a still-resolving session — sees the full nav. Gating on the backend role
+  // (not the legacy Firestore staff record) is what fixes invited cashiers seeing the owner nav.
+  const cashierNavHrefs = new Set([
+    '/dashboard',
+    '/dashboard/sales',
+    '/dashboard/products',
+    '/dashboard/inventory',
+    '/dashboard/payments'
+  ])
   const filteredNavigationItems = navigationItems.filter(item => {
-    // If no staff (regular user/owner), show all items
-    if (!staff) return true
-    
-    // For staff members, check permissions
-    return hasPermission(item.permission)
+    if (businessRole === 'cashier') return cashierNavHrefs.has(item.href)
+    return true
   })
 
   // Close dropdown when clicking outside

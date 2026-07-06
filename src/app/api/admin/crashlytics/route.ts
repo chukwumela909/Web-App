@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminApp } from '@/lib/firebase-admin-server'
+import { requirePlatformAdmin } from '@/lib/api-auth'
 
 const FIREBASE_PROJECT_ID = 'fahampesa-8c514'
 
@@ -113,6 +114,9 @@ function determineSeverity(title: string, eventCount: number): 'critical' | 'hig
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requirePlatformAdmin(request)
+    if ('response' in authResult) return authResult.response
+
     console.log('Fetching real Crashlytics data from Firebase...')
 
     // Check if Firebase Admin SDK is available

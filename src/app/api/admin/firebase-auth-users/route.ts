@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { listAllUsers, getUserByEmail, FirebaseAuthUser, adminDb } from '@/lib/firebase-admin-server'
+import { requirePlatformAdmin } from '@/lib/api-auth'
 
 export interface EnhancedUser extends FirebaseAuthUser {
   lastActiveAt?: string
@@ -16,6 +17,9 @@ export interface EnhancedUser extends FirebaseAuthUser {
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requirePlatformAdmin(request)
+    if ('response' in authResult) return authResult.response
+
     const { searchParams } = new URL(request.url)
     const email = searchParams.get('email')
     const includeFirestoreData = searchParams.get('includeFirestore') === 'true'

@@ -30,12 +30,11 @@ import {
   TableCellsIcon,
   Bars3BottomLeftIcon
 } from '@heroicons/react/24/outline'
-import { doc, updateDoc, serverTimestamp, deleteDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { Debtor, DebtorPayment, PaymentMethod, PaymentStatus, InstallmentFrequency, createDebtor, getDebtors, recordDebtorPayment } from '@/lib/firestore'
+import { Debtor, DebtorPayment, PaymentMethod, PaymentStatus, InstallmentFrequency, createDebtor, getDebtors, recordDebtorPayment, updateDebtor, deleteDebtor, addDebtorPurchase } from '@/lib/firestore'
+import { isBackendApiError } from '@/lib/backend-api'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { UpgradeModal } from '@/components/UpgradeModal'
@@ -233,9 +232,10 @@ interface EditDebtorModalProps {
   debtor: Debtor
   onSave: (debtor: Debtor) => void
   onCancel: () => void
+  currencySymbol: string
 }
 
-function EditDebtorModal({ debtor, onSave, onCancel }: EditDebtorModalProps) {
+function EditDebtorModal({ debtor, onSave, onCancel, currencySymbol }: EditDebtorModalProps) {
   const [editForm, setEditForm] = useState({
     name: debtor.name,
     phone: debtor.phone,
@@ -441,13 +441,17 @@ export default function DebtorsPage() {
   const handleDeleteDebtor = async (debtor: Debtor) => {
     if (confirm(`Are you sure you want to delete ${debtor.name}? This action cannot be undone.`)) {
       try {
-        await deleteDoc(doc(db, 'debtors', debtor.id))
+        await deleteDebtor(debtor.id)
         setShowSuccess(true)
         setTimeout(() => setShowSuccess(false), 4000)
         fetchData()
       } catch (error) {
         console.error('Failed to delete debtor:', error)
-        alert('Failed to delete debtor. Please try again.')
+        if (isBackendApiError(error) && error.code === 'debtor_has_outstanding_debt') {
+          alert('This debtor still owes money. Settle or write off the outstanding balance before deleting.')
+        } else {
+          alert('Failed to delete debtor. Please try again.')
+        }
       }
     }
   }
@@ -458,11 +462,7 @@ export default function DebtorsPage() {
 
   const handleUpdateDebtor = async (updatedDebtor: Debtor) => {
     try {
-      const ref = doc(db, 'debtors', updatedDebtor.id)
-      await updateDoc(ref, {
-        ...updatedDebtor,
-        updatedAt: serverTimestamp()
-      })
+      await updateDebtor(updatedDebtor.id, updatedDebtor)
       setEditingDebtor(null)
       setShowSuccess(true)
       setTimeout(() => setShowSuccess(false), 4000)
@@ -605,21 +605,12 @@ export default function DebtorsPage() {
           return
         }
         
-        const ref = doc(db, 'debtors', existingDebtorId)
-        const timestamp = Date.now()
-        
-        // Add to existing debt instead of replacing it
-        await updateDoc(ref, {
-          currentDebt: existingDebtor.currentDebt + newDebtAmount,
-          totalPurchases: existingDebtor.totalPurchases + newDebtAmount,
-          lastPurchaseDate: timestamp,
-          preferredPaymentType: debtorForm.preferredPaymentType,
-          installmentAmount: debtorForm.preferredPaymentType !== 'FULL' ? Number(debtorForm.installmentAmount || 0) : null,
-          installmentFrequency: debtorForm.preferredPaymentType === 'INSTALLMENT' ? debtorForm.installmentFrequency : null,
-          dueDate: debtorForm.dueDate ? new Date(debtorForm.dueDate).getTime() : null,
-          notes: debtorForm.notes || existingDebtor.notes,
-          updatedAt: serverTimestamp()
-        })
+        // Add to the existing debt (backend enforces the credit limit and updates totals atomically)
+        await addDebtorPurchase(
+          existingDebtorId,
+          newDebtAmount,
+          debtorForm.dueDate ? new Date(debtorForm.dueDate).getTime() : null
+        )
       }
       
       setShowAdd(false)
@@ -1485,10 +1476,11 @@ export default function DebtorsPage() {
                   exit={{ opacity: 0, scale: 0.95, y: 20 }} 
                   className="bg-card rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden border border-border"
                 >
-                  <EditDebtorModal 
+                  <EditDebtorModal
                     debtor={editingDebtor}
                     onSave={handleUpdateDebtor}
                     onCancel={() => setEditingDebtor(null)}
+                    currencySymbol={currencySymbol}
                   />
                 </motion.div>
               </div>

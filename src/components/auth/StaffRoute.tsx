@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { authedFetch } from '@/lib/authed-fetch'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { Loader2, Shield } from 'lucide-react'
@@ -42,7 +43,7 @@ export default function StaffRoute({ children, requiredPermission }: StaffRouteP
       setLoading(true)
       
       // Check if user is a staff member
-      const response = await fetch(`/api/admin/staff/${user.uid}`)
+      const response = await authedFetch(`/api/admin/staff/${user.uid}`)
       const data = await response.json()
       
       if (!data.success) {

@@ -2,6 +2,7 @@
 
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import StaffProtectedRoute from '@/components/auth/StaffProtectedRoute'
+import { authedFetch } from '@/lib/authed-fetch'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
@@ -132,7 +133,7 @@ export default function AddStaffPage() {
       // `emailed` flag in the body — not res.ok — or we'd falsely report success.
       let emailed = false
       try {
-        const res = await fetch('/api/staff/invite-email', {
+        const res = await authedFetch('/api/staff/invite-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, inviteUrl, role: newStaff.role, businessName: user.displayName || undefined })

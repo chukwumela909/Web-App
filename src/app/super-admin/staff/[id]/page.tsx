@@ -1,8 +1,10 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { authedFetch } from '@/lib/authed-fetch'
 import { useParams, useRouter } from 'next/navigation'
 import AdminRoute from '@/components/auth/AdminRoute'
+import SuperAdminLayout from '@/components/super-admin/SuperAdminLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -176,7 +178,7 @@ export default function StaffDetailsPage() {
     try {
       setLoading(true)
       
-      const response = await fetch(`/api/admin/staff/${staffId}`)
+      const response = await authedFetch(`/api/admin/staff/${staffId}`)
       const data = await response.json()
       
       if (data.success) {
@@ -218,7 +220,7 @@ export default function StaffDetailsPage() {
       
       const newPassword = generatePassword(staff.name)
       
-      const response = await fetch(`/api/admin/staff/${staff.id}/reset-password`, {
+      const response = await authedFetch(`/api/admin/staff/${staff.id}/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -265,7 +267,7 @@ export default function StaffDetailsPage() {
     try {
       setSaving(true)
       
-      const response = await fetch(`/api/admin/staff/${staff.id}`, {
+      const response = await authedFetch(`/api/admin/staff/${staff.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -310,7 +312,7 @@ export default function StaffDetailsPage() {
     try {
       setSaving(true)
       
-      const response = await fetch(`/api/admin/staff/${staff.id}`, {
+      const response = await authedFetch(`/api/admin/staff/${staff.id}`, {
         method: 'DELETE'
       })
 

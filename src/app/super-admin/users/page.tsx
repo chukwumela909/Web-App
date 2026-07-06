@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { authedFetch } from '@/lib/authed-fetch'
 import AdminRoute from '@/components/auth/AdminRoute'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -47,7 +48,6 @@ import { userManagementActions } from '@/lib/firebase-admin'
 import { useToast } from '@/hooks/use-toast'
 import { handleError } from '@/lib/error-handler'
 import {
-  activateBackendSubscription,
   deactivateBackendAdminSubscription,
   manuallyActivateBackendAdminSubscription,
   searchBackendAdminBusinesses,
@@ -372,7 +372,7 @@ async function fillMissingEmailsFromAuth(users: User[]) {
   if (!users.some((user) => !userEmailOf(user))) return users
 
   try {
-    const response = await fetch('/api/admin/firebase-auth-users?includeFirestore=true')
+    const response = await authedFetch('/api/admin/firebase-auth-users?includeFirestore=true')
     const data = await response.json()
 
     if (!data.success || !Array.isArray(data.users)) return users
@@ -475,22 +475,6 @@ export default function UsersPage() {
     return usersWithEmails.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   }, [])
 
-  const activateCurrentOwnerSubscription = async (targetUser: User) => {
-    const currentUser = auth.currentUser
-    if (!currentUser) {
-      throw new Error('No authenticated user is available for backend activation.')
-    }
-
-    const result = await activateBackendSubscription('monthly')
-    const subscription = (result.subscription || result) as BackendSubscriptionRecord | null
-
-    markUserSubscriptionActive(targetUser.id, subscription, 'monthly')
-    return {
-      id: String(result.account?.id || result.account?._id || subscription?.businessAccountId || ''),
-      name: result.account?.businessName || result.account?.name || targetUser.businessName || targetUser.email
-    }
-  }
-
   const findBusinessAccountForUser = async (targetUser: User) => {
     const email = userEmailOf(targetUser)
     if (!email) {
@@ -569,26 +553,10 @@ export default function UsersPage() {
   }
 
   const activateUserSubscription = async (targetUser: User) => {
-    const currentUser = auth.currentUser
-    const isCurrentOwner = currentUser && (
-      currentUser.uid === targetUser.id ||
-      currentUser.email?.trim().toLowerCase() === userEmailOf(targetUser)
-    )
-
-    let activatedWithOwnerEndpoint = false
+    // Always activate the TARGET user's business via the admin endpoint (platform-admin gated,
+    // audit-logged). The former owner-level self-activation fallback was removed — it let any
+    // owner grant themselves a free month.
     const businessAccount = await findBusinessAccountForUser(targetUser)
-      .catch((error) => {
-        if (isCurrentOwner) {
-          activatedWithOwnerEndpoint = true
-          return activateCurrentOwnerSubscription(targetUser)
-        }
-
-        throw error
-      })
-
-    if (activatedWithOwnerEndpoint) {
-      return businessAccount
-    }
 
     const result = await manuallyActivateBackendAdminSubscription(
       businessAccount.id,
@@ -732,59 +700,12 @@ export default function UsersPage() {
         }
           
         case 'delete':
-          console.log('Attempting to delete user:', selectedUser.id, selectedUser.email)
-          
-          // Import Firebase functions dynamically
-          const { doc, deleteDoc, collection, query, where, getDocs, writeBatch } = await import('firebase/firestore')
-          const { db } = await import('@/lib/firebase')
-          
-          // Delete user document
-          const userRef = doc(db, 'users', selectedUser.id)
-          
-          // Create a batch to delete user and related data
-          const batch = writeBatch(db)
-          batch.delete(userRef)
-          
-          // Delete related user data (sales, inventory, etc.)
-          const collections = ['sales', 'inventory', 'expenses', 'staff', 'branches']
-          
-          for (const collectionName of collections) {
-            try {
-              // Check for userId references
-              const relatedQuery = query(
-                collection(db, collectionName),
-                where('userId', '==', selectedUser.id)
-              )
-              const relatedDocs = await getDocs(relatedQuery)
-              
-              relatedDocs.forEach((doc) => {
-                batch.delete(doc.ref)
-              })
-
-              // Check for email references
-              if (selectedUser.email) {
-                const emailQuery = query(
-                  collection(db, collectionName),
-                  where('userEmail', '==', selectedUser.email)
-                )
-                const emailDocs = await getDocs(emailQuery)
-                
-                emailDocs.forEach((doc) => {
-                  batch.delete(doc.ref)
-                })
-              }
-            } catch (collectionError) {
-              console.warn(`Error processing collection ${collectionName}:`, collectionError)
-              // Continue with other collections
-            }
-          }
-          
-          // Execute the batch delete
-          await batch.commit()
-          
+          // The backend is the source of truth and has no hard-delete; disabling blocks all sign-in
+          // and suspends the user's business memberships (their data is retained for audit/recovery).
+          await setBackendPlatformUserDisabled(selectedUser.id, true)
           toast({
-            title: 'Success',
-            description: 'User and all related data deleted successfully',
+            title: 'User disabled',
+            description: `${selectedUser.email} can no longer sign in and their access has been suspended.`,
             variant: 'success'
           })
           break
@@ -867,52 +788,9 @@ export default function UsersPage() {
             }
             break
           case 'delete':
-            // Import Firebase functions dynamically
-            const { doc, collection, query, where, getDocs, writeBatch } = await import('firebase/firestore')
-            const { db } = await import('@/lib/firebase')
-            
-            // Delete user document
-            const userRef = doc(db, 'users', user.id)
-            
-            // Create a batch to delete user and related data
-            const batch = writeBatch(db)
-            batch.delete(userRef)
-            
-            // Delete related user data
-            const collections = ['sales', 'inventory', 'expenses', 'staff', 'branches']
-            
-            for (const collectionName of collections) {
-              try {
-                // Check for userId references
-                const relatedQuery = query(
-                  collection(db, collectionName),
-                  where('userId', '==', user.id)
-                )
-                const relatedDocs = await getDocs(relatedQuery)
-                
-                relatedDocs.forEach((doc) => {
-                  batch.delete(doc.ref)
-                })
-
-                // Check for email references
-                if (user.email) {
-                  const emailQuery = query(
-                    collection(db, collectionName),
-                    where('userEmail', '==', user.email)
-                  )
-                  const emailDocs = await getDocs(emailQuery)
-                  
-                  emailDocs.forEach((doc) => {
-                    batch.delete(doc.ref)
-                  })
-                }
-              } catch (collectionError) {
-                console.warn(`Error processing collection ${collectionName} for user ${user.email}:`, collectionError)
-              }
-            }
-            
-            // Execute the batch delete
-            await batch.commit()
+            // Disable via the backend (source of truth). There is no hard-delete; disabling blocks
+            // sign-in and suspends the user's business memberships.
+            await setBackendPlatformUserDisabled(user.id, true)
             break
         }
       }

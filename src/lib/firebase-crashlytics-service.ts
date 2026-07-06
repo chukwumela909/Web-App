@@ -10,6 +10,7 @@ import {
   getDoc
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { authedFetch } from '@/lib/authed-fetch'
 
 export interface CrashReport {
   id: string
@@ -74,7 +75,7 @@ class FirebaseCrashlyticsService {
   async getRealCrashlyticsData(): Promise<{ issues: CrashIssue[], analytics: CrashAnalytics }> {
     try {
       console.log('Fetching real Crashlytics data from API...')
-      const response = await fetch('/api/admin/crashlytics')
+      const response = await authedFetch('/api/admin/crashlytics')
       const data = await response.json()
       
       if (!data.success) {

@@ -5,7 +5,7 @@ import StaffProtectedRoute from '@/components/auth/StaffProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
-import { useStaff } from '@/contexts/StaffContext'
+import { useBusinessRole } from '@/hooks/useBusinessRole'
 import { cacheUserCurrency } from '@/hooks/useCurrency'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -100,24 +100,22 @@ const defaultBackupSettings: DataSyncSettings['backupSettings'] = {
 
 export default function SettingsPage() {
   const { user, logout } = useAuth()
-  const { staff, hasPermission } = useStaff()
+  const { role: businessRole } = useBusinessRole()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('account')
 
-  // Define which tabs are available based on permissions
+  // Cashiers only get their own Account and Support; business/pricing/device/sync settings are
+  // manager+ (their saves 403 server-side). Gate on the backend role so invited cashiers are
+  // restricted too. Everyone else (owner/manager/admin/unresolved) sees all tabs.
+  const cashierSettingsTabs = new Set(['account', 'support'])
   const availableTabs = [
-    { id: 'account', label: 'Account', icon: User, permission: 'settings:account_read' },
-    { id: 'business', label: 'Business', icon: Building2, permission: 'settings:business_read' },
-    { id: 'devices', label: 'Devices', icon: Smartphone, permission: 'settings:devices_read' },
-    { id: 'data-sync', label: 'Data & Sync', icon: Database, permission: 'settings:data_sync_read' },
-    { id: 'pricing-taxes', label: 'Pricing', icon: DollarSign, permission: 'settings:pricing_read' },
-    { id: 'support', label: 'Support', icon: HelpCircle, permission: 'settings:support_read' }
-  ].filter(tab => {
-    // If no staff (owner), show all tabs
-    if (!staff) return true
-    // For staff members, check permissions
-    return hasPermission(tab.permission)
-  })
+    { id: 'account', label: 'Account', icon: User },
+    { id: 'business', label: 'Business', icon: Building2 },
+    { id: 'devices', label: 'Devices', icon: Smartphone },
+    { id: 'data-sync', label: 'Data & Sync', icon: Database },
+    { id: 'pricing-taxes', label: 'Pricing', icon: DollarSign },
+    { id: 'support', label: 'Support', icon: HelpCircle }
+  ].filter(tab => businessRole !== 'cashier' || cashierSettingsTabs.has(tab.id))
 
   // Ensure active tab is accessible
   useEffect(() => {

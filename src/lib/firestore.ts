@@ -21,16 +21,19 @@ import {
 } from './multi-item-sales-types'
 import type { DiscountType, LegacyDiscountType } from './multi-item-sales-types'
 import {
+  addBackendDebtorPurchase,
   createBackendDebtor,
   createBackendExpense,
   createBackendProduct,
   createBackendSale,
   createBackendSaleAndReturn,
+  deleteBackendDebtor,
   deleteBackendExpense,
   deleteBackendProduct,
   deleteBackendSale,
   refundBackendSale,
   getBackendDebtors,
+  updateBackendDebtor,
   getBackendExpenses,
   getBackendMultiItemSales,
   getBackendProduct,
@@ -866,7 +869,38 @@ export async function getDebtors(userId: string, branchId?: string): Promise<Deb
 }
 
 export async function deleteDebtor(debtorId: string): Promise<void> {
+  if (isBackendAvailable()) {
+    await deleteBackendDebtor(debtorId)
+    return
+  }
   await deleteDoc(doc(db, 'debtors', debtorId))
+}
+
+export async function updateDebtor(debtorId: string, data: Partial<Debtor>): Promise<void> {
+  if (isBackendAvailable()) {
+    await updateBackendDebtor(debtorId, data)
+    return
+  }
+  await updateDoc(doc(db, 'debtors', debtorId), {
+    ...data,
+    updatedAt: serverTimestamp()
+  })
+}
+
+// Add debt to an existing debtor (manual purchase). Backend enforces the credit limit.
+export async function addDebtorPurchase(
+  debtorId: string,
+  amount: number,
+  dueDate?: number | null
+): Promise<void> {
+  if (isBackendAvailable()) {
+    await addBackendDebtorPurchase(debtorId, amount, dueDate)
+    return
+  }
+  await updateDoc(doc(db, 'debtors', debtorId), {
+    currentDebt: amount,
+    updatedAt: serverTimestamp()
+  })
 }
 
 export async function createDebtor(userId: string, data: Partial<Debtor>): Promise<void> {
@@ -1846,19 +1880,37 @@ export async function getMultiItemSales(userId: string, max: number = 2000, bran
 
 // Update multi-item sale
 export async function updateMultiItemSale(saleId: string, data: Partial<MultiItemSale>): Promise<void> {
+  if (isBackendAvailable()) {
+    // Sales live in the backend (Mongo). Only customer details / notes are editable server-side.
+    await updateBackendSale(saleId, {
+      customerName: (data as { customerName?: string }).customerName,
+      customerPhone: (data as { customerPhone?: string }).customerPhone,
+      notes: (data as { notes?: string }).notes
+    } as Partial<Sale>)
+    return
+  }
+
   const saleRef = doc(db, 'multi_item_sales', saleId)
-  await updateDoc(saleRef, { 
-    ...data, 
+  await updateDoc(saleRef, {
+    ...data,
     lastModifiedAt: Date.now(),
-    updatedAt: serverTimestamp() 
+    updatedAt: serverTimestamp()
   })
 }
 
-// Delete multi-item sale (soft delete)
+// Delete multi-item sale
 export async function deleteMultiItemSale(saleId: string): Promise<void> {
-  await updateMultiItemSale(saleId, {
+  if (isBackendAvailable()) {
+    // Backend delete restores branch stock and reverses any debtor balance in one transaction.
+    await deleteBackendSale(saleId)
+    return
+  }
+
+  const saleRef = doc(db, 'multi_item_sales', saleId)
+  await updateDoc(saleRef, {
     isDeleted: true,
-    deletedAt: Date.now()
+    deletedAt: Date.now(),
+    updatedAt: serverTimestamp()
   })
 }
 

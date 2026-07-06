@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { authedFetch } from '@/lib/authed-fetch'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface StaffMember {
@@ -57,7 +58,7 @@ export function AdminAccessProvider({ children }: { children: React.ReactNode })
       }
 
       // Check if user is a staff member with permissions
-      const response = await fetch(`/api/admin/staff/${user.uid}`)
+      const response = await authedFetch(`/api/admin/staff/${user.uid}`)
       const data = await response.json()
       
       if (!data.success) {

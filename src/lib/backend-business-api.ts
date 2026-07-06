@@ -426,6 +426,9 @@ export function mapBranch(row: AnyRecord): Branch {
     lowStockItemsCount: Number(row.lowStockItemsCount ?? row.lowStockItems ?? 0),
     userId: row.userId || row.ownerId || '',
     createdBy: row.createdBy || row.userId || '',
+    // Backend stores the branch manager as managerUserId (a User id); expose it as managerId so
+    // existing UI keeps working. The display name is resolved from the staff list on the page.
+    managerId: row.managerUserId ? String(row.managerUserId) : (row.managerId ? String(row.managerId) : ''),
     createdAt: new Date(toMillis(row.createdAt)),
     updatedAt: new Date(toMillis(row.updatedAt))
   } as Branch
@@ -478,6 +481,10 @@ function toBackendBranchUpdatePayload(data: Partial<Branch>): AnyRecord {
   if (data.openingHours !== undefined) payload.openingHours = data.openingHours
   if (record.taxSettings !== undefined) payload.taxSettings = record.taxSettings
   if (data.status !== undefined) payload.status = String(data.status).toLowerCase()
+  // Branch manager assignment. Accepts managerUserId (preferred) or the managerId alias; the
+  // value must be the manager's backend User id. null clears the assignment.
+  if (record.managerUserId !== undefined) payload.managerUserId = record.managerUserId
+  else if (record.managerId !== undefined) payload.managerUserId = record.managerId
   return payload
 }
 
@@ -729,7 +736,9 @@ export function mapMultiItemSale(row: AnyRecord): MultiItemSale {
       discountAmount: lineDiscountAmount,
       lineSubtotal,
       lineTotal: lineGross,
-      profit: Number(item.profit ?? Math.max(0, lineSubtotal - costPrice * quantity)),
+      // Backend emits `lineProfit`; fall back to `profit`, then compute. Don't clamp to 0 —
+      // loss-making lines must show a negative profit, not a misleading zero.
+      profit: Number(item.lineProfit ?? item.profit ?? (lineSubtotal - costPrice * quantity)),
       notes: item.notes || null
     } as SaleItem
   })
@@ -1040,6 +1049,42 @@ export async function updateBackendDebtor(debtorId: string, data: Partial<Debtor
       email: data.email || undefined,
       creditLimit: data.totalCreditLimit,
       dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined
+    })
+  })
+}
+
+export interface BackendUsage {
+  products: number
+  branches: number
+  staff: number
+  suppliers: number
+  debtors: number
+  dailySales: number
+}
+
+// Source-of-truth counts for plan-limit enforcement (GET /usage).
+export async function getBackendUsage() {
+  return api<BackendUsage>('/usage')
+}
+
+export async function deleteBackendDebtor(debtorId: string, branchId?: string) {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  await api(`/branches/${targetBranch}/debtors/${debtorId}`, { method: 'DELETE' })
+}
+
+// Manually add debt to an existing debtor (credit-limit-guarded server-side).
+export async function addBackendDebtorPurchase(
+  debtorId: string,
+  amount: number,
+  dueDate?: number | null,
+  branchId?: string
+) {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  await api(`/branches/${targetBranch}/debtors/${debtorId}/purchases`, {
+    method: 'POST',
+    body: JSON.stringify({
+      amount,
+      dueDate: dueDate ? new Date(dueDate).toISOString() : undefined
     })
   })
 }
@@ -1463,13 +1508,6 @@ export async function getBackendCheckoutStatus(subscriptionId: string): Promise<
     amount: Number(result.amount || 0),
     currency: currencyOf(result.currency)
   }
-}
-
-export async function activateBackendSubscription(planType: BackendPlanType = 'monthly') {
-  return api<AnyRecord>('/billing/subscription/activate', {
-    method: 'POST',
-    body: JSON.stringify({ planType })
-  })
 }
 
 export async function startBackendMpesaCheckout(planType: BackendPlanType, phoneNumber: string, country?: string): Promise<BackendMpesaCheckoutResponse> {

@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useStaff } from '@/contexts/StaffContext'
-import { collection, query, where, getDocs } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { getBackendUsage } from '@/lib/backend-business-api'
 import { PLAN_LIMITS, PlanTier, getNumericLimit, FEATURE_NAMES } from '@/lib/plan-limits'
 
 interface PlanLimitCheck {
@@ -27,30 +25,14 @@ interface UsePlanLimitsReturn {
   refreshLimits: () => Promise<void>
 }
 
-function getTimestampMillis(value: unknown): number {
-  if (typeof value === 'number') return value
-  if (value instanceof Date) return value.getTime()
-  if (typeof value === 'string') {
-    const parsed = Date.parse(value)
-    return Number.isNaN(parsed) ? 0 : parsed
-  }
-  if (value && typeof value === 'object') {
-    const timestamp = value as { seconds?: number; toMillis?: () => number }
-    if (typeof timestamp.toMillis === 'function') return timestamp.toMillis()
-    if (typeof timestamp.seconds === 'number') return timestamp.seconds * 1000
-  }
-  return 0
-}
-
 /**
- * Hook to check plan limits and enforce billing restrictions
- * For staff members, this uses the owner's subscription instead of the staff's
+ * Hook to check plan limits and enforce billing restrictions.
+ * Plan tier and usage counts both come from the backend (the source of truth), so invited staff
+ * correctly inherit the business's subscription and caps via their own session.
  */
 export function usePlanLimits(): UsePlanLimitsReturn {
   const { user, backendSession, backendSessionLoading, refreshBackendSession } = useAuth()
-  const { staff } = useStaff()
-  // Use owner's ID for staff members to inherit subscription
-  const effectiveUserId = staff ? staff.userId : user?.uid
+  const effectiveUserId = user?.uid
   const [planTier, setPlanTier] = useState<PlanTier>('free')
   const [isLoading, setIsLoading] = useState(true)
 
@@ -90,18 +72,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
   }, [effectiveUserId, backendSession, backendSessionLoading, refreshBackendSession])
 
   /**
-   * Get today's date range in user's local timezone
-   */
-  const getTodayRange = useCallback(() => {
-    const now = new Date()
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
-    return { startOfDay, endOfDay }
-  }, [])
-
-  /**
-   * Generic limit checker
-   * Uses effectiveUserId so staff members count against owner's limits
+   * Generic limit checker. Usage counts come from the backend, scoped to the business account.
    */
   const checkLimit = useCallback(
     async (feature: keyof typeof PLAN_LIMITS.free): Promise<PlanLimitCheck> => {
@@ -142,65 +113,27 @@ export function usePlanLimits(): UsePlanLimitsReturn {
         }
       }
 
-      // Check current count based on feature
-      let currentCount = 0
-      let collectionName = ''
-
-      switch (feature) {
-        case 'products':
-          collectionName = 'products'
-          break
-        case 'suppliers':
-          collectionName = 'suppliers'
-          break
-        case 'debtors':
-          collectionName = 'debtors'
-          break
-        case 'branches':
-          collectionName = 'branches'
-          break
-        case 'staff':
-          collectionName = 'staff'
-          break
-        case 'dailySales':
-          collectionName = 'sales'
-          break
-        case 'reports':
-          return {
-            allowed: false,
-            currentCount: 0,
-            limit: 0,
-            limitReached: true,
-            message: `${FEATURE_NAMES[feature]} are only available on the Pro plan. Upgrade to access detailed business reports.`,
-          }
+      if (feature === 'reports') {
+        return {
+          allowed: false,
+          currentCount: 0,
+          limit: 0,
+          limitReached: true,
+          message: `${FEATURE_NAMES[feature]} are only available on the Pro plan. Upgrade to access detailed business reports.`,
+        }
       }
 
       try {
-        if (feature === 'dailySales') {
-          const { startOfDay, endOfDay } = getTodayRange()
-          const startTime = startOfDay.getTime()
-          const endTime = endOfDay.getTime()
-          const saleCollections = ['sales', 'multi_item_sales']
-          const snapshots = await Promise.all(
-            saleCollections.map(name =>
-              getDocs(query(collection(db, name), where('userId', '==', effectiveUserId)))
-            )
-          )
-
-          currentCount = snapshots.reduce((count, snapshot) => {
-            const todaysSales = snapshot.docs.filter(saleDoc => {
-              const data = saleDoc.data() as { timestamp?: unknown; isDeleted?: boolean }
-              const saleTime = getTimestampMillis(data.timestamp)
-              return data.isDeleted !== true && saleTime >= startTime && saleTime <= endTime
-            })
-            return count + todaysSales.length
-          }, 0)
-        } else {
-          const collectionRef = collection(db, collectionName)
-          const q = query(collectionRef, where('userId', '==', effectiveUserId))
-          const snapshot = await getDocs(q)
-          currentCount = snapshot.size
+        const usage = await getBackendUsage()
+        const countByFeature: Record<string, number> = {
+          products: usage.products,
+          suppliers: usage.suppliers,
+          debtors: usage.debtors,
+          branches: usage.branches,
+          staff: usage.staff,
+          dailySales: usage.dailySales,
         }
+        const currentCount = Number(countByFeature[feature] ?? 0)
 
         const limitReached = currentCount >= numericLimit
         const allowed = !limitReached
@@ -229,7 +162,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
         }
       }
     },
-    [effectiveUserId, planTier, getTodayRange]
+    [effectiveUserId, planTier]
   )
 
   // Feature-specific checkers

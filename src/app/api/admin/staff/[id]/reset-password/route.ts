@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuth } from 'firebase-admin/auth'
 import { adminApp } from '@/lib/firebase-admin-server'
+import { requirePlatformAdmin } from '@/lib/api-auth'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requirePlatformAdmin(request)
+    if ('response' in authResult) return authResult.response
+
     const { id: staffId } = await params
     const body = await request.json()
     const { password } = body
@@ -17,7 +21,14 @@ export async function POST(
         error: 'Password is required'
       }, { status: 400 })
     }
-    
+
+    if (!adminApp) {
+      return NextResponse.json({
+        success: false,
+        error: 'Firebase Admin SDK not initialized'
+      }, { status: 500 })
+    }
+
     // Reset Firebase Auth password
     const auth = getAuth(adminApp)
     
