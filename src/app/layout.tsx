@@ -46,12 +46,12 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "FahamPesa - Lightweight Sales & Inventory App for Small Business",
-  description: "A native Android app designed for small business owners in Kenya. Track inventory, record sales, and manage your business with sunlight-optimized design and offline-first functionality.",
-  keywords: "sales app, inventory management, small business, Kenya, offline app, business tools",
+  description: "Grow your business with confidence. FahamPesa is a powerful cloud and offline point of sale software that helps you manage sales, inventory, purchases, expenses, customers, and real time reports and business insights from one platform. Built for retailers, wholesalers, pharmacies, restaurants, and growing businesses.",
+  keywords: "POS software, point of sale, inventory management, small business, Kenya, offline app, business tools",
   authors: [{ name: "FahamPesa Team" }],
   openGraph: {
     title: "FahamPesa - Lightweight Sales & Inventory App",
-    description: "Track inventory, record sales, and manage your business with our sunlight-optimized mobile app.",
+    description: "Grow your business with confidence. FahamPesa is a powerful cloud and offline point of sale software that helps you manage sales, inventory, purchases, expenses, customers, and real time reports and business insights from one platform. Built for retailers, wholesalers, pharmacies, restaurants, and growing businesses.",
     type: "website",
   },
 };

@@ -45,7 +45,7 @@ const assets = {
 const faqs = [
   {
     question: "What is Fahampesa?",
-    answer: "Fahampesa is a professional business management platform combining point of sale, inventory control, and business reporting for growing businesses."
+    answer: "Grow your business with confidence. FahamPesa is a powerful cloud and offline point of sale software that helps you manage sales, inventory, purchases, expenses, customers, and real time reports and business insights from one platform. Built for retailers, wholesalers, pharmacies, restaurants, and growing businesses."
   },
   {
     question: "Who is Fahampesa built for?",
