@@ -207,6 +207,7 @@ export type SaleType = 'PRODUCT' | 'SERVICE' | 'OTHER'
 export interface Sale {
   id: string
   saleNumber?: string // Human-readable backend sale number (e.g. "SALE-000042"); populated by the API
+  profit?: number | null // Backend-stored profit (totalAmount - totalCost, cost captured at sale time)
   productId?: string | null
   productName: string
   saleType: SaleType

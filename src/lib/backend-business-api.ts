@@ -694,13 +694,19 @@ export function mapSale(row: AnyRecord): Sale {
   return {
     id: idOf(row),
     saleNumber: row.saleNumber || idOf(row),
+    // Backend-stored profit (totalAmount - totalCost, cost captured at sale time). Preferred by
+    // the dashboards so web/desktop/backend all report the same figure. Absent for cashier-role
+    // responses (the backend strips margin fields) — consumers fall back to an estimate.
+    profit: row.profit != null ? Number(row.profit) : null,
     productId: item.productId || row.productId || null,
     productName: item.productName || item.name || row.productName || row.name || 'Sale',
     saleType: 'PRODUCT',
     quantitySold: quantity,
     unitPrice,
     totalAmount: total,
-    costPrice: Number(item.costPrice ?? row.costPrice ?? 0),
+    // Backend items carry lineCost (qty × cost at sale time), not costPrice — derive it so
+    // profit fallbacks don't treat the goods as free.
+    costPrice: Number(item.costPrice ?? (item.lineCost != null && quantity > 0 ? Number(item.lineCost) / quantity : row.costPrice ?? 0)),
     timestamp,
     paymentMethod: fromBackendPaymentMethod(row.paymentMethod),
     customerName: row.customer?.name || row.customerName || null,
@@ -719,7 +725,8 @@ export function mapMultiItemSale(row: AnyRecord): MultiItemSale {
   const items: SaleItem[] = saleItems(row).map((item, index) => {
     const quantity = Number(item.quantity || 1)
     const unitPrice = Number(item.unitPrice || 0)
-    const costPrice = Number(item.costPrice || 0)
+    // Backend items carry lineCost (qty × cost at sale time), not costPrice — derive it.
+    const costPrice = Number(item.costPrice ?? (item.lineCost != null && quantity > 0 ? Number(item.lineCost) / quantity : 0))
     const lineGross = Number(item.lineTotal ?? item.grossTotal ?? quantity * unitPrice)
     const lineDiscountAmount = Number(item.discountAmount ?? 0)
     const lineSubtotal = Number(item.lineSubtotal ?? Math.max(0, lineGross - lineDiscountAmount))
@@ -747,6 +754,8 @@ export function mapMultiItemSale(row: AnyRecord): MultiItemSale {
   return {
     id: idOf(row),
     saleNumber: row.saleNumber || idOf(row),
+    // Backend-stored profit (totalAmount - totalCost); see mapSale.
+    profit: row.profit != null ? Number(row.profit) : null,
     items,
     customerName: row.customer?.name || row.customerName || null,
     customerPhone: row.customer?.phone || row.customerPhone || null,

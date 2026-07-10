@@ -28,6 +28,7 @@ export interface SaleItem {
 export interface MultiItemSale {
   id: string // Unique sale transaction ID
   saleNumber: string // Human-readable sale number (e.g., "SALE-2024-001")
+  profit?: number | null // Backend-stored profit (totalAmount - totalCost, cost captured at sale time)
   items: SaleItem[] // Array of items in this sale
   
   // Customer Information

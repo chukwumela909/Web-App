@@ -172,16 +172,18 @@ export default function DashboardPage() {
   // Calculate metrics
   const totalSalesAmount = filteredSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
   const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0)
-  const totalProfit = filteredSales.reduce((sum, sale) => {
+  // Prefer the backend-stored profit (totalAmount - totalCost, cost captured at sale time) so the
+  // web, desktop, and backend all report the identical figure. The local estimate is only a
+  // fallback for rows without it (e.g. cashier-role responses strip margin fields).
+  const saleProfit = (sale: (typeof allSales)[number]): number => {
+    if (sale.profit != null) return Number(sale.profit)
     if (sale.saleCategory === 'single-item') {
-      const profit = ((sale.unitPrice || 0) - (sale.costPrice || 0)) * (sale.quantitySold || 0)
-      return sum + profit
-    } else {
-      // For multi-item sales, calculate profit from items
-      const items = (sale as any).items || []
-      return sum + items.reduce((itemSum: number, item: any) => itemSum + (item.profit || 0), 0)
+      return ((sale.unitPrice || 0) - (sale.costPrice || 0)) * (sale.quantitySold || 0)
     }
-  }, 0)
+    const items = (sale as any).items || []
+    return items.reduce((itemSum: number, item: any) => itemSum + (item.profit || 0), 0)
+  }
+  const totalProfit = filteredSales.reduce((sum, sale) => sum + saleProfit(sale), 0)
 
   // Today's specific metrics for the performance cards
   const todayRange = getDateRange('today')
@@ -189,15 +191,7 @@ export default function DashboardPage() {
   const todaysExpenses = expenses.filter(expense => expense.timestamp >= todayRange.start && expense.timestamp <= todayRange.end)
   const todaysSalesTotal = todaysSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
   const todaysExpensesTotal = todaysExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0)
-  const todaysProfit = todaysSales.reduce((sum, sale) => {
-    if (sale.saleCategory === 'single-item') {
-      const profit = ((sale.unitPrice || 0) - (sale.costPrice || 0)) * (sale.quantitySold || 0)
-      return sum + profit
-    } else {
-      const items = (sale as any).items || []
-      return sum + items.reduce((itemSum: number, item: any) => itemSum + (item.profit || 0), 0)
-    }
-  }, 0)
+  const todaysProfit = todaysSales.reduce((sum, sale) => sum + saleProfit(sale), 0)
 
   // Check if dashboard is in empty state (no products AND no sales)
   const isEmptyState = products.length === 0 && allSales.length === 0
