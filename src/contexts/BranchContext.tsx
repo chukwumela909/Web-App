@@ -30,6 +30,11 @@ export function useBranch() {
   return context
 }
 
+// Non-throwing variant for hooks that may render outside the provider (e.g. public pages).
+export function useBranchOptional() {
+  return useContext(BranchContext) ?? null
+}
+
 export function BranchProvider({ children }: { children: React.ReactNode }) {
   const { user, backendSessionLoading } = useAuth()
   const [branches, setBranches] = useState<Branch[]>([])

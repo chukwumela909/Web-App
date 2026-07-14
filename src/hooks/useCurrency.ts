@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useBranchOptional } from '@/contexts/BranchContext'
 import { getBusinessProfile } from '@/lib/firestore'
 
 type Currency = 'USD' | 'KES' | 'KSH' | 'EUR' | 'GBP' | 'UGX' | 'TZS' | 'NGN' | 'GHS' | 'ZAR' | 'RWF' | 'ETB'
@@ -127,6 +128,10 @@ export function cacheUserCurrency(uid: string, currencyInput: unknown, country =
  */
 export function useCurrency() {
   const { user, backendSession } = useAuth()
+  // The selected branch's currency always wins: branches can trade in a
+  // different currency from the business default (matches the desktop app).
+  const branchContext = useBranchOptional()
+  const branchCurrency = normalizeCurrency(branchContext?.selectedBranch?.currency)
   const [currency, setCurrency] = useState<Currency>('USD')
   const [isLoading, setIsLoading] = useState(true)
   const [country, setCountry] = useState<string>('')
@@ -235,7 +240,7 @@ export function useCurrency() {
     }
   }, [user?.uid])
 
-  return { currency, isLoading, country }
+  return { currency: branchCurrency || currency, isLoading, country }
 }
 
 /**

@@ -72,7 +72,7 @@ export default function CompletionStep({
   const { user } = useAuth()
 
   const effectiveBranchName = data.branchSetup.branchName.trim()
-    || `${data.businessProfile.businessName.trim()} - Main`
+    || data.businessProfile.businessName.trim()
 
   const completedFeatures = [
     data.personalProfile.fullName && "Personal profile",

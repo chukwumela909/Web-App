@@ -558,7 +558,8 @@ function buildCompletionPayload(data: OnboardingData, user: import('firebase/aut
 }
 
 function getEffectiveBranchName(data: OnboardingData) {
-  return data.branchSetup.branchName.trim() || `${data.businessProfile.businessName.trim()} - Main`
+  // No "- Main" suffix: the MAIN branch code/badge already marks the primary branch.
+  return data.branchSetup.branchName.trim() || data.businessProfile.businessName.trim()
 }
 
 function isValidEmail(email: string) {

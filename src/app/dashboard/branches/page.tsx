@@ -4,10 +4,12 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
+import { useBranch } from '@/contexts/BranchContext'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus'
 import { useBusinessRole } from '@/hooks/useBusinessRole'
 import { isBackendApiError } from '@/lib/backend-api'
+import { displayBranchName } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -108,6 +110,9 @@ function BranchesContent() {
   const { user } = useAuth()
   const router = useRouter()
   const { currency } = useCurrency()
+  // Shared branch list behind the header switcher; must be refreshed after mutations
+  // or new branches won't appear anywhere else until the next login.
+  const { refreshBranches } = useBranch()
   const { isSubscribed, isLoading: subscriptionLoading } = useSubscriptionStatus()
   const { isOwner } = useBusinessRole()
   const [loading, setLoading] = useState(true)
@@ -183,8 +188,7 @@ function BranchesContent() {
 
     try {
       await createBranchRecord(user.uid, branchData)
-      await loadBranches()
-      await loadDashboard()
+      await Promise.all([loadBranches(), loadDashboard(), refreshBranches()])
       setShowAddModal(false)
       return true
     } catch (error) {
@@ -206,8 +210,7 @@ function BranchesContent() {
 
     try {
       await updateBranchRecord(branchId, { id: branchId, ...branchData } as any)
-      await loadBranches()
-      await loadDashboard()
+      await Promise.all([loadBranches(), loadDashboard(), refreshBranches()])
       setShowEditModal(null)
       return true
     } catch (error) {
@@ -226,8 +229,7 @@ function BranchesContent() {
     setDeleting(true)
     try {
       await deleteBranchRecord(branch.id)
-      await loadBranches()
-      await loadDashboard()
+      await Promise.all([loadBranches(), loadDashboard(), refreshBranches()])
       setShowDeleteModal(null)
       setDeleteConfirmText('')
     } catch (error) {
@@ -647,7 +649,7 @@ function BranchesContent() {
                           </div>
                           <div>
                             <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
-                              {branch.name}
+                              {displayBranchName(branch.name, branch.branchCode || branch.branchType)}
                             </h3>
                             <div className="flex items-center gap-2 mt-1">
                               {branch.branchCode && (
@@ -925,7 +927,7 @@ function BranchesContent() {
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <h3 className="font-semibold text-gray-900">{branch.name}</h3>
+                                  <h3 className="font-semibold text-gray-900">{displayBranchName(branch.name, branch.branchCode || branch.branchType)}</h3>
                                   <Badge className={`${getStatusColor(branch.status)} border-0`}>{branch.status}</Badge>
                                 </div>
                                 <p className="mt-1 text-sm text-gray-500">

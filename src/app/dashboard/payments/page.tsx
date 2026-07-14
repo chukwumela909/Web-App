@@ -111,6 +111,13 @@ function PaymentsPageContent() {
   }, [user])
 
   const handleUpgradePlan = () => {
+    if (currentPlan === 'monthly') {
+      // Monthly → yearly upgrade: go straight to checkout with the yearly plan
+      // pre-selected. The backend stacks the new term on top of the remaining
+      // days, so nothing already paid for is lost.
+      router.push('/dashboard/subscription/checkout?plan=yearly')
+      return
+    }
     router.push('/dashboard/pricing')
   }
 
@@ -257,14 +264,14 @@ function PaymentsPageContent() {
               </div>
             </div>
 
-            {/* Upgrade Plan Button - only show if on free plan */}
-            {currentPlan === 'free' && (
+            {/* Upgrade Plan Button - hidden only when already on the yearly plan */}
+            {currentPlan !== 'yearly' && (
               <button
                 onClick={handleUpgradePlan}
-                className="bg-[#004aad] border-[1.5px] border-[#004aad] rounded-full px-6 py-1.5 h-14 w-[180px] flex items-center justify-center hover:bg-[#003a8c] transition-colors"
+                className="bg-[#004aad] border-[1.5px] border-[#004aad] rounded-full px-6 py-1.5 h-14 min-w-[180px] flex items-center justify-center hover:bg-[#003a8c] transition-colors"
               >
                 <p className="font-dm-sans font-semibold text-base text-white text-center">
-                  Upgrade Plan
+                  {currentPlan === 'monthly' ? 'Upgrade to Yearly' : 'Upgrade Plan'}
                 </p>
               </button>
             )}

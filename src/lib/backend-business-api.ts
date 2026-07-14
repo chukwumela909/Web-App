@@ -420,7 +420,9 @@ export function mapBranch(row: AnyRecord): Branch {
     branchType: row.branchType || 'BRANCH',
     description: row.description || '',
     status: (row.status || (row.isActive === false ? 'INACTIVE' : 'ACTIVE')).toUpperCase(),
-    currency: row.currency || 'KES',
+    // Leave currency empty when the branch has none so consumers fall back to
+    // the business currency instead of a hardcoded KES.
+    currency: row.currency || '',
     totalProducts: Number(row.totalProducts ?? row.productsCount ?? 0),
     totalInventoryValue: Number(row.totalInventoryValue ?? row.inventoryValue ?? 0),
     lowStockItemsCount: Number(row.lowStockItemsCount ?? row.lowStockItems ?? 0),
@@ -446,7 +448,8 @@ export async function createBackendBranch(data: Partial<Branch>) {
       branchCode: data.branchCode,
       branchType: data.branchType || 'BRANCH',
       description: data.description,
-      currency: data.currency || 'KES',
+      // Only send an explicit currency; otherwise the branch inherits the business currency.
+      currency: data.currency || undefined,
       location: data.location,
       contact: data.contact
     })
@@ -1015,7 +1018,7 @@ export function mapDebtor(row: AnyRecord): Debtor {
     totalPayments: Number(row.totalPayments || 0),
     creditScore: Number(row.creditScore || 100),
     isActive: row.isActive !== false,
-    notes: row.notes || null,
+    notes: row.note || row.notes || null,
     paymentStatus: currentDebt <= 0 ? 'PAID' : 'UNPAID',
     dueDate: row.dueDate ? toMillis(row.dueDate) : null,
     originalDebtAmount: Number(row.originalDebtAmount || currentDebt),
@@ -1036,6 +1039,7 @@ export async function getBackendDebtors(branchId?: string): Promise<Debtor[]> {
 
 export async function createBackendDebtor(data: Partial<Debtor>, branchId?: string) {
   const targetBranch = branchId || await getSelectedBackendBranchId()
+  const openingDebt = Number(data.originalDebtAmount ?? data.currentDebt ?? 0)
   await api(`/branches/${targetBranch}/debtors`, {
     method: 'POST',
     body: JSON.stringify({
@@ -1043,7 +1047,9 @@ export async function createBackendDebtor(data: Partial<Debtor>, branchId?: stri
       phone: data.phone,
       email: data.email || undefined,
       creditLimit: data.totalCreditLimit ?? (data as AnyRecord).creditLimit,
-      dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined
+      dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined,
+      note: data.notes || undefined,
+      openingDebt: openingDebt > 0 ? openingDebt : undefined
     })
   })
 }
@@ -1057,7 +1063,10 @@ export async function updateBackendDebtor(debtorId: string, data: Partial<Debtor
       phone: data.phone,
       email: data.email || undefined,
       creditLimit: data.totalCreditLimit,
-      dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined
+      dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined,
+      // An explicit empty string clears the note; undefined leaves it untouched.
+      note: typeof data.notes === 'string' ? data.notes : undefined,
+      isActive: data.isActive
     })
   })
 }

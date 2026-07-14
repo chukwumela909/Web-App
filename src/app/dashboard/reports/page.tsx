@@ -372,6 +372,8 @@ export default function ReportsPage() {
       timestamp: sale.timestamp || 0,
       totalAmount: sale.totalAmount || 0,
       costPrice: (sale.costPrice || 0) * (sale.quantitySold || 1),
+      // Backend-stored profit (cost captured at sale time); null falls back to the local estimate.
+      profit: sale.profit ?? null,
       quantitySold: sale.quantitySold || 1,
       paymentMethod: sale.paymentMethod || 'CASH',
       productName: sale.productName,
@@ -391,6 +393,7 @@ export default function ReportsPage() {
         timestamp: sale.timestamp || 0,
         totalAmount: sale.totalAmount || 0,
         costPrice: totalCost,
+        profit: sale.profit ?? null,
         quantitySold: totalQty,
         paymentMethod: paymentMethodId,
         productName: sale.items?.[0]?.productName || 'Multi-item Sale',
@@ -401,6 +404,12 @@ export default function ReportsPage() {
 
     return [...singleSales, ...multiSales].sort((a, b) => b.timestamp - a.timestamp)
   }, [recentSales, multiItemSales])
+
+  // Prefer the backend-stored profit so web/desktop/backend report the same figure;
+  // the revenue-minus-cost estimate is only a fallback for rows without it (a
+  // costPrice of 0 there made profit == sales).
+  const saleProfit = (sale: { totalAmount?: number; costPrice?: number; profit?: number | null }): number =>
+    sale.profit != null ? Number(sale.profit) : Math.max(0, (sale.totalAmount || 0) - (sale.costPrice || 0))
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -443,11 +452,7 @@ export default function ReportsPage() {
     console.log('Metrics calculation - Period:', selectedPeriod, 'Days:', periodDays, 'Filtered sales:', filteredSales.length, 'Total all sales:', allSalesData.length)
 
     const totalSales = filteredSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
-    const totalProfit = filteredSales.reduce((sum, sale) => {
-      const cost = Number(sale.costPrice || 0)
-      const revenue = Number(sale.totalAmount || 0)
-      return sum + Math.max(0, revenue - cost)
-    }, 0)
+    const totalProfit = filteredSales.reduce((sum, sale) => sum + saleProfit(sale), 0)
     const totalTransactions = filteredSales.length
 
     return {
@@ -493,7 +498,7 @@ export default function ReportsPage() {
 
         if (salesByDate[dateKey]) {
           salesByDate[dateKey].sales += sale.totalAmount || 0
-          salesByDate[dateKey].profit += Math.max(0, (sale.totalAmount || 0) - (sale.costPrice || 0))
+          salesByDate[dateKey].profit += saleProfit(sale)
         }
       })
 
@@ -527,8 +532,7 @@ export default function ReportsPage() {
         })
 
         const totalSales = weekSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
-        const totalProfit = weekSales.reduce((sum, sale) =>
-          sum + Math.max(0, (sale.totalAmount || 0) - (sale.costPrice || 0)), 0)
+        const totalProfit = weekSales.reduce((sum, sale) => sum + saleProfit(sale), 0)
 
         const label = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { day: 'numeric' })}`
         weeks.push({ label, sales: totalSales, profit: totalProfit })
@@ -557,8 +561,7 @@ export default function ReportsPage() {
         })
 
         const totalSales = monthSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0)
-        const totalProfit = monthSales.reduce((sum, sale) =>
-          sum + Math.max(0, (sale.totalAmount || 0) - (sale.costPrice || 0)), 0)
+        const totalProfit = monthSales.reduce((sum, sale) => sum + saleProfit(sale), 0)
 
         const label = monthDate.toLocaleDateString('en-US', { month: 'long' })
         months.push({ label, sales: totalSales, profit: totalProfit })

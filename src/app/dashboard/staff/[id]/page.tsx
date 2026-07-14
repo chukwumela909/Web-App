@@ -9,6 +9,7 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { getBranches } from '@/lib/branches-service'
 import { Branch } from '@/lib/branches-types'
+import { displayBranchName } from '@/lib/utils'
 import { Staff, StaffRole, STAFF_PERMISSIONS } from '@/lib/firestore'
 import {
   getBackendStaffMember,
@@ -891,7 +892,8 @@ interface BranchManagerModalProps {
 }
 
 function BranchManagerModal({ staff, branches, onSave, onClose }: BranchManagerModalProps) {
-  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>(staff.branchIds || [])
+  // Dedupe on init: earlier saves could persist duplicated ids (double-toggle bug).
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>(() => [...new Set(staff.branchIds || [])])
   const [searchTerm, setSearchTerm] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -913,12 +915,13 @@ function BranchManagerModal({ staff, branches, onSave, onClose }: BranchManagerM
     }
   }
 
+  // Single functional updater: decides add/remove from the CURRENT state (not a
+  // stale closure) and can never produce duplicate ids, so the count stays correct
+  // even if the toggle fires twice for one click.
   const handleToggleBranch = (branchId: string) => {
-    if (selectedBranchIds.includes(branchId)) {
-      setSelectedBranchIds(prev => prev.filter(id => id !== branchId))
-    } else {
-      setSelectedBranchIds(prev => [...prev, branchId])
-    }
+    setSelectedBranchIds(prev =>
+      prev.includes(branchId) ? prev.filter(id => id !== branchId) : [...prev, branchId]
+    )
   }
 
   return (
@@ -989,16 +992,18 @@ function BranchManagerModal({ staff, branches, onSave, onClose }: BranchManagerM
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
+                      {/* Visual-only: the row's onClick owns toggling. A second handler
+                          here made every click toggle twice (1 counted as 2). */}
                       <input
                         type="checkbox"
                         checked={selectedBranchIds.includes(branch.id)}
-                        onChange={() => handleToggleBranch(branch.id)}
-                        className="rounded border-gray-300 text-[#004AAD] focus:ring-[#004AAD]"
+                        readOnly
+                        className="rounded border-gray-300 text-[#004AAD] focus:ring-[#004AAD] pointer-events-none"
                       />
                       <Building2 className="h-5 w-5 text-gray-500" />
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-gray-900">{branch.name}</p>
+                          <p className="font-medium text-gray-900">{displayBranchName(branch.name, branch.branchCode || branch.branchType)}</p>
                           {branch.branchCode && (
                             <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
                               {branch.branchCode}

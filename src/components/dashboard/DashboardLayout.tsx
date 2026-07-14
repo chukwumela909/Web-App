@@ -7,7 +7,8 @@ import { useBusinessRole } from '@/hooks/useBusinessRole'
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus'
 import { useNotifications } from '@/contexts/NotificationsContext'
 import { useBranch } from '@/contexts/BranchContext'
-import { 
+import { displayBranchName } from '@/lib/utils'
+import {
   Squares2X2Icon,
   ArchiveBoxIcon,
   ShoppingCartIcon,
@@ -314,7 +315,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   >
                     <BuildingOfficeIcon className="h-4 w-4 mr-2" />
                     <span className="hidden sm:inline truncate max-w-24">
-                      {branchesLoading ? 'Loading...' : (currentBranch?.name || 'Select Branch')}
+                      {branchesLoading ? 'Loading...' : (currentBranch ? displayBranchName(currentBranch.name, currentBranch.branchCode || currentBranch.branchType) : 'Select Branch')}
                     </span>
                     {branches.length > 1 && (
                       <ChevronDownIcon className="h-4 w-4 ml-1 flex-shrink-0" />
@@ -340,7 +341,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                 selectedBranchId === branch.id ? 'text-primary' : 'text-muted-foreground'
                               }`} />
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">{branch.name}</div>
+                                <div className="font-medium truncate">{displayBranchName(branch.name, branch.branchCode || branch.branchType)}</div>
                                 {branch.branchCode && (
                                   <div className="text-xs text-muted-foreground truncate">{branch.branchCode}</div>
                                 )}

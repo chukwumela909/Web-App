@@ -388,7 +388,7 @@ export default function DebtorsPage() {
   const [loading, setLoading] = useState(true)
   const [debtors, setDebtors] = useState<Debtor[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'ALL' | PaymentStatus>('ALL')
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'OVERDUE' | 'HIGH_RISK' | 'AT_LIMIT'>('ALL')
   const [showAdd, setShowAdd] = useState(false)
   const [showPayment, setShowPayment] = useState<Debtor | null>(null)
   const [showDetails, setShowDetails] = useState<Debtor | null>(null)
@@ -495,7 +495,20 @@ export default function DebtorsPage() {
       const matchesSearch = debtor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          debtor.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          debtor.email?.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesStatus = filterStatus === 'ALL' || debtor.paymentStatus === filterStatus
+      const matchesStatus = (() => {
+        switch (filterStatus) {
+          case 'ALL':
+            return true
+          case 'ACTIVE':
+            return debtor.currentDebt > 0
+          case 'OVERDUE':
+            return debtor.currentDebt > 0 && !!debtor.dueDate && debtor.dueDate < Date.now()
+          case 'HIGH_RISK':
+            return debtor.totalCreditLimit > 0 && debtor.currentDebt > debtor.totalCreditLimit * 0.8
+          case 'AT_LIMIT':
+            return debtor.totalCreditLimit > 0 && debtor.currentDebt >= debtor.totalCreditLimit
+        }
+      })()
       return matchesSearch && matchesStatus
     })
 
@@ -756,19 +769,16 @@ export default function DebtorsPage() {
               
               {/* Filter Chips */}
               <div className="flex flex-wrap gap-2">
-                {[
+                {([
                   { value: 'ALL', label: 'All' },
-                  { value: 'UNPAID', label: 'Active' },
-                  { value: 'PARTIAL', label: 'Overdue' },
+                  { value: 'ACTIVE', label: 'Active' },
+                  { value: 'OVERDUE', label: 'Overdue' },
                   { value: 'HIGH_RISK', label: 'High Risk' },
                   { value: 'AT_LIMIT', label: 'At Limit' }
-                ].map((filter) => (
+                ] as const).map((filter) => (
                   <button
                     key={filter.value}
-                    onClick={() => setFilterStatus(filter.value === 'ALL' ? 'ALL' : 
-                      filter.value === 'HIGH_RISK' ? 'UNPAID' : 
-                      filter.value === 'AT_LIMIT' ? 'UNPAID' :
-                      filter.value as PaymentStatus)}
+                    onClick={() => setFilterStatus(filter.value)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                       (filterStatus === 'ALL' && filter.value === 'ALL') ||
                       (filterStatus === filter.value)
@@ -874,21 +884,31 @@ export default function DebtorsPage() {
                       </div>
                     </div>
                     
-                    {/* Update Status Button for debtors with debt */}
-                    {debtor.currentDebt > 0 && (
-                      <div className="mt-3">
+                    {/* Row actions: record payment (when owing) + edit details */}
+                    <div className="mt-3 flex items-center gap-2">
+                      {debtor.currentDebt > 0 && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
                             setShowPayment(debtor)
                           }}
-                          className="w-full bg-[#66BB6A] text-white py-2 rounded-lg font-medium hover:bg-[#5cb660] transition-colors flex items-center justify-center space-x-2"
+                          className="flex-1 bg-[#66BB6A] text-white py-2 rounded-lg font-medium hover:bg-[#5cb660] transition-colors flex items-center justify-center space-x-2"
                         >
                           <CheckCircleIcon className="h-4 w-4" />
                           <span>Update Status</span>
                         </button>
-                      </div>
-                    )}
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditDebtor(debtor)
+                        }}
+                        className={`${debtor.currentDebt > 0 ? '' : 'flex-1 '}px-4 py-2 border border-border text-muted-foreground rounded-lg font-medium hover:bg-muted transition-colors flex items-center justify-center space-x-2`}
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                        <span>Edit</span>
+                      </button>
+                    </div>
                   </motion.div>
                 ))}
               </div>

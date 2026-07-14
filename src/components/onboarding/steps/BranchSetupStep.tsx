@@ -34,7 +34,9 @@ export default function BranchSetupStep({
   isSaving
 }: BranchSetupStepProps) {
   const [formData, setFormData] = useState({
-    branchName: data.branchSetup.branchName || data.businessProfile.businessName + ' - Main',
+    // No "- Main" suffix: the branch already carries the MAIN code/badge, so a
+    // suffixed name rendered "Main" twice across the apps.
+    branchName: data.branchSetup.branchName || data.businessProfile.businessName,
     location: data.branchSetup.location,
     defaultCurrency: data.branchSetup.defaultCurrency || data.businessProfile.currency,
     addMoreLater: data.branchSetup.addMoreLater

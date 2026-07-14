@@ -2,7 +2,6 @@
 
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import StaffProtectedRoute from '@/components/auth/StaffProtectedRoute'
-import { authedFetch } from '@/lib/authed-fetch'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
@@ -128,21 +127,9 @@ export default function AddStaffPage() {
       try { token = new URL(rawUrl).searchParams.get('token') || '' } catch { token = '' }
       const inviteUrl = token ? `${window.location.origin}/staff/invite?token=${token}` : rawUrl
 
-      // Best-effort email delivery; the link is shown regardless so it can be shared manually.
-      // The route returns HTTP 200 even when it couldn't send (e.g. no Brevo key), so trust the
-      // `emailed` flag in the body — not res.ok — or we'd falsely report success.
-      let emailed = false
-      try {
-        const res = await authedFetch('/api/staff/invite-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, inviteUrl, role: newStaff.role, businessName: user.displayName || undefined })
-        })
-        const data = await res.json().catch(() => null)
-        emailed = res.ok && data?.emailed === true
-      } catch {
-        emailed = false
-      }
+      // The backend sends the invitation email (Resend) when it creates the invite and
+      // reports the outcome; the link is shown regardless so it can be shared manually.
+      const emailed = (invitation as { emailSent?: boolean })?.emailSent === true
 
       setInviteResult({ inviteUrl, email, emailed })
     } catch (error) {
