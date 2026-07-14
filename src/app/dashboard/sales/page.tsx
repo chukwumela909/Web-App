@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  Calculator,
   Clock,
   Loader2,
   LogOut,
@@ -19,6 +20,7 @@ import {
   Wifi,
   X
 } from 'lucide-react'
+import PosCalculator from '@/components/pos/PosCalculator'
 
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import StaffProtectedRoute from '@/components/auth/StaffProtectedRoute'
@@ -217,6 +219,7 @@ function SalesPOSContent() {
   const displayCurrency = currencySymbol === 'KSh' ? 'Ksh' : currencySymbol
 
   const [isSaleActive, setIsSaleActive] = useState(false)
+  const [calcOpen, setCalcOpen] = useState(false)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [customerName, setCustomerName] = useState('')
   const [taxRateInput, setTaxRateInput] = useState('0')
@@ -729,6 +732,16 @@ function SalesPOSContent() {
               <div className="h-8 w-px bg-[#1f2a4a]" />
               <button
                 type="button"
+                onClick={() => setCalcOpen((v) => !v)}
+                aria-pressed={calcOpen}
+                className={`grid h-11 w-11 place-items-center rounded-full transition hover:bg-[#1a2547] hover:text-white ${calcOpen ? 'bg-[#1a2547] text-white' : 'text-[#cbd5e1]'}`}
+                title="Calculator"
+              >
+                <Calculator className="h-6 w-6" />
+              </button>
+              <div className="h-8 w-px bg-[#1f2a4a]" />
+              <button
+                type="button"
                 onClick={() => router.push('/dashboard')}
                 className="grid h-11 w-11 place-items-center rounded-full text-[#cbd5e1] transition hover:bg-[#1a2547] hover:text-white"
                 title="Back to dashboard"
@@ -746,6 +759,8 @@ function SalesPOSContent() {
               </button>
             </div>
           </header>
+
+          {calcOpen && <PosCalculator onClose={() => setCalcOpen(false)} />}
 
           <main className="grid h-[calc(100vh-78px)] grid-cols-1 gap-4 overflow-hidden p-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <section className="dashboard-panel min-h-0 overflow-hidden px-5 py-6">
