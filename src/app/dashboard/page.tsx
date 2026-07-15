@@ -106,7 +106,7 @@ export default function DashboardPage() {
 
   // Determine the effective user ID for data loading
   const effectiveUserId = staff ? staff.userId : user?.uid
-  const { data: dashboardData, isLoading } = useDashboardDataQuery({ userId: effectiveUserId, branchId: selectedBranchId })
+  const { data: dashboardData, isLoading, isError, refetch } = useDashboardDataQuery({ userId: effectiveUserId, branchId: selectedBranchId })
   const products = dashboardData?.products || []
   const sales = dashboardData?.sales || []
   const multiItemSales = dashboardData?.multiItemSales || []
@@ -213,6 +213,30 @@ export default function DashboardPage() {
         <DashboardLayout>
           <DashboardSkeleton />
         </DashboardLayout>
+      </ProtectedRoute>
+    )
+  }
+
+  // A failed load must not masquerade as an empty business (all-zero tiles).
+  if (isError && !dashboardData) {
+    return (
+      <ProtectedRoute>
+        <StaffProtectedRoute requiredPermission="dashboard:read">
+          <DashboardLayout>
+            <div className="flex min-h-[60vh] items-center justify-center font-dm-sans">
+              <div className="max-w-md rounded-2xl border border-[#fecaca] bg-[#fff1f2] p-8 text-center">
+                <h2 className="text-lg font-semibold text-[#b42318]">Couldn&apos;t load your dashboard</h2>
+                <p className="mt-2 text-sm text-[#7f1d1d]">Check your internet connection — your data is safe on the server.</p>
+                <button
+                  onClick={() => refetch()}
+                  className="mt-5 rounded-xl bg-[#004aad] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#003a8c]"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          </DashboardLayout>
+        </StaffProtectedRoute>
       </ProtectedRoute>
     )
   }

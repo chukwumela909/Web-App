@@ -653,7 +653,7 @@ export default function SettingsPage() {
                         value={userProfile?.phoneNumber || ''}
                         onChange={(e) => setUserProfile(prev => prev ? {...prev, phoneNumber: e.target.value} : null)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-transparent"
-                        placeholder="+254 700 000 000"
+                        placeholder="Phone number"
                       />
                     </div>
                   </CardContent>
@@ -802,7 +802,7 @@ export default function SettingsPage() {
                         value={businessProfile?.businessPhone || ''}
                         onChange={(e) => setBusinessProfile(prev => prev ? {...prev, businessPhone: e.target.value} : null)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#004AAD] focus:border-transparent"
-                        placeholder="+254 700 000 000"
+                        placeholder="Phone number"
                       />
                     </div>
                     <div>
@@ -1279,7 +1279,7 @@ export default function SettingsPage() {
                                   className="border-blue-300 text-blue-700 hover:bg-blue-100"
                                   onClick={() => {
                                     // Simulate test print
-                                    alert(`Test print sent to ${printer.name}`)
+                                    alert('Printer integration is coming soon — test printing is not available yet.')
                                   }}
                                 >
                                   Test Print
@@ -1346,7 +1346,7 @@ export default function SettingsPage() {
                                   className="border-green-300 text-green-700 hover:bg-green-100"
                                   onClick={() => {
                                     // Simulate test scan
-                                    alert(`Test scan initiated on ${scanner.name}`)
+                                    alert('Scanner integration is coming soon — test scanning is not available yet.')
                                   }}
                                 >
                                   Test Scan
@@ -1824,7 +1824,7 @@ export default function SettingsPage() {
                         onClick={() => {
                           // Simulate running diagnostics
                           if (deviceSettings?.pairedDevices?.length) {
-                            alert('Running diagnostics on all paired devices...')
+                            alert('Device diagnostics are coming soon.')
                           } else {
                             alert('No devices available for diagnostics')
                           }
@@ -1850,7 +1850,7 @@ export default function SettingsPage() {
                               ...deviceSettings,
                               pairedDevices: resetDevices
                             })
-                            alert('All device connections have been reset')
+                            alert('Device connection management is coming soon.')
                           }
                         }}
                       >

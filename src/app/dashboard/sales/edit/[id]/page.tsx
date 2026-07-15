@@ -577,7 +577,7 @@ function EditSalePageContent() {
                       type="tel"
                       value={editForm.customerPhone}
                       onChange={(e) => setEditForm(prev => ({ ...prev, customerPhone: e.target.value }))}
-                      placeholder="+254... (optional)"
+                      placeholder="Phone number"
                       className="w-full px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-colors"
                     />
                   </div>

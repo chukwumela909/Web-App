@@ -942,11 +942,14 @@ export default function ReportsPage() {
     }
   }, [trendData])
 
-  // Export handler
+  // Export handler — includes every sale in the selected period, not just the four summary rows.
   const handleExport = async () => {
     setIsExporting(true)
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      const periodDays = periodToDays(selectedPeriod)
+      const periodStart = Date.now() - periodDays * 24 * 60 * 60 * 1000
+      const periodSales = allSalesData.filter(sale => (sale.timestamp || 0) >= periodStart)
+      const escapeCell = (cell: string | number) => `"${String(cell).replace(/"/g, '""')}"`
 
       const csvContent = [
         ['FahamPesa Business Report'],
@@ -957,8 +960,19 @@ export default function ReportsPage() {
         ['Total Sales', `${currencySymbol} ${metrics.totalSales.toLocaleString()}`],
         ['Total Profit', `${currencySymbol} ${metrics.totalProfit.toLocaleString()}`],
         ['Transactions', metrics.totalTransactions.toString()],
-        ['Expenses', `${currencySymbol} ${metrics.expenses.toLocaleString()}`]
-      ].map(row => row.join(',')).join('\n')
+        ['Expenses', `${currencySymbol} ${metrics.expenses.toLocaleString()}`],
+        [''],
+        ['Sales'],
+        ['Date', 'Product', 'Quantity', 'Amount', 'Profit', 'Payment Method'],
+        ...periodSales.map(sale => [
+          new Date(sale.timestamp).toLocaleString(),
+          sale.productName || 'Sale',
+          String(sale.quantitySold || 0),
+          String(sale.totalAmount || 0),
+          String(saleProfit(sale)),
+          String(sale.paymentMethod || '')
+        ])
+      ].map(row => row.map(escapeCell).join(',')).join('\n')
 
       const blob = new Blob([csvContent], { type: 'text/csv' })
       const url = URL.createObjectURL(blob)

@@ -7,12 +7,12 @@ import {
   Calculator,
   Clock,
   History,
+  Home,
   Loader2,
   LogOut,
   Minus,
   Package,
   Plus,
-  Power,
   Printer,
   Search,
   ShoppingCart,
@@ -217,7 +217,8 @@ function SalesPOSContent() {
 
   const effectiveUserId = staff ? staff.userId : user?.uid
   const cashierName = staff?.fullName || user?.displayName || user?.email?.split('@')[0] || 'Cashier'
-  const displayCurrency = currencySymbol === 'KSh' ? 'Ksh' : currencySymbol
+  // Same symbol everywhere ('KSh', not a POS-only 'Ksh' variant).
+  const displayCurrency = currencySymbol
 
   const [isSaleActive, setIsSaleActive] = useState(false)
   const [calcOpen, setCalcOpen] = useState(false)
@@ -756,7 +757,7 @@ function SalesPOSContent() {
                 className="grid h-11 w-11 place-items-center rounded-full text-[#cbd5e1] transition hover:bg-[#1a2547] hover:text-white"
                 title="Back to dashboard"
               >
-                <Power className="h-7 w-7" />
+                <Home className="h-6 w-6" />
               </button>
               <button
                 type="button"
@@ -956,7 +957,11 @@ function SalesPOSContent() {
                           </button>
                           <button
                             type="button"
-                            onClick={handleClearSale}
+                            onClick={() => {
+                              if (cartItems.length === 0 || window.confirm('Clear this sale? All items in the cart will be removed.')) {
+                                void handleClearSale()
+                              }
+                            }}
                             disabled={cartItems.length === 0}
                             className="rounded-[5px] bg-[#fff1ee] px-2 py-1 text-[11px] font-medium text-[#f04438] disabled:opacity-50"
                           >
@@ -1066,7 +1071,7 @@ function SalesPOSContent() {
                       </div>
                       <div className="flex items-center justify-between border-t border-[#d9dee7] pt-2">
                         <span className="text-[16px] font-bold text-[#141925]">Total</span>
-                        <span className="text-[24px] font-extrabold">{formatMoney(totalAmount).replace(' ', '')}</span>
+                        <span className="text-[24px] font-extrabold">{formatMoney(totalAmount)}</span>
                       </div>
                     </div>
 

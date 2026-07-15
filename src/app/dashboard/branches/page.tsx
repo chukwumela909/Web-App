@@ -1360,7 +1360,7 @@ function EditBranchModal({ branch, onSave, onCancel }: EditBranchModalProps) {
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-gray-700">Phone</span>
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254 …" className="dashboard-field w-full px-3 py-2 text-sm" />
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" className="dashboard-field w-full px-3 py-2 text-sm" />
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium text-gray-700">Email</span>

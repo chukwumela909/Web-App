@@ -1132,6 +1132,7 @@ export async function addBackendDebtorPurchase(
   const targetBranch = branchId || await getSelectedBackendBranchId()
   await api(`/branches/${targetBranch}/debtors/${debtorId}/purchases`, {
     method: 'POST',
+    headers: { 'Idempotency-Key': crypto.randomUUID() },
     body: JSON.stringify({
       amount,
       dueDate: dueDate ? new Date(dueDate).toISOString() : undefined
@@ -1143,6 +1144,8 @@ export async function recordBackendDebtorPayment(data: Partial<DebtorPayment>, b
   const targetBranch = branchId || await getSelectedBackendBranchId()
   await api(`/branches/${targetBranch}/debtors/${data.debtorId}/payments`, {
     method: 'POST',
+    // Collapses accidental duplicate submissions server-side (backend idempotency middleware).
+    headers: { 'Idempotency-Key': crypto.randomUUID() },
     body: JSON.stringify({
       amount: data.amount,
       paymentMethod: toBackendPaymentMethod(data.paymentMethod),

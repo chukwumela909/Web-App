@@ -33,7 +33,7 @@ import {
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { Debtor, DebtorPayment, PaymentMethod, PaymentStatus, InstallmentFrequency, createDebtor, getDebtors, recordDebtorPayment, updateDebtor, deleteDebtor, addDebtorPurchase } from '@/lib/firestore'
+import { Debtor, PaymentMethod, createDebtor, getDebtors, recordDebtorPayment, updateDebtor, deleteDebtor, addDebtorPurchase } from '@/lib/firestore'
 import { isBackendApiError } from '@/lib/backend-api'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
@@ -116,185 +116,6 @@ function AddDebtModal({ debtor, currencySymbol, onCancel, onSubmit }: {
   )
 }
 
-// Debtor Details Modal Component
-interface DebtorDetailsModalProps {
-  debtor: Debtor
-  onClose: () => void
-  onEdit: () => void
-  onRecordPayment: () => void
-  currencySymbol: string
-}
-
-function DebtorDetailsModal({ debtor, onClose, onEdit, onRecordPayment, currencySymbol }: DebtorDetailsModalProps) {
-  return (
-    <div className="flex flex-col h-full max-h-[90vh]">
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
-              <span className="text-white font-bold text-2xl">{debtor.name.charAt(0).toUpperCase()}</span>
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold">{debtor.name}</h2>
-              <p className="text-blue-100 mt-1">Debtor Details & Payment History</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Personal Information */}
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-bold text-card-foreground mb-4">Personal Information</h3>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <UserIcon className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Name</p>
-                    <p className="font-medium text-card-foreground">{debtor.name}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <PhoneIcon className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Phone</p>
-                    <p className="font-medium text-card-foreground">{debtor.phone}</p>
-                  </div>
-                </div>
-                {debtor.email && (
-                  <div className="flex items-center gap-3">
-                    <EnvelopeIcon className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Email</p>
-                      <p className="font-medium text-card-foreground">{debtor.email}</p>
-                    </div>
-                  </div>
-                )}
-                {debtor.address && (
-                  <div className="flex items-center gap-3">
-                    <MapPinIcon className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Address</p>
-                      <p className="font-medium text-card-foreground">{debtor.address}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {debtor.notes && (
-              <div>
-                <h3 className="text-lg font-bold text-card-foreground mb-4">Notes</h3>
-                <div className="p-4 bg-muted/50 rounded-xl">
-                  <p className="text-card-foreground">{debtor.notes}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Financial Information */}
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-bold text-card-foreground mb-4">Financial Summary</h3>
-              <div className="grid grid-cols-1 gap-4">
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
-                  <p className="text-sm text-red-700 dark:text-red-300">Current Debt</p>
-                      <p className="text-2xl font-bold text-red-900 dark:text-red-100">
-                        {currencySymbol} {Number(debtor.currentDebt).toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-                  <p className="text-sm text-blue-700 dark:text-blue-300">Credit Limit</p>
-                      <p className="text-xl font-bold text-blue-900 dark:text-blue-100">
-                        {currencySymbol} {Number(debtor.totalCreditLimit).toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
-                  <p className="text-sm text-green-700 dark:text-green-300">Total Payments</p>
-                      <p className="text-xl font-bold text-green-900 dark:text-green-100">
-                        {currencySymbol} {Number(debtor.totalPayments).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-bold text-card-foreground mb-4">Status & Dates</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Payment Status:</span>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    debtor.paymentStatus === 'PAID' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                    debtor.paymentStatus === 'PARTIAL' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                  }`}>
-                    {debtor.paymentStatus}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Last Payment:</span>
-                  <span className="font-medium text-card-foreground">
-                    {debtor.lastPaymentDate 
-                      ? new Date(debtor.lastPaymentDate).toLocaleDateString()
-                      : 'Never'
-                    }
-                  </span>
-                </div>
-                {debtor.dueDate && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Due Date:</span>
-                    <span className={`font-medium ${
-                      debtor.dueDate < Date.now() ? 'text-red-600' : 'text-card-foreground'
-                    }`}>
-                      {new Date(debtor.dueDate).toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Credit Score:</span>
-                  <span className="font-medium text-card-foreground">{debtor.creditScore}/100</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-6 border-t border-border bg-muted/30">
-        <div className="flex items-center justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-6 py-3 border border-border text-muted-foreground rounded-xl hover:bg-muted transition-colors"
-          >
-            Close
-          </button>
-          <button
-            onClick={onEdit}
-            className="px-6 py-3 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors"
-          >
-            <PencilIcon className="h-4 w-4 inline mr-2" />
-            Edit Debtor
-          </button>
-          <button
-            onClick={onRecordPayment}
-            className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-700 hover:to-emerald-700 transition-colors shadow-lg"
-          >
-            <BanknotesIcon className="h-5 w-5 inline mr-2" />
-            Record Payment
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // Edit Debtor Modal Component
 interface EditDebtorModalProps {
@@ -444,9 +265,11 @@ export default function DebtorsPage() {
   const [filterStatus, setFilterStatus] = useState<'ACTIVE' | 'COMPLETED' | 'OVERDUE'>('ACTIVE')
   const [showAdd, setShowAdd] = useState(false)
   const [showPayment, setShowPayment] = useState<Debtor | null>(null)
-  const [showDetails, setShowDetails] = useState<Debtor | null>(null)
   const [editingDebtor, setEditingDebtor] = useState<Debtor | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
+  // Disabled-while-submitting guard: a double-click on Record Payment previously
+  // recorded the payment twice against the balance.
+  const [submitting, setSubmitting] = useState(false)
   // Small "add more debt to this debtor" modal (partial of the old wizard's EXISTING mode)
   const [addingDebtTo, setAddingDebtTo] = useState<Debtor | null>(null)
   const receiptRef = useRef<HTMLDivElement>(null)
@@ -526,19 +349,6 @@ export default function DebtorsPage() {
     return method === 'MPESA' ? 'M-Pesa' : method.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
   }
 
-  const getPaymentStatusColor = (status: PaymentStatus) => {
-    switch (status) {
-      case 'PAID':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-      case 'PARTIAL':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-      case 'UNPAID':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
-    }
-  }
-
   const filteredDebtors = useMemo(() => {
     const filtered = debtors.filter(debtor => {
       const matchesSearch = debtor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -580,11 +390,13 @@ export default function DebtorsPage() {
     })
   }
 
-  const canSubmit = Boolean(debtorForm.name.trim() && debtorForm.phone.trim())
+  const amountOwedNum = Number(debtorForm.amountOwed || 0)
+  const dueBeforeTaken = Boolean(debtorForm.dueDate && debtorForm.debtDate && debtorForm.dueDate < debtorForm.debtDate)
+  const canSubmit = Boolean(debtorForm.name.trim() && debtorForm.phone.trim()) && amountOwedNum >= 0 && !dueBeforeTaken
 
   const handleSubmit = async () => {
-    if (!user || !canSubmit) return
-
+    if (!user || !canSubmit || submitting) return
+    setSubmitting(true)
     try {
       await createDebtor(user.uid, {
         name: debtorForm.name.trim(),
@@ -604,6 +416,8 @@ export default function DebtorsPage() {
     } catch (error) {
       console.error('Failed to save debtor:', error)
       alert('Failed to save debtor. Please try again.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -686,9 +500,9 @@ export default function DebtorsPage() {
               <div className="bg-[#E8F5E8] rounded-xl p-4 text-center border border-green-200/50">
                 <CheckCircleIcon className="h-6 w-6 text-[#66BB6A] mx-auto mb-2" />
                 <p className="text-2xl font-bold text-[#66BB6A] mb-1">
-                  {currencySymbol} 0
+                  {currencySymbol} {debtors.reduce((sum, d) => sum + (d.totalPayments || 0), 0).toLocaleString()}
                 </p>
-                <p className="text-sm text-[#66BB6A] font-medium">Today&apos;s Payments</p>
+                <p className="text-sm text-[#66BB6A] font-medium">Total Collected</p>
               </div>
               
               <div className="bg-[#FEE2E2] rounded-xl p-4 text-center border border-red-200/50">
@@ -965,6 +779,12 @@ export default function DebtorsPage() {
                         />
                       </div>
                     </div>
+                    {amountOwedNum < 0 && (
+                      <p className="mt-3 text-xs font-medium text-[#DC2626]">Amount owed can&apos;t be negative.</p>
+                    )}
+                    {dueBeforeTaken && (
+                      <p className="mt-3 text-xs font-medium text-[#DC2626]">The due date can&apos;t be before the date the debt was taken.</p>
+                    )}
                     <p className="mt-4 text-xs text-muted-foreground">Payments can be partial — record them anytime from the debtor&apos;s card.</p>
                   </div>
 
@@ -977,10 +797,10 @@ export default function DebtorsPage() {
                     </button>
                     <button
                       onClick={handleSubmit}
-                      disabled={!canSubmit}
+                      disabled={!canSubmit || submitting}
                       className="px-8 py-3 bg-gradient-to-r from-[#004AAD] to-[#0056CC] text-white font-semibold rounded-xl hover:opacity-95 transition-opacity shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Save Debtor
+                      {submitting ? 'Saving…' : 'Save Debtor'}
                     </button>
                   </div>
                 </motion.div>
@@ -1035,7 +855,8 @@ export default function DebtorsPage() {
                   <form
                     onSubmit={async (e) => {
                       e.preventDefault()
-                      if (!user || !showPayment) return
+                      if (!user || !showPayment || submitting) return
+                      setSubmitting(true)
                       try {
                       await recordDebtorPayment(user.uid, {
                         debtorId: showPayment.id,
@@ -1053,7 +874,11 @@ export default function DebtorsPage() {
                       fetchData()
                       } catch (error) {
                         console.error('Failed to record payment:', error)
-                        alert('Failed to record payment. Please try again.')
+                        alert(isBackendApiError(error) && error.code === 'payment_exceeds_debt'
+                          ? `Payment can't exceed the ${currencySymbol} ${Number(showPayment.currentDebt).toLocaleString()} owed.`
+                          : 'Failed to record payment. Please try again.')
+                      } finally {
+                        setSubmitting(false)
                       }
                     }}
                     className="p-6 space-y-6"
@@ -1114,11 +939,11 @@ export default function DebtorsPage() {
                       </button>
                       <button 
                         type="submit" 
-                        disabled={!paymentForm.amount || paymentForm.amount <= 0}
+                        disabled={submitting || !paymentForm.amount || paymentForm.amount <= 0}
                         className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         <BanknotesIcon className="h-5 w-5 inline mr-2" />
-                        Record Payment
+                        {submitting ? 'Recording…' : 'Record Payment'}
                       </button>
                     </div>
                   </form>
@@ -1127,33 +952,6 @@ export default function DebtorsPage() {
             )}
           </AnimatePresence>
 
-          {/* Debtor Details Modal */}
-          <AnimatePresence>
-            {showDetails && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-                  animate={{ opacity: 1, scale: 1, y: 0 }} 
-                  exit={{ opacity: 0, scale: 0.95, y: 20 }} 
-                  className="bg-card rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-border"
-                >
-                  <DebtorDetailsModal 
-                    debtor={showDetails}
-                    currencySymbol={currencySymbol}
-                    onClose={() => setShowDetails(null)}
-                    onEdit={() => {
-                      setEditingDebtor(showDetails)
-                      setShowDetails(null)
-                    }}
-                    onRecordPayment={() => {
-                      setShowPayment(showDetails)
-                      setShowDetails(null)
-                    }}
-                  />
-                </motion.div>
-              </div>
-            )}
-          </AnimatePresence>
 
           {/* Edit Debtor Modal */}
           <AnimatePresence>

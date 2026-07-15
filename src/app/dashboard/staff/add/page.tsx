@@ -300,7 +300,7 @@ export default function AddStaffPage() {
                           value={newStaff.phone}
                           onChange={(e) => setNewStaff(prev => ({ ...prev, phone: e.target.value }))}
                           className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                          placeholder="+254 700 000 000"
+                          placeholder="Phone number"
                         />
                       </div>
                       <div>

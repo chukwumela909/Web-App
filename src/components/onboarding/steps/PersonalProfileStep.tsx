@@ -144,7 +144,7 @@ export default function PersonalProfileStep({
               type="tel"
               value={formData.phoneNumber}
               onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-              placeholder="+254 700 000 000"
+              placeholder="Phone number"
               className={`w-full pl-10 pr-4 py-3 border rounded-xl bg-white text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#004AAD] focus:border-transparent transition-colors ${
                 errors.phoneNumber ? 'border-red-300 bg-red-50' : 'border-gray-300'
               }`}

@@ -24,6 +24,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import type { Debtor, PaymentMethod, PaymentStatus } from '@/lib/firestore'
 import { recordDebtorPayment, deleteDebtor } from '@/lib/firestore'
+import { isBackendApiError } from '@/lib/backend-api'
 import { getBackendDebtorDetail, type BackendDebtorPaymentRecord } from '@/lib/backend-business-api'
 
 const fadeInUp = {
@@ -79,12 +80,6 @@ function DebtorDetailsContent() {
     fetchDebtor()
   }, [user, debtorId])
 
-  const getRiskLevel = (debtor: Debtor) => {
-    if (debtor.currentDebt > debtor.totalCreditLimit * 0.8) return 'HIGH'
-    if (debtor.currentDebt > debtor.totalCreditLimit * 0.5) return 'MEDIUM'
-    return 'LOW'
-  }
-
   const handleDeleteDebtor = async () => {
     if (!debtor) return
     try {
@@ -92,23 +87,11 @@ function DebtorDetailsContent() {
       router.push('/dashboard/debtors')
     } catch (error) {
       console.error('Failed to delete debtor:', error)
-      alert('Failed to delete debtor. Please try again.')
-    }
-  }
-
-  const getRiskLevelColor = (level: string) => {
-    switch (level) {
-      case 'HIGH': return 'text-[#DC2626]'
-      case 'MEDIUM': return 'text-[#F29F05]'
-      default: return 'text-[#66BB6A]'
-    }
-  }
-
-  const getRiskLevelBg = (level: string) => {
-    switch (level) {
-      case 'HIGH': return 'bg-[#FEE2E2]'
-      case 'MEDIUM': return 'bg-[#FEF3E0]'
-      default: return 'bg-[#E8F5E8]'
+      if (isBackendApiError(error) && error.code === 'debtor_has_outstanding_debt') {
+        alert('This debtor still owes money. Settle or write off the outstanding balance before deleting.')
+      } else {
+        alert('Failed to delete debtor. Please try again.')
+      }
     }
   }
 
@@ -116,9 +99,11 @@ function DebtorDetailsContent() {
     return method === 'MPESA' ? 'M-Pesa' : method.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
   }
 
+  const [recordingPayment, setRecordingPayment] = useState(false)
+
   const handleRecordPayment = async (amount: number, paymentMethod: PaymentMethod, notes: string) => {
-    if (!user || !debtor) return
-    
+    if (!user || !debtor || recordingPayment) return
+    setRecordingPayment(true)
     try {
       await recordDebtorPayment(user.uid, {
         debtorId: debtor.id,
@@ -135,7 +120,11 @@ function DebtorDetailsContent() {
       fetchDebtor() // Refresh debtor data
     } catch (error) {
       console.error('Failed to record payment:', error)
-      alert('Failed to record payment. Please try again.')
+      alert(isBackendApiError(error) && error.code === 'payment_exceeds_debt'
+        ? `Payment can't exceed the amount owed.`
+        : 'Failed to record payment. Please try again.')
+    } finally {
+      setRecordingPayment(false)
     }
   }
 
@@ -174,8 +163,13 @@ function DebtorDetailsContent() {
     )
   }
 
-  const riskLevel = getRiskLevel(debtor)
-  const availableCredit = debtor.totalCreditLimit - debtor.currentDebt
+  const isOverdue = debtor.currentDebt > 0 && !!debtor.dueDate && debtor.dueDate < Date.now()
+  const statusLabel = debtor.currentDebt <= 0 ? 'Completed' : isOverdue ? 'Overdue' : 'Active'
+  const statusTone = debtor.currentDebt <= 0
+    ? 'bg-[#E8F5E8] text-[#66BB6A]'
+    : isOverdue
+    ? 'bg-[#FEE2E2] text-[#DC2626]'
+    : 'bg-[#E3F2FD] text-[#2175C7]'
 
   return (
     <ProtectedRoute>
@@ -203,14 +197,13 @@ function DebtorDetailsContent() {
             <div className="bg-card rounded-2xl p-6 shadow-sm border border-border">
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center space-x-4">
-                  {/* Risk Level Indicator */}
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${getRiskLevelBg(riskLevel)}`}>
-                    {riskLevel === 'HIGH' ? (
-                      <ExclamationTriangleIcon className={`h-7 w-7 ${getRiskLevelColor(riskLevel)}`} />
-                    ) : riskLevel === 'MEDIUM' ? (
-                      <ClockIcon className={`h-7 w-7 ${getRiskLevelColor(riskLevel)}`} />
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${statusTone}`}>
+                    {statusLabel === 'Completed' ? (
+                      <CheckCircleIcon className="h-7 w-7" />
+                    ) : statusLabel === 'Overdue' ? (
+                      <ExclamationTriangleIcon className="h-7 w-7" />
                     ) : (
-                      <CheckCircleIcon className={`h-7 w-7 ${getRiskLevelColor(riskLevel)}`} />
+                      <ClockIcon className="h-7 w-7" />
                     )}
                   </div>
                   
@@ -227,9 +220,8 @@ function DebtorDetailsContent() {
                     Delete
                   </button>
                 </div>
-                {/* Risk Level Badge */}
-                <div className={`px-3 py-2 rounded-xl font-bold text-sm ${getRiskLevelBg(riskLevel)} ${getRiskLevelColor(riskLevel)}`}>
-                  {riskLevel}
+                <div className={`px-3 py-2 rounded-xl font-bold text-sm ${statusTone}`}>
+                  {statusLabel}
                 </div>
               </div>
               
@@ -246,23 +238,23 @@ function DebtorDetailsContent() {
                 </div>
                 
                 <div className="text-center">
-                  <div className="w-10 h-10 rounded-xl bg-[#E3F2FD] flex items-center justify-center mx-auto mb-2">
-                    <CreditCardIcon className="h-5 w-5 text-[#2175C7]" />
-                  </div>
-                  <p className="text-xl font-bold text-[#2175C7] mb-1">
-                    {currencySymbol} {debtor.totalCreditLimit.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Credit Limit</p>
-                </div>
-                
-                <div className="text-center">
                   <div className="w-10 h-10 rounded-xl bg-[#E8F5E8] flex items-center justify-center mx-auto mb-2">
                     <TagIcon className="h-5 w-5 text-[#66BB6A]" />
                   </div>
                   <p className="text-xl font-bold text-[#66BB6A] mb-1">
-                    {currencySymbol} {availableCredit.toLocaleString()}
+                    {currencySymbol} {(debtor.totalPayments || 0).toLocaleString()}
                   </p>
-                  <p className="text-xs text-muted-foreground">Available Credit</p>
+                  <p className="text-xs text-muted-foreground">Total Paid</p>
+                </div>
+
+                <div className="text-center">
+                  <div className="w-10 h-10 rounded-xl bg-[#E3F2FD] flex items-center justify-center mx-auto mb-2">
+                    <ClockIcon className="h-5 w-5 text-[#2175C7]" />
+                  </div>
+                  <p className={`text-xl font-bold mb-1 ${isOverdue ? 'text-[#DC2626]' : 'text-[#2175C7]'}`}>
+                    {debtor.dueDate ? new Date(debtor.dueDate).toLocaleDateString() : '—'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Due Date</p>
                 </div>
               </div>
             </div>
@@ -274,26 +266,28 @@ function DebtorDetailsContent() {
               <h3 className="text-lg font-bold text-card-foreground mb-4">Quick Actions</h3>
               
               {debtor.currentDebt > 0 ? (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <button
-                    onClick={() => setShowPaymentDialog(true)}
+                    onClick={() => {
+                      // Pre-fill the full balance so "Mark Paid" is one confirm away.
+                      setPaymentForm(prev => ({ ...prev, amount: debtor.currentDebt }))
+                      setShowPaymentDialog(true)
+                    }}
                     className="bg-[#66BB6A] text-white py-3 rounded-xl font-medium hover:bg-[#5cb660] transition-colors flex items-center justify-center space-x-2"
                   >
                     <CheckCircleIcon className="h-4 w-4" />
                     <span className="text-sm">Mark Paid</span>
                   </button>
-                  
+
                   <button
-                    onClick={() => setShowPaymentDialog(true)}
+                    onClick={() => {
+                      setPaymentForm(prev => ({ ...prev, amount: 0 }))
+                      setShowPaymentDialog(true)
+                    }}
                     className="border border-[#F29F05] text-[#F29F05] py-3 rounded-xl font-medium hover:bg-[#F29F05]/10 transition-colors flex items-center justify-center space-x-2"
                   >
                     <ClockIcon className="h-4 w-4" />
-                    <span className="text-sm">Partial</span>
-                  </button>
-                  
-                  <button className="border border-[#DC2626] text-[#DC2626] py-3 rounded-xl font-medium hover:bg-[#DC2626]/10 transition-colors flex items-center justify-center space-x-2">
-                    <XMarkIcon className="h-4 w-4" />
-                    <span className="text-sm">Unpaid</span>
+                    <span className="text-sm">Partial Payment</span>
                   </button>
                 </div>
               ) : (
@@ -335,6 +329,18 @@ function DebtorDetailsContent() {
                   </div>
                 )}
                 
+                {debtor.debtDate ? (
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-lg bg-[#E3F2FD] flex items-center justify-center">
+                      <ClockIcon className="h-4 w-4 text-[#2175C7]" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Debt Taken</p>
+                      <p className="font-medium text-card-foreground">{new Date(debtor.debtDate).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                ) : null}
+
                 {debtor.address && (
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 rounded-lg bg-[#FEF3E0] flex items-center justify-center">
@@ -504,7 +510,7 @@ function DebtorDetailsContent() {
                   </button>
                   <button 
                     type="submit" 
-                    disabled={!paymentForm.amount || paymentForm.amount <= 0}
+                    disabled={recordingPayment || !paymentForm.amount || paymentForm.amount <= 0}
                     className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     Record Payment

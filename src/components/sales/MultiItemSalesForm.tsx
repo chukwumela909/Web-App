@@ -565,7 +565,7 @@ export default function MultiItemSalesForm({
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="+254 700 000 000"
+                  placeholder="Phone number"
                 />
               </div>
               <div>
