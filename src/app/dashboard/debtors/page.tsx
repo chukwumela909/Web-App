@@ -45,7 +45,76 @@ const fadeInUp = {
   transition: { duration: 0.6 }
 }
 
-type WizardStep = 'mode' | 'personal' | 'financial' | 'payment'
+// Add Debt Modal — add more debt to an existing debtor
+function AddDebtModal({ debtor, currencySymbol, onCancel, onSubmit }: {
+  debtor: Debtor
+  currencySymbol: string
+  onCancel: () => void
+  onSubmit: (amount: number, dueDate?: string) => void
+}) {
+  const [amount, setAmount] = useState('')
+  const [dueDate, setDueDate] = useState('')
+  const valid = Number(amount) > 0
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-card rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-border"
+      >
+        <div className="bg-gradient-to-r from-[#004AAD] to-[#0056CC] text-white p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold">Add Debt</h2>
+              <p className="text-blue-100 text-sm mt-1">{debtor.name}</p>
+            </div>
+            <button onClick={onCancel} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="p-4 bg-muted/50 rounded-xl text-sm text-muted-foreground">
+            Currently owes <span className="font-semibold text-[#F29F05]">{currencySymbol} {Number(debtor.currentDebt).toLocaleString()}</span>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-card-foreground mb-2">Amount ({currencySymbol})</label>
+            <input
+              type="number"
+              min="0"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              placeholder="0"
+              autoFocus
+              className="w-full px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-card-foreground mb-2">New Due Date (optional)</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+              className="w-full px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-colors"
+            />
+          </div>
+        </div>
+        <div className="p-6 border-t border-border bg-muted/30 flex items-center justify-end gap-3">
+          <button onClick={onCancel} className="px-6 py-3 border border-border text-muted-foreground rounded-xl hover:bg-muted transition-colors">Cancel</button>
+          <button
+            onClick={() => onSubmit(Number(amount), dueDate || undefined)}
+            disabled={!valid}
+            className="px-8 py-3 bg-gradient-to-r from-[#004AAD] to-[#0056CC] text-white font-semibold rounded-xl hover:opacity-95 transition-opacity shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Add Debt
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
 
 // Debtor Details Modal Component
 interface DebtorDetailsModalProps {
@@ -239,9 +308,8 @@ function EditDebtorModal({ debtor, onSave, onCancel, currencySymbol }: EditDebto
   const [editForm, setEditForm] = useState({
     name: debtor.name,
     phone: debtor.phone,
-    email: debtor.email || '',
     address: debtor.address || '',
-    totalCreditLimit: debtor.totalCreditLimit,
+    dueDate: debtor.dueDate ? new Date(debtor.dueDate).toISOString().slice(0, 10) : '',
     notes: debtor.notes || ''
   })
 
@@ -250,9 +318,8 @@ function EditDebtorModal({ debtor, onSave, onCancel, currencySymbol }: EditDebto
       ...debtor,
       name: editForm.name,
       phone: editForm.phone,
-      email: editForm.email || null,
       address: editForm.address || null,
-      totalCreditLimit: Number(editForm.totalCreditLimit),
+      dueDate: editForm.dueDate ? new Date(editForm.dueDate).getTime() : null,
       notes: editForm.notes || null
     }
     onSave(updatedDebtor)
@@ -306,26 +373,12 @@ function EditDebtorModal({ debtor, onSave, onCancel, currencySymbol }: EditDebto
 
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-2">
-                Email Address
+                Due Date
               </label>
               <input
-                type="email"
-                value={editForm.email}
-                onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
-                className="w-full px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-colors"
-                placeholder="Optional"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-card-foreground mb-2">
-                Credit Limit ({currencySymbol})
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={editForm.totalCreditLimit}
-                onChange={(e) => setEditForm(prev => ({ ...prev, totalCreditLimit: Number(e.target.value) || 0 }))}
+                type="date"
+                value={editForm.dueDate}
+                onChange={(e) => setEditForm(prev => ({ ...prev, dueDate: e.target.value }))}
                 className="w-full px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-colors"
               />
             </div>
@@ -388,15 +441,14 @@ export default function DebtorsPage() {
   const [loading, setLoading] = useState(true)
   const [debtors, setDebtors] = useState<Debtor[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'OVERDUE' | 'HIGH_RISK' | 'AT_LIMIT'>('ALL')
+  const [filterStatus, setFilterStatus] = useState<'ACTIVE' | 'COMPLETED' | 'OVERDUE'>('ACTIVE')
   const [showAdd, setShowAdd] = useState(false)
   const [showPayment, setShowPayment] = useState<Debtor | null>(null)
   const [showDetails, setShowDetails] = useState<Debtor | null>(null)
   const [editingDebtor, setEditingDebtor] = useState<Debtor | null>(null)
-  const [currentStep, setCurrentStep] = useState<WizardStep>('mode')
-  const [mode, setMode] = useState<'NEW' | 'EXISTING'>('NEW')
-  const [existingDebtorId, setExistingDebtorId] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
+  // Small "add more debt to this debtor" modal (partial of the old wizard's EXISTING mode)
+  const [addingDebtTo, setAddingDebtTo] = useState<Debtor | null>(null)
   const receiptRef = useRef<HTMLDivElement>(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [upgradeModalData, setUpgradeModalData] = useState<{
@@ -406,16 +458,13 @@ export default function DebtorsPage() {
     message: string
   } | null>(null)
   const { canAddDebtor } = usePlanLimits()
+  // Simple debtor form: name, phone, address, amount owed, date taken, due date, note.
   const [debtorForm, setDebtorForm] = useState({
     name: '',
     phone: '',
-    email: '',
     address: '',
-    totalCreditLimit: 10000,
-    originalDebtAmount: 0,
-    preferredPaymentType: 'FULL' as 'FULL' | 'INSTALLMENT' | 'CUSTOM',
-    installmentAmount: 0,
-    installmentFrequency: 'MONTHLY' as 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY',
+    amountOwed: '',
+    debtDate: new Date().toISOString().slice(0, 10),
     dueDate: '',
     notes: ''
   })
@@ -495,18 +544,17 @@ export default function DebtorsPage() {
       const matchesSearch = debtor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          debtor.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          debtor.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      // Mutually exclusive tabs: Active (owing, not past due), Overdue (owing, past due),
+      // Completed (fully paid).
+      const isOverdue = debtor.currentDebt > 0 && !!debtor.dueDate && debtor.dueDate < Date.now()
       const matchesStatus = (() => {
         switch (filterStatus) {
-          case 'ALL':
-            return true
           case 'ACTIVE':
-            return debtor.currentDebt > 0
+            return debtor.currentDebt > 0 && !isOverdue
           case 'OVERDUE':
-            return debtor.currentDebt > 0 && !!debtor.dueDate && debtor.dueDate < Date.now()
-          case 'HIGH_RISK':
-            return debtor.totalCreditLimit > 0 && debtor.currentDebt > debtor.totalCreditLimit * 0.8
-          case 'AT_LIMIT':
-            return debtor.totalCreditLimit > 0 && debtor.currentDebt >= debtor.totalCreditLimit
+            return isOverdue
+          case 'COMPLETED':
+            return debtor.currentDebt <= 0
         }
       })()
       return matchesSearch && matchesStatus
@@ -521,113 +569,37 @@ export default function DebtorsPage() {
   const totalDebt = debtors.reduce((sum, debtor) => sum + (debtor.currentDebt || 0), 0)
 
   const resetForm = () => {
-    setCurrentStep('mode')
-    setMode('NEW')
-    setExistingDebtorId('')
-    setDebtorForm({ 
-      name: '', 
-      phone: '', 
-      email: '', 
-      address: '', 
-      totalCreditLimit: 10000, 
-      originalDebtAmount: 0, 
-      preferredPaymentType: 'FULL', 
-      installmentAmount: 0, 
-      installmentFrequency: 'MONTHLY', 
-      dueDate: '', 
-      notes: '' 
+    setDebtorForm({
+      name: '',
+      phone: '',
+      address: '',
+      amountOwed: '',
+      debtDate: new Date().toISOString().slice(0, 10),
+      dueDate: '',
+      notes: ''
     })
   }
 
-  const handleNext = () => {
-    if (currentStep === 'mode') {
-      if (mode === 'NEW') {
-        setCurrentStep('personal')
-      } else {
-        setCurrentStep('financial')
-      }
-    } else if (currentStep === 'personal') {
-      setCurrentStep('financial')
-    } else if (currentStep === 'financial') {
-      setCurrentStep('payment')
-    }
-  }
-
-  const handlePrevious = () => {
-    if (currentStep === 'payment') {
-      setCurrentStep('financial')
-    } else if (currentStep === 'financial') {
-      if (mode === 'NEW') {
-        setCurrentStep('personal')
-      } else {
-        setCurrentStep('mode')
-      }
-    } else if (currentStep === 'personal') {
-      setCurrentStep('mode')
-    }
-  }
-
-  const canProceed = () => {
-    switch (currentStep) {
-      case 'mode':
-        return mode === 'NEW' || (mode === 'EXISTING' && existingDebtorId)
-      case 'personal':
-        return debtorForm.name.trim() && debtorForm.phone.trim()
-      case 'financial':
-        return debtorForm.totalCreditLimit >= 0
-      case 'payment':
-        return true
-      default:
-        return false
-    }
-  }
+  const canSubmit = Boolean(debtorForm.name.trim() && debtorForm.phone.trim())
 
   const handleSubmit = async () => {
-    if (!user) return
-    
+    if (!user || !canSubmit) return
+
     try {
-      if (mode === 'NEW') {
-        await createDebtor(user.uid, {
-          name: debtorForm.name,
-          phone: debtorForm.phone,
-          email: debtorForm.email,
-          address: debtorForm.address,
-          totalCreditLimit: Number(debtorForm.totalCreditLimit || 0),
-          originalDebtAmount: Number(debtorForm.originalDebtAmount || 0),
-          currentDebt: Number(debtorForm.originalDebtAmount || 0),
-          preferredPaymentType: debtorForm.preferredPaymentType,
-          installmentAmount: debtorForm.preferredPaymentType !== 'FULL' ? Number(debtorForm.installmentAmount || 0) : undefined,
-          installmentFrequency: debtorForm.preferredPaymentType === 'INSTALLMENT' ? debtorForm.installmentFrequency : undefined,
-          dueDate: debtorForm.dueDate ? new Date(debtorForm.dueDate).getTime() : undefined,
-          notes: debtorForm.notes || undefined
-        })
-      } else if (existingDebtorId) {
-        // Get the existing debtor data
-        const existingDebtor = debtors.find(d => d.id === existingDebtorId)
-        if (!existingDebtor) {
-          alert('Debtor not found. Please try again.')
-          return
-        }
-        
-        const newDebtAmount = Number(debtorForm.originalDebtAmount || 0)
-        const availableCredit = existingDebtor.totalCreditLimit - existingDebtor.currentDebt
-        
-        // Check if the new debt amount exceeds available credit
-        if (newDebtAmount > availableCredit) {
-          alert(`Cannot add debt of ${newDebtAmount.toLocaleString()} ${currencySymbol}. Available credit is only ${availableCredit.toLocaleString()} ${currencySymbol} (Limit: ${existingDebtor.totalCreditLimit.toLocaleString()} ${currencySymbol}, Current Debt: ${existingDebtor.currentDebt.toLocaleString()} ${currencySymbol})`)
-          return
-        }
-        
-        // Add to the existing debt (backend enforces the credit limit and updates totals atomically)
-        await addDebtorPurchase(
-          existingDebtorId,
-          newDebtAmount,
-          debtorForm.dueDate ? new Date(debtorForm.dueDate).getTime() : null
-        )
-      }
-      
+      await createDebtor(user.uid, {
+        name: debtorForm.name.trim(),
+        phone: debtorForm.phone.trim(),
+        address: debtorForm.address.trim() || undefined,
+        originalDebtAmount: Number(debtorForm.amountOwed || 0),
+        currentDebt: Number(debtorForm.amountOwed || 0),
+        debtDate: debtorForm.debtDate ? new Date(debtorForm.debtDate).getTime() : undefined,
+        dueDate: debtorForm.dueDate ? new Date(debtorForm.dueDate).getTime() : undefined,
+        notes: debtorForm.notes || undefined
+      })
       setShowAdd(false)
       resetForm()
+      setShowSuccess(true)
+      setTimeout(() => setShowSuccess(false), 4000)
       fetchData()
     } catch (error) {
       console.error('Failed to save debtor:', error)
@@ -635,41 +607,18 @@ export default function DebtorsPage() {
     }
   }
 
-  const getStepTitle = () => {
-    switch (currentStep) {
-      case 'mode':
-        return 'Select Mode'
-      case 'personal':
-        return 'Personal Information'
-      case 'financial':
-        return 'Financial Information'
-      case 'payment':
-        return 'Payment Terms & Review'
-      default:
-        return ''
-    }
-  }
-
-  const getStepDescription = () => {
-    switch (currentStep) {
-      case 'mode':
-        return 'Choose whether to add a new debtor or add more debt to an existing one'
-      case 'personal':
-        return 'Enter basic personal information for the new debtor'
-      case 'financial':
-        if (mode === 'EXISTING') {
-          const existingDebtor = debtors.find(d => d.id === existingDebtorId)
-          if (existingDebtor) {
-            const availableCredit = existingDebtor.totalCreditLimit - existingDebtor.currentDebt
-            return `Add additional debt amount. Available credit: ${availableCredit.toLocaleString()} ${currencySymbol}`
-          }
-          return 'Add additional debt amount to existing debtor'
-        }
-        return 'Set credit limits and initial debt amount'
-      case 'payment':
-        return 'Configure payment terms and review details'
-      default:
-        return ''
+  // Add more debt to an existing debtor (partial of the old wizard's EXISTING mode).
+  const handleAddDebt = async (amount: number, dueDate?: string) => {
+    if (!addingDebtTo || amount <= 0) return
+    try {
+      await addDebtorPurchase(addingDebtTo.id, amount, dueDate ? new Date(dueDate).getTime() : null)
+      setAddingDebtTo(null)
+      setShowSuccess(true)
+      setTimeout(() => setShowSuccess(false), 4000)
+      fetchData()
+    } catch (error) {
+      console.error('Failed to add debt:', error)
+      alert('Failed to add debt. Please try again.')
     }
   }
 
@@ -745,9 +694,9 @@ export default function DebtorsPage() {
               <div className="bg-[#FEE2E2] rounded-xl p-4 text-center border border-red-200/50">
                 <ExclamationTriangleIcon className="h-6 w-6 text-[#DC2626] mx-auto mb-2" />
                 <p className="text-2xl font-bold text-[#DC2626] mb-1">
-                  {debtors.filter(d => d.currentDebt > d.totalCreditLimit * 0.8).length}
+                  {debtors.filter(d => d.currentDebt > 0 && !!d.dueDate && d.dueDate < Date.now()).length}
                 </p>
-                <p className="text-sm text-[#DC2626] font-medium">High Risk</p>
+                <p className="text-sm text-[#DC2626] font-medium">Overdue</p>
               </div>
             </div>
           </motion.div>
@@ -767,21 +716,18 @@ export default function DebtorsPage() {
                 />
               </div>
               
-              {/* Filter Chips */}
+              {/* Status Tabs */}
               <div className="flex flex-wrap gap-2">
                 {([
-                  { value: 'ALL', label: 'All' },
                   { value: 'ACTIVE', label: 'Active' },
-                  { value: 'OVERDUE', label: 'Overdue' },
-                  { value: 'HIGH_RISK', label: 'High Risk' },
-                  { value: 'AT_LIMIT', label: 'At Limit' }
+                  { value: 'COMPLETED', label: 'Completed' },
+                  { value: 'OVERDUE', label: 'Overdue' }
                 ] as const).map((filter) => (
                   <button
                     key={filter.value}
                     onClick={() => setFilterStatus(filter.value)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                      (filterStatus === 'ALL' && filter.value === 'ALL') ||
-                      (filterStatus === filter.value)
+                      filterStatus === filter.value
                         ? 'bg-[#2175C7] text-white'
                         : 'bg-background text-muted-foreground hover:bg-muted'
                     }`}
@@ -852,39 +798,42 @@ export default function DebtorsPage() {
                         <div className="flex-1">
                           <h3 className="font-bold text-card-foreground text-lg">{debtor.name}</h3>
                           <p className="text-sm text-muted-foreground">{debtor.phone}</p>
-                          {debtor.currentDebt > 0 && (
-                            <p className="text-sm font-medium text-[#F29F05]">
-                              Debt: {currencySymbol} {Number(debtor.currentDebt).toLocaleString()}
-                            </p>
+                          {debtor.address && (
+                            <p className="text-xs text-muted-foreground">{debtor.address}</p>
                           )}
+                          {debtor.dueDate ? (
+                            <p className={`text-xs font-medium ${debtor.currentDebt > 0 && debtor.dueDate < Date.now() ? 'text-[#DC2626]' : 'text-muted-foreground'}`}>
+                              Due {new Date(debtor.dueDate).toLocaleDateString()}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
-                      
+
                       <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Available Credit</p>
-                        <p className="text-lg font-bold text-[#66BB6A]">
-                          {currencySymbol} {Number(debtor.totalCreditLimit - debtor.currentDebt).toLocaleString()}
+                        <p className="text-xs text-muted-foreground">Owes</p>
+                        <p className={`text-lg font-bold ${debtor.currentDebt > 0 ? 'text-[#F29F05]' : 'text-[#66BB6A]'}`}>
+                          {currencySymbol} {Number(debtor.currentDebt).toLocaleString()}
                         </p>
-                        
-                        {/* Risk Level Badge */}
-                        <div className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium mt-1 ${
-                          debtor.currentDebt > debtor.totalCreditLimit * 0.8
+
+                        {/* Status Badge */}
+                        {(() => {
+                          const overdue = debtor.currentDebt > 0 && !!debtor.dueDate && debtor.dueDate < Date.now()
+                          const label = debtor.currentDebt <= 0 ? 'Completed' : overdue ? 'Overdue' : 'Active'
+                          const tone = debtor.currentDebt <= 0
+                            ? 'bg-[#E8F5E8] text-[#66BB6A]'
+                            : overdue
                             ? 'bg-[#FEE2E2] text-[#DC2626]'
-                            : debtor.currentDebt > debtor.totalCreditLimit * 0.5
-                            ? 'bg-[#FEF3E0] text-[#F29F05]'
-                            : 'bg-[#E8F5E8] text-[#66BB6A]'
-                        }`}>
-                          {debtor.currentDebt > debtor.totalCreditLimit * 0.8
-                            ? 'HIGH'
-                            : debtor.currentDebt > debtor.totalCreditLimit * 0.5
-                            ? 'MEDIUM'
-                            : 'LOW'
-                          }
-                        </div>
+                            : 'bg-[#E3F2FD] text-[#2175C7]'
+                          return (
+                            <div className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium mt-1 ${tone}`}>
+                              {label}
+                            </div>
+                          )
+                        })()}
                       </div>
                     </div>
                     
-                    {/* Row actions: record payment (when owing) + edit details */}
+                    {/* Row actions: record payment (when owing) + add debt + edit details */}
                     <div className="mt-3 flex items-center gap-2">
                       {debtor.currentDebt > 0 && (
                         <button
@@ -894,16 +843,26 @@ export default function DebtorsPage() {
                           }}
                           className="flex-1 bg-[#66BB6A] text-white py-2 rounded-lg font-medium hover:bg-[#5cb660] transition-colors flex items-center justify-center space-x-2"
                         >
-                          <CheckCircleIcon className="h-4 w-4" />
-                          <span>Update Status</span>
+                          <BanknotesIcon className="h-4 w-4" />
+                          <span>Record Payment</span>
                         </button>
                       )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleEditDebtor(debtor)
+                          setAddingDebtTo(debtor)
                         }}
                         className={`${debtor.currentDebt > 0 ? '' : 'flex-1 '}px-4 py-2 border border-border text-muted-foreground rounded-lg font-medium hover:bg-muted transition-colors flex items-center justify-center space-x-2`}
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                        <span>Add Debt</span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditDebtor(debtor)
+                        }}
+                        className="px-4 py-2 border border-border text-muted-foreground rounded-lg font-medium hover:bg-muted transition-colors flex items-center justify-center space-x-2"
                       >
                         <PencilIcon className="h-4 w-4" />
                         <span>Edit</span>
@@ -915,419 +874,129 @@ export default function DebtorsPage() {
             )}
           </motion.div>
 
-          {/* Add Debtor Wizard */}
+          {/* Add Debtor Modal (simple single form) */}
           <AnimatePresence>
             {showAdd && (
-              <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-                  animate={{ opacity: 1, scale: 1, y: 0 }} 
-                  exit={{ opacity: 0, scale: 0.95, y: 20 }} 
-                  className="bg-card/95 backdrop-blur-md rounded-3xl shadow-2xl border border-border max-w-4xl w-full max-h-[95vh] overflow-hidden"
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className="bg-card rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden border border-border flex flex-col"
                 >
-                  {/* Header */}
                   <div className="bg-gradient-to-r from-[#004AAD] to-[#0056CC] text-white p-6">
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-xl font-bold">Add Debtor</h2>
-                        <p className="text-blue-100 text-sm mt-1">{getStepDescription()}</p>
+                        <p className="text-blue-100 text-sm mt-1">Track who owes you, how much, and when it&apos;s due</p>
                       </div>
-                      <button 
-                        onClick={() => { setShowAdd(false); resetForm(); }} 
-                        className="p-2 hover:bg-white/20 dark:hover:bg-black/20 rounded-lg"
-                      >
-                        <XMarkIcon className="h-6 w-6" />
+                      <button onClick={() => { setShowAdd(false); resetForm() }} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
+                        <XMarkIcon className="h-5 w-5" />
                       </button>
-                    </div>
-                    
-                    {/* Progress Indicators */}
-                    <div className="mt-8">
-                      <div className="flex items-center justify-center">
-                        {(['mode', 'personal', 'financial', 'payment'] as WizardStep[]).map((step, index) => {
-                          const stepNames = ['mode', 'personal', 'financial', 'payment'] as WizardStep[]
-                          const currentIndex = stepNames.indexOf(currentStep)
-                          const isActive = currentStep === step
-                          const isCompleted = index < currentIndex
-                          
-                          return (
-                            <div key={step} className="flex items-center">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
-                                isActive 
-                                  ? 'bg-white text-[#004AAD] shadow-lg scale-110' 
-                                  : isCompleted
-                                    ? 'bg-blue-200 text-blue-800' 
-                                    : 'bg-blue-800/50 text-blue-200'
-                              }`}>
-                                {isCompleted ? '✓' : index + 1}
-                              </div>
-                              {index < 3 && (
-                                <div className={`h-1 w-16 mx-3 transition-all duration-300 ${
-                                  isCompleted 
-                                    ? 'bg-blue-200' 
-                                    : 'bg-blue-800/30'
-                                }`} />
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                      <div className="flex justify-between text-xs text-blue-100 mt-4 px-4">
-                        <span className={currentStep === 'mode' ? 'font-bold text-white' : ''}>Mode</span>
-                        <span className={currentStep === 'personal' ? 'font-bold text-white' : ''}>Personal</span>
-                        <span className={currentStep === 'financial' ? 'font-bold text-white' : ''}>Financial</span>
-                        <span className={currentStep === 'payment' ? 'font-bold text-white' : ''}>Payment</span>
-                      </div>
                     </div>
                   </div>
 
-                  {/* Step Content */}
-                  <div className="p-8 overflow-y-auto max-h-[calc(95vh-280px)]">
-                    <div className="mb-8">
-                      <h3 className="text-2xl font-bold text-gray-900">{getStepTitle()}</h3>
-                      <p className="text-gray-600 mt-2">{getStepDescription()}</p>
+                  <div className="flex-1 overflow-y-auto p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-medium text-card-foreground mb-2">Full Name *</label>
+                        <input
+                          value={debtorForm.name}
+                          onChange={e => setDebtorForm({ ...debtorForm, name: e.target.value })}
+                          placeholder="Customer name"
+                          className="w-full px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-card-foreground mb-2">Phone Number *</label>
+                        <input
+                          value={debtorForm.phone}
+                          onChange={e => setDebtorForm({ ...debtorForm, phone: e.target.value })}
+                          placeholder="Phone number"
+                          className="w-full px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-colors"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-card-foreground mb-2">Address</label>
+                        <input
+                          value={debtorForm.address}
+                          onChange={e => setDebtorForm({ ...debtorForm, address: e.target.value })}
+                          placeholder="Optional"
+                          className="w-full px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-card-foreground mb-2">Amount Owed ({currencySymbol})</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={debtorForm.amountOwed}
+                          onChange={e => setDebtorForm({ ...debtorForm, amountOwed: e.target.value })}
+                          placeholder="0"
+                          className="w-full px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-card-foreground mb-2">Date Debt Taken</label>
+                        <input
+                          type="date"
+                          value={debtorForm.debtDate}
+                          onChange={e => setDebtorForm({ ...debtorForm, debtDate: e.target.value })}
+                          className="w-full px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-card-foreground mb-2">Due Date</label>
+                        <input
+                          type="date"
+                          value={debtorForm.dueDate}
+                          onChange={e => setDebtorForm({ ...debtorForm, dueDate: e.target.value })}
+                          className="w-full px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-colors"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-card-foreground mb-2">Note</label>
+                        <textarea
+                          rows={3}
+                          value={debtorForm.notes}
+                          onChange={e => setDebtorForm({ ...debtorForm, notes: e.target.value })}
+                          placeholder="Optional"
+                          className="w-full px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-colors resize-none"
+                        />
+                      </div>
                     </div>
+                    <p className="mt-4 text-xs text-muted-foreground">Payments can be partial — record them anytime from the debtor&apos;s card.</p>
+                  </div>
 
-                    {/* Step 1: Mode Selection */}
-                    {currentStep === 'mode' && (
-                      <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="space-y-8"
-                      >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <button 
-                            type="button" 
-                            onClick={() => setMode('NEW')} 
-                            className={`p-8 rounded-xl border-2 text-center transition-all duration-200 hover:shadow-lg ${
-                              mode === 'NEW' 
-                                ? 'border-[#004AAD] bg-blue-50 text-[#004AAD] shadow-lg' 
-                                : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                            }`}
-                          >
-                            <UserIcon className="h-12 w-12 mx-auto mb-4" />
-                            <div className="font-bold text-lg mb-2">New Debtor</div>
-                            <div className="text-sm text-gray-500">Add a new customer to your system</div>
-                          </button>
-                          <button 
-                            type="button" 
-                            onClick={() => setMode('EXISTING')} 
-                            className={`p-8 rounded-xl border-2 text-center transition-all duration-200 hover:shadow-lg ${
-                              mode === 'EXISTING' 
-                                ? 'border-[#004AAD] bg-blue-50 text-[#004AAD] shadow-lg' 
-                                : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                            }`}
-                          >
-                            <UsersIcon className="h-12 w-12 mx-auto mb-4" />
-                            <div className="font-bold text-lg mb-2">Existing Debtor</div>
-                            <div className="text-sm text-gray-500">Update existing customer information</div>
-                          </button>
-                        </div>
-                        
-                        {mode === 'EXISTING' && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            className="mt-8"
-                          >
-                            <label className="block text-base font-semibold text-gray-700 mb-3">Choose Debtor</label>
-                            <select 
-                              value={existingDebtorId} 
-                              onChange={e => setExistingDebtorId(e.target.value)} 
-                              className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-all"
-                            >
-                              <option value="">Select debtor...</option>
-                              {debtors.map(d => (
-                                <option key={d.id} value={d.id}>{d.name} ({d.phone})</option>
-                              ))}
-                            </select>
-                          </motion.div>
-                        )}
-                      </motion.div>
-                    )}
-
-                    {/* Step 2: Personal Information */}
-                    {currentStep === 'personal' && mode === 'NEW' && (
-                      <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="space-y-6"
-                      >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <label className="block text-base font-semibold text-card-foreground mb-3">Full Name *</label>
-                            <input 
-                              value={debtorForm.name} 
-                              onChange={e => setDebtorForm({ ...debtorForm, name: e.target.value })} 
-                              className="w-full px-4 py-3 text-base border border-border rounded-xl bg-card text-card-foreground focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-all" 
-                              placeholder="Enter full name"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-base font-semibold text-card-foreground mb-3">Phone Number *</label>
-                            <input 
-                              value={debtorForm.phone} 
-                              onChange={e => setDebtorForm({ ...debtorForm, phone: e.target.value })} 
-                              className="w-full px-4 py-3 text-base border border-border rounded-xl bg-card text-card-foreground focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-all" 
-                              placeholder="Enter phone number"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-base font-semibold text-gray-700 mb-3">Email (Optional)</label>
-                            <input 
-                              type="email"
-                              value={debtorForm.email} 
-                              onChange={e => setDebtorForm({ ...debtorForm, email: e.target.value })} 
-                              className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-all" 
-                              placeholder="Enter email address"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-base font-semibold text-gray-700 mb-3">Address (Optional)</label>
-                            <input 
-                              value={debtorForm.address} 
-                              onChange={e => setDebtorForm({ ...debtorForm, address: e.target.value })} 
-                              className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-all" 
-                              placeholder="Enter address"
-                            />
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-
-                    {/* Step 3: Financial Information */}
-                    {currentStep === 'financial' && (
-                      <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="space-y-8"
-                      >
-                        {/* Show current credit info for existing debtors */}
-                        {mode === 'EXISTING' && existingDebtorId && (() => {
-                          const existingDebtor = debtors.find(d => d.id === existingDebtorId)
-                          if (existingDebtor) {
-                            const availableCredit = existingDebtor.totalCreditLimit - existingDebtor.currentDebt
-                            return (
-                              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6 mb-6">
-                                <h4 className="font-semibold text-blue-900 mb-4">Current Credit Status</h4>
-                                <div className="grid grid-cols-3 gap-4">
-                                  <div>
-                                    <p className="text-sm text-blue-600 mb-1">Credit Limit</p>
-                                    <p className="text-xl font-bold text-blue-900">{existingDebtor.totalCreditLimit.toLocaleString()} {currencySymbol}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-blue-600 mb-1">Current Debt</p>
-                                    <p className="text-xl font-bold text-orange-600">{existingDebtor.currentDebt.toLocaleString()} {currencySymbol}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-blue-600 mb-1">Available Credit</p>
-                                    <p className="text-xl font-bold text-green-600">{availableCredit.toLocaleString()} {currencySymbol}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          }
-                          return null
-                        })()}
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {mode === 'NEW' && (
-                            <div>
-                              <label className="block text-base font-semibold text-gray-700 mb-3">Total Credit Limit ({currencySymbol})</label>
-                              <input 
-                                type="number" 
-                                min="0" 
-                                value={debtorForm.totalCreditLimit} 
-                                onChange={e => setDebtorForm({ ...debtorForm, totalCreditLimit: Number(e.target.value || 0) })} 
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-all" 
-                                placeholder="Enter credit limit"
-                              />
-                            </div>
-                          )}
-                          <div className={mode === 'NEW' ? '' : 'md:col-span-2'}>
-                            <label className="block text-base font-semibold text-gray-700 mb-3">
-                              {mode === 'EXISTING' ? `New Debt Amount to Add (${currencySymbol})` : `Current Debt Amount (${currencySymbol})`}
-                            </label>
-                            <input 
-                              type="number" 
-                              min="0" 
-                              value={debtorForm.originalDebtAmount} 
-                              onChange={e => setDebtorForm({ ...debtorForm, originalDebtAmount: Number(e.target.value || 0) })} 
-                              className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-all" 
-                              placeholder={mode === 'EXISTING' ? 'Enter amount to add' : 'Enter current debt'}
-                            />
-                          </div>
-                          <div className="md:col-span-2">
-                            <label className="block text-base font-semibold text-gray-700 mb-3">Due Date (Optional)</label>
-                            <input 
-                              type="date" 
-                              value={debtorForm.dueDate} 
-                              onChange={e => setDebtorForm({ ...debtorForm, dueDate: e.target.value })} 
-                              className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-all" 
-                            />
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-base font-semibold text-gray-700 mb-3">Notes</label>
-                          <textarea 
-                            rows={4} 
-                            value={debtorForm.notes} 
-                            onChange={e => setDebtorForm({ ...debtorForm, notes: e.target.value })} 
-                            className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-all resize-none" 
-                            placeholder="Additional notes about this debtor..."
-                          />
-                        </div>
-                      </motion.div>
-                    )}
-
-                    {/* Step 4: Payment Terms & Review */}
-                    {currentStep === 'payment' && (
-                      <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="space-y-8"
-                      >
-                        <div>
-                          <label className="block text-base font-semibold text-gray-700 mb-4">Preferred Payment Type</label>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {(['FULL', 'INSTALLMENT', 'CUSTOM'] as const).map(type => (
-                              <button
-                                key={type}
-                                type="button"
-                                onClick={() => setDebtorForm({ ...debtorForm, preferredPaymentType: type })}
-                                className={`p-6 rounded-xl border-2 text-center transition-all duration-200 hover:shadow-lg ${
-                                  debtorForm.preferredPaymentType === type
-                                    ? 'border-[#004AAD] bg-blue-50 text-[#004AAD] shadow-lg'
-                                    : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                                }`}
-                              >
-                                <div className="font-bold text-lg mb-2">{type}</div>
-                                <div className="text-sm text-gray-500">
-                                  {type === 'FULL' && 'Pay full amount at once'}
-                                  {type === 'INSTALLMENT' && 'Fixed regular installments'}
-                                  {type === 'CUSTOM' && 'Custom payment schedule'}
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {debtorForm.preferredPaymentType !== 'FULL' && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            className="grid grid-cols-1 md:grid-cols-2 gap-6"
-                          >
-                            <div>
-                              <label className="block text-base font-semibold text-gray-700 mb-3">Installment Amount ({currencySymbol})</label>
-                              <input 
-                                type="number" 
-                                min="0" 
-                                value={debtorForm.installmentAmount} 
-                                onChange={e => setDebtorForm({ ...debtorForm, installmentAmount: Number(e.target.value || 0) })} 
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-all" 
-                                placeholder="Enter installment amount"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-base font-semibold text-gray-700 mb-3">Payment Frequency</label>
-                              <select 
-                                value={debtorForm.installmentFrequency} 
-                                onChange={e => setDebtorForm({ ...debtorForm, installmentFrequency: e.target.value as InstallmentFrequency })} 
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#004AAD] focus:border-transparent outline-none transition-all"
-                              >
-                                <option value="WEEKLY">Weekly</option>
-                                <option value="BIWEEKLY">Bi-weekly</option>
-                                <option value="MONTHLY">Monthly</option>
-                                <option value="QUARTERLY">Quarterly</option>
-                              </select>
-                            </div>
-                          </motion.div>
-                        )}
-
-                        {/* Review Summary */}
-                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-                          <h4 className="font-bold text-xl text-gray-900 mb-4">Review Details</h4>
-                          <div className="space-y-3 text-base">
-                            {mode === 'NEW' && (
-                              <>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-700">Name:</span>
-                                  <span className="font-semibold text-gray-900">{debtorForm.name || 'Not specified'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-700">Phone:</span>
-                                  <span className="font-semibold text-gray-900">{debtorForm.phone || 'Not specified'}</span>
-                                </div>
-                              </>
-                            )}
-                            <div className="flex justify-between">
-                              <span className="text-gray-700">Credit Limit:</span>
-                              <span className="font-semibold text-gray-900">{currencySymbol} {debtorForm.totalCreditLimit.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-700">Current Debt:</span>
-                              <span className="font-semibold text-gray-900">{currencySymbol} {debtorForm.originalDebtAmount.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-700">Payment Type:</span>
-                              <span className="font-semibold text-gray-900">{debtorForm.preferredPaymentType}</span>
-                            </div>
-                            {debtorForm.preferredPaymentType !== 'FULL' && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-700">Installment:</span>
-                                <span className="font-semibold text-gray-900">
-                                  {currencySymbol} {debtorForm.installmentAmount.toLocaleString()} ({debtorForm.installmentFrequency.toLowerCase()})
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-
-                    {/* Navigation */}
-                    <div className="flex items-center justify-between pt-8 mt-8 border-t border-gray-200">
-                      <button
-                        type="button"
-                        onClick={currentStep === 'mode' ? () => { setShowAdd(false); resetForm(); } : handlePrevious}
-                        className="inline-flex items-center px-6 py-3 text-base border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 hover:shadow-md"
-                      >
-                        {currentStep === 'mode' ? (
-                          <>
-                            <XMarkIcon className="h-5 w-5 mr-2" />
-                            Cancel
-                          </>
-                        ) : (
-                          <>
-                            <ArrowLeftIcon className="h-5 w-5 mr-2" />
-                            Previous
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={currentStep === 'payment' ? handleSubmit : handleNext}
-                        disabled={!canProceed()}
-                        className="inline-flex items-center px-8 py-3 text-base bg-[#004AAD] text-white rounded-xl hover:bg-[#003a8c] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg font-semibold"
-                      >
-                        {currentStep === 'payment' ? (
-                          <>
-                            <CheckIcon className="h-5 w-5 mr-2" />
-                            Add Debtor
-                          </>
-                        ) : (
-                          <>
-                            Next
-                            <ArrowRightIcon className="h-5 w-5 ml-2" />
-                          </>
-                        )}
-                      </button>
-                    </div>
+                  <div className="p-6 border-t border-border bg-muted/30 flex items-center justify-end gap-3">
+                    <button
+                      onClick={() => { setShowAdd(false); resetForm() }}
+                      className="px-6 py-3 border border-border text-muted-foreground rounded-xl hover:bg-muted transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={!canSubmit}
+                      className="px-8 py-3 bg-gradient-to-r from-[#004AAD] to-[#0056CC] text-white font-semibold rounded-xl hover:opacity-95 transition-opacity shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Save Debtor
+                    </button>
                   </div>
                 </motion.div>
               </div>
+            )}
+          </AnimatePresence>
+
+          {/* Add Debt (existing debtor) Modal */}
+          <AnimatePresence>
+            {addingDebtTo && (
+              <AddDebtModal
+                debtor={addingDebtTo}
+                currencySymbol={currencySymbol}
+                onCancel={() => setAddingDebtTo(null)}
+                onSubmit={handleAddDebt}
+              />
             )}
           </AnimatePresence>
 

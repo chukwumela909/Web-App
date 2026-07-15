@@ -116,6 +116,7 @@ interface ProductFormData {
   description: string
   costPrice: string
   sellingPrice: string
+  quantity: string // Initial stock quantity (create only; afterwards stock is managed via inventory)
   minStockLevel: string
   unitOfMeasure: string
   supplier: string // LEGACY: Keep for backward compatibility
@@ -186,6 +187,7 @@ function ProductsPageContent() {
     description: '',
     costPrice: '',
     sellingPrice: '',
+    quantity: '',
     minStockLevel: '',
     unitOfMeasure: 'pcs',
     supplier: '', // LEGACY: Keep for backward compatibility
@@ -310,6 +312,7 @@ function ProductsPageContent() {
       description: '',
       costPrice: '',
       sellingPrice: '',
+      quantity: '',
       minStockLevel: '',
       unitOfMeasure: 'pcs',
       supplier: '', // LEGACY: Keep for backward compatibility
@@ -478,7 +481,7 @@ function ProductsPageContent() {
       description: productForm.description,
       costPrice: Number(productForm.costPrice || 0),
       sellingPrice: Number(productForm.sellingPrice || 0),
-      quantity: editingProduct ? Number(editingProduct.quantity || 0) : 0,
+      quantity: editingProduct ? Number(editingProduct.quantity || 0) : Number(productForm.quantity || 0),
       minStockLevel: Number(productForm.minStockLevel || 0),
       unitOfMeasure: productForm.unitOfMeasure,
       supplier: productForm.supplier || '', // LEGACY: Keep for backward compatibility
@@ -573,6 +576,7 @@ function ProductsPageContent() {
       description: product.description || '',
       costPrice: product.costPrice.toString(),
       sellingPrice: product.sellingPrice.toString(),
+      quantity: product.quantity.toString(),
       minStockLevel: product.minStockLevel.toString(),
       unitOfMeasure: product.unitOfMeasure || 'pcs',
       supplier: product.supplier || '', // LEGACY: Keep for backward compatibility
@@ -634,7 +638,8 @@ function ProductsPageContent() {
     || branches.find(branch => branch.status === 'ACTIVE')?.currency
     || branches[0]?.currency
   const currencySymbol = getCurrencySymbol(selectedBranchCurrency || currency)
-  const hasRequiredProductImage = Boolean(editingProduct) || productForm.images.length > 0
+  // Product images are optional (both web and desktop); we only block while an upload is mid-flight.
+  const hasRequiredProductImage = true
 
   const nextStep = () => {
     if (currentStep === 'basic') setCurrentStep('pricing')
@@ -985,7 +990,7 @@ function ProductsPageContent() {
                             {/* Enhanced Product Images Upload */}
                             <div className="mb-6">
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Product Images <span className="text-red-500">*</span> <span className="text-gray-500">(Max 3 images)</span>
+                                Product Images <span className="text-gray-500">(Optional, max 3 images)</span>
                               </label>
 
                               {/* Image Gallery */}
@@ -1262,6 +1267,20 @@ function ProductsPageContent() {
                                     <option key={unit} value={unit}>{unit}</option>
                                   ))}
                                 </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={productForm.quantity}
+                                  onChange={(e) => setProductForm(prev => ({ ...prev, quantity: e.target.value }))}
+                                  placeholder="0"
+                                  disabled={Boolean(editingProduct)}
+                                  className="dashboard-field w-full px-3 py-2 disabled:opacity-60"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">{editingProduct ? 'Stock is managed from the Inventory page after creation' : 'Opening stock for this branch'}</p>
                               </div>
 
                               <div>

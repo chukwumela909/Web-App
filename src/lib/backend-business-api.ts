@@ -1020,6 +1020,7 @@ export function mapDebtor(row: AnyRecord): Debtor {
     isActive: row.isActive !== false,
     notes: row.note || row.notes || null,
     paymentStatus: currentDebt <= 0 ? 'PAID' : 'UNPAID',
+    debtDate: row.debtDate ? toMillis(row.debtDate) : null,
     dueDate: row.dueDate ? toMillis(row.dueDate) : null,
     originalDebtAmount: Number(row.originalDebtAmount || currentDebt),
     preferredPaymentType: 'FULL',
@@ -1046,7 +1047,9 @@ export async function createBackendDebtor(data: Partial<Debtor>, branchId?: stri
       name: data.name,
       phone: data.phone,
       email: data.email || undefined,
+      address: data.address || undefined,
       creditLimit: data.totalCreditLimit ?? (data as AnyRecord).creditLimit,
+      debtDate: data.debtDate ? new Date(data.debtDate).toISOString() : undefined,
       dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined,
       note: data.notes || undefined,
       openingDebt: openingDebt > 0 ? openingDebt : undefined
@@ -1062,8 +1065,10 @@ export async function updateBackendDebtor(debtorId: string, data: Partial<Debtor
       name: data.name,
       phone: data.phone,
       email: data.email || undefined,
+      address: typeof data.address === 'string' ? data.address : undefined,
       creditLimit: data.totalCreditLimit,
-      dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined,
+      debtDate: data.debtDate ? new Date(data.debtDate).toISOString() : undefined,
+      dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
       // An explicit empty string clears the note; undefined leaves it untouched.
       note: typeof data.notes === 'string' ? data.notes : undefined,
       isActive: data.isActive

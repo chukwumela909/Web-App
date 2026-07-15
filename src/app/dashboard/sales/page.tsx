@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Calculator,
   Clock,
+  History,
   Loader2,
   LogOut,
   Minus,
@@ -715,6 +716,15 @@ function SalesPOSContent() {
             </div>
 
             <div className="flex min-w-0 flex-1 items-center justify-end gap-6 px-7">
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard/sales/history')}
+                className="hidden items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#cbd5e1] transition hover:bg-[#1a2547] hover:text-white sm:flex"
+                title="Sales history"
+              >
+                <History className="h-5 w-5" /> History
+              </button>
+              <div className="hidden h-8 w-px bg-[#1f2a4a] sm:block" />
               <div className="hidden items-center gap-3 text-sm font-medium md:flex">
                 <User className="h-5 w-5" />
                 <span>User: {cashierName}</span>

@@ -280,6 +280,8 @@ export interface Debtor {
   isActive: boolean
   notes?: string | null
   paymentStatus: PaymentStatus
+  /** When the debt was taken (backdatable). */
+  debtDate?: number | null
   dueDate?: number | null
   originalDebtAmount: number
   preferredPaymentType: PaymentType
