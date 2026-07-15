@@ -23,7 +23,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import type { Debtor, PaymentMethod, PaymentStatus } from '@/lib/firestore'
-import { getDebtors, recordDebtorPayment, deleteDebtor } from '@/lib/firestore'
+import { recordDebtorPayment, deleteDebtor } from '@/lib/firestore'
+import { getBackendDebtorDetail, type BackendDebtorPaymentRecord } from '@/lib/backend-business-api'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 60 },
@@ -48,6 +49,7 @@ function DebtorDetailsContent() {
   const currencySymbol = getCurrencySymbol(currency)
   
   const [debtor, setDebtor] = useState<Debtor | null>(null)
+  const [payments, setPayments] = useState<BackendDebtorPaymentRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [paymentForm, setPaymentForm] = useState<{ amount: number, paymentMethod: PaymentMethod, notes: string }>({ 
@@ -61,11 +63,13 @@ function DebtorDetailsContent() {
     if (!user || !debtorId) return
     setLoading(true)
     try {
-      const debtors = await getDebtors(user.uid)
-      const foundDebtor = debtors.find(d => d.id === debtorId)
-      setDebtor(foundDebtor || null)
+      // Single fetch returns the debtor together with its payment history.
+      const detail = await getBackendDebtorDetail(debtorId)
+      setDebtor(detail.debtor)
+      setPayments(detail.payments)
     } catch (error) {
       console.error('Error fetching debtor:', error)
+      setDebtor(null)
     } finally {
       setLoading(false)
     }
@@ -362,17 +366,47 @@ function DebtorDetailsContent() {
           <motion.div variants={fadeInUp}>
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-bold text-foreground">Payment History</h3>
-              <span className="text-sm text-muted-foreground">0 payments</span>
+              <span className="text-sm text-muted-foreground">{payments.length} payment{payments.length === 1 ? '' : 's'}</span>
             </div>
           </motion.div>
 
-          {/* Empty Payment History */}
+          {/* Payment History */}
           <motion.div variants={fadeInUp}>
-            <div className="bg-muted/30 rounded-2xl p-8 text-center">
-              <CheckCircleIcon className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-              <h4 className="text-lg font-bold text-card-foreground mb-2">No Payment History</h4>
-              <p className="text-muted-foreground">Payment history will appear here once payments are made</p>
-            </div>
+            {payments.length === 0 ? (
+              <div className="bg-muted/30 rounded-2xl p-8 text-center">
+                <CheckCircleIcon className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                <h4 className="text-lg font-bold text-card-foreground mb-2">No Payment History</h4>
+                <p className="text-muted-foreground">Payment history will appear here once payments are made</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {payments.map(payment => (
+                  <div key={payment.id} className="bg-card rounded-2xl p-4 shadow-sm border border-border flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-[#E8F5E8] flex items-center justify-center shrink-0">
+                        <BanknotesIcon className="h-5 w-5 text-[#66BB6A]" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-card-foreground">
+                          {currencySymbol} {payment.amount.toLocaleString()}
+                          <span className="ml-2 text-xs font-medium text-muted-foreground uppercase">
+                            {payment.paymentMethod === 'mpesa' ? 'M-Pesa' : payment.paymentMethod.replace('_', ' ')}
+                          </span>
+                        </p>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {new Date(payment.createdAt).toLocaleString()}
+                          {payment.reference ? ` · Ref: ${payment.reference}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs text-muted-foreground">Balance after</p>
+                      <p className="text-sm font-semibold text-card-foreground">{currencySymbol} {payment.outstandingBalance.toLocaleString()}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </motion.div>
         </motion.div>
 

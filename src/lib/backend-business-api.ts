@@ -1038,6 +1038,33 @@ export async function getBackendDebtors(branchId?: string): Promise<Debtor[]> {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
+export interface BackendDebtorPaymentRecord {
+  id: string
+  amount: number
+  paymentMethod: string
+  reference: string | null
+  outstandingBalance: number
+  createdAt: number
+}
+
+// Single debtor incl. its payment history (GET /debtors/:id returns { ...debtor, payments }).
+export async function getBackendDebtorDetail(
+  debtorId: string,
+  branchId?: string
+): Promise<{ debtor: Debtor; payments: BackendDebtorPaymentRecord[] }> {
+  const targetBranch = branchId || await getSelectedBackendBranchId()
+  const row = await api<AnyRecord>(`/branches/${targetBranch}/debtors/${debtorId}`)
+  const payments = (Array.isArray(row.payments) ? row.payments : []).map((p: AnyRecord) => ({
+    id: idOf(p),
+    amount: Number(p.amount || 0),
+    paymentMethod: String(p.paymentMethod || 'cash'),
+    reference: p.reference ? String(p.reference) : null,
+    outstandingBalance: Number(p.outstandingBalance ?? 0),
+    createdAt: toMillis(p.createdAt)
+  }))
+  return { debtor: mapDebtor(row), payments }
+}
+
 export async function createBackendDebtor(data: Partial<Debtor>, branchId?: string) {
   const targetBranch = branchId || await getSelectedBackendBranchId()
   const openingDebt = Number(data.originalDebtAmount ?? data.currentDebt ?? 0)
