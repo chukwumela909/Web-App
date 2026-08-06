@@ -123,7 +123,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       !isOnboardingRoute &&
       !isSuperAdmin &&
       !isSuperAdminRoute &&
-      !isStaffRoute ? null : children}
+      !isStaffRoute &&
+      // Invitees are signed in without a business right up until they accept — hiding the
+      // invite page here unmounted it mid-accept and stranded them into /onboarding.
+      !isInviteRoute ? null : children}
     </OnboardingContext.Provider>
   )
 }
