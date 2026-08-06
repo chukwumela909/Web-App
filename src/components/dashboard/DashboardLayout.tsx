@@ -131,20 +131,29 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     checkPhoneVerification()
   }, [user])
 
-  // Cashiers (whether direct or invited) only get the sales/POS surface. Everyone else — owner,
-  // manager, admin, or a still-resolving session — sees the full nav. Gating on the backend role
-  // (not the legacy Firestore staff record) is what fixes invited cashiers seeing the owner nav.
-  const cashierNavHrefs = new Set([
-    '/dashboard',
-    '/dashboard/sales',
-    '/dashboard/products',
-    '/dashboard/inventory',
-    '/dashboard/payments'
-  ])
+  // Cashiers (whether direct or invited) only get the sales page — no dashboard home,
+  // products, inventory, or payments (client requirement). Everyone else — owner, manager,
+  // admin, or a still-resolving session — sees the full nav. Gating on the backend role
+  // (not the legacy Firestore staff record) is what covers invited cashiers.
+  const cashierNavHrefs = new Set(['/dashboard/sales'])
   const filteredNavigationItems = navigationItems.filter(item => {
     if (businessRole === 'cashier') return cashierNavHrefs.has(item.href)
     return true
   })
+
+  // Central cashier gate: every page rendered through DashboardLayout is off-limits to
+  // cashiers except the sales surface and the header targets (settings, notifications).
+  // This covers pages with no guard of their own (products, inventory, debtors, …) so a
+  // cashier typing a URL directly is bounced back to sales instead of seeing owner data.
+  const cashierAllowedPath =
+    pathname.startsWith('/dashboard/sales') ||
+    pathname.startsWith('/dashboard/settings') ||
+    pathname.startsWith('/dashboard/notifications')
+  const cashierBlocked = businessRole === 'cashier' && !cashierAllowedPath
+
+  useEffect(() => {
+    if (cashierBlocked) router.replace('/dashboard/sales')
+  }, [cashierBlocked, router])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -199,6 +208,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     phoneVerified === false &&
     !phoneCheckLoading &&
     !isOnVerifyPhonePage
+
+  // Don't flash restricted content while the redirect above lands.
+  if (cashierBlocked) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#f6f8fb]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#004AAD]"></div>
+      </div>
+    )
+  }
 
   return (
     <div className="h-screen flex bg-[#f6f8fb] font-dm-sans text-[#0f172a] chrome-flex-row chrome-gpu-acceleration">

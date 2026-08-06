@@ -95,10 +95,14 @@ export default function LoginPage() {
         console.log('Redirecting staff member to /staff-dashboard')
         router.push('/staff-dashboard')
       } else {
-        // User is not a staff member, redirect to regular dashboard
+        // User is not a legacy staff member. Invited cashiers (backend role) go straight
+        // to the sales page — they have no access to the dashboard home.
         if (backendSession?.onboardingStatus && !backendSession.onboardingStatus.hasBusiness) {
           console.log('Redirecting owner without business to /onboarding')
           router.push('/onboarding')
+        } else if (String(backendSession?.role ?? '').toLowerCase() === 'cashier') {
+          console.log('Redirecting cashier to /dashboard/sales')
+          router.push('/dashboard/sales')
         } else {
           console.log('Redirecting regular user to /dashboard')
           router.push('/dashboard')
@@ -106,7 +110,13 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error('Error checking staff status:', error)
-      router.push(backendSession?.onboardingStatus?.hasBusiness === false ? '/onboarding' : '/dashboard')
+      if (backendSession?.onboardingStatus?.hasBusiness === false) {
+        router.push('/onboarding')
+      } else if (String(backendSession?.role ?? '').toLowerCase() === 'cashier') {
+        router.push('/dashboard/sales')
+      } else {
+        router.push('/dashboard')
+      }
     }
   }
 

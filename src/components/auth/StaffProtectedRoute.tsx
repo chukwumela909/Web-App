@@ -16,12 +16,12 @@ interface StaffProtectedRouteProps {
 }
 
 // Backend roles carry no granular permission list, so gate legacy `resource:action` permissions
-// by role. Owners/managers/admins get everything; cashiers get only the read/POS surface. This
+// by role. Owners/managers/admins get everything; cashiers get only the sales/POS surface —
+// NOT the dashboard home (client requirement: cashiers see just the sales page). This
 // mirrors the backend's own enforcement (manager_required etc.) so the UI never dead-ends a cashier
 // on a screen whose writes the server would 403 anyway — and, critically, no longer fails OPEN for
 // invited staff (who are absent from the legacy Firestore staff collection).
 const CASHIER_ALLOWED_PERMISSIONS = new Set([
-  'dashboard:read',
   'sales:read',
   'sales:create',
   'pos:read',
