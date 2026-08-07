@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Eye, EyeOff, Loader2, CheckCircle, AlertCircle, ChevronDown } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
 
 const countries = [
   { code: 'KE', name: 'Kenya', dial_code: '+254', flag: '🇰🇪' },
@@ -527,7 +528,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#f6f6f9] relative flex flex-col items-center justify-center font-dm-sans overflow-x-hidden">
         {/* Header */}
         <header className="fixed top-0 left-0 right-0 h-[80px] bg-white px-4 md:px-[100px] flex items-center justify-between border-b border-gray-100 z-10">
-            <div className="flex items-center gap-[7px]">
+            <Link href="/" className="flex items-center gap-[7px]">
                 {/* Logo */}
                 <div className="w-[32px] h-[32px] relative shrink-0">
                     <Image src="/assets/figma/landing/logo-icon.svg" alt="FahamPesa" fill className="object-contain" />
@@ -536,7 +537,7 @@ export default function LoginPage() {
                     <span className="font-roboto font-bold text-[20px] text-[#001223] leading-none">Fahampesa</span>
                     <span className="font-inter font-light text-[10px] text-[#001223]">Smart Business Tools</span>
                 </div>
-            </div>
+            </Link>
             
             <div className="text-[14px] flex items-center gap-1">
                 <span className="text-[#64748b] hidden md:inline">
