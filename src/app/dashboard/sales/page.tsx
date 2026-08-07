@@ -868,11 +868,11 @@ function SalesPOSContent() {
                           </button>
 
                           <div className="space-y-1">
-                            <div className="min-h-[34px]">
-                              <h3 className="line-clamp-2 text-[11px] font-bold leading-snug text-[#171b25]">
+                            <div className="min-h-[40px]">
+                              <h3 className="line-clamp-2 text-[14px] font-bold leading-snug text-[#0b1220]">
                                 {product.name}
                               </h3>
-                              <div className="mt-1 flex items-center justify-between gap-2 text-[9px] text-[#808794]">
+                              <div className="mt-1 flex items-center justify-between gap-2 text-[9px] text-[#98a0ad]">
                                 <span className="truncate">{product.category || 'Product'}</span>
                                 <span className="shrink-0">SKU: {product.sku || product.id.slice(0, 7).toUpperCase()}</span>
                               </div>
