@@ -53,7 +53,8 @@ export default function LoginPage() {
     verifyLoginOtp,
     verificationId,
     setPendingRegistration,
-    clearRecaptcha
+    clearRecaptcha,
+    logout
   } = useAuth()
   const { staff, hasPermission, loading: staffLoading } = useStaff()
   const router = useRouter()
@@ -62,9 +63,15 @@ export default function LoginPage() {
   const [loginPhoneStep, setLoginPhoneStep] = useState<'phone' | 'otp'>('phone')
   const [loginPhoneNumber, setLoginPhoneNumber] = useState('')
 
+  // Only auto-redirect after the user actively signs in on this page (or explicitly
+  // chooses to continue with the existing session). A leftover Firebase session must
+  // not lock visitors out of the login form.
+  const [authSubmitted, setAuthSubmitted] = useState(false)
+
   // Smart redirect logic - wait for auth data to load
   React.useEffect(() => {
     if (loading || roleLoading || backendSessionLoading || !user) return
+    if (!authSubmitted) return
 
     // During signup, let the registration handler route to onboarding after OTP verification.
     if (!isLogin) return
@@ -83,7 +90,7 @@ export default function LoginPage() {
 
     // Check if user is a staff member by trying to fetch their staff data.
     checkStaffStatus()
-  }, [user, isSuperAdmin, loading, roleLoading, backendSessionLoading, backendSession, isLogin, router])
+  }, [user, isSuperAdmin, loading, roleLoading, backendSessionLoading, backendSession, isLogin, authSubmitted, router])
 
   const checkStaffStatus = async () => {
     try {
@@ -325,15 +332,14 @@ export default function LoginPage() {
           if (loginPhoneStep === 'otp') {
             // Verify OTP and login
             await verifyLoginOtp(formData.otp.replace(/ /g, ''))
+            setAuthSubmitted(true)
             // useEffect will handle redirect
           }
         } else {
           // Email login
           await login(formData.email, formData.password)
-          // Wait a moment for auth context and role to update
-          setTimeout(() => {
-            // The useEffect above will handle the redirect
-          }, 500)
+          setAuthSubmitted(true)
+          // The useEffect above will handle the redirect once auth context updates
         }
       } else {
         // Registration Flow
@@ -575,6 +581,38 @@ export default function LoginPage() {
                     </p>
                 )}
             </div>
+
+            {/* Existing session notice - let the user choose instead of force-redirecting */}
+            {user && !authSubmitted && !loading && isLogin && !isForgotPassword && (
+                <div className="bg-[#eef4ff] border border-[#c7dbff] rounded-[8px] p-4 flex flex-col gap-3">
+                    <p className="text-[14px] text-[#191d23]">
+                        You&apos;re already signed in{user.email || user.phoneNumber ? ` as ${user.email || user.phoneNumber}` : ''}.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setAuthSubmitted(true)}
+                            className="flex-1 bg-[#004aad] text-white text-[14px] font-semibold rounded-[8px] px-4 py-2.5 hover:bg-[#003c8c] transition-colors"
+                        >
+                            Continue to dashboard
+                        </button>
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    await logout()
+                                } catch (err) {
+                                    console.error('Error signing out:', err)
+                                    setError('Could not sign out. Please try again.')
+                                }
+                            }}
+                            className="flex-1 bg-white border border-[#e4e4e7] text-[#191d23] text-[14px] font-semibold rounded-[8px] px-4 py-2.5 hover:bg-[#f4f4f5] transition-colors"
+                        >
+                            Use a different account
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Toggle (Only show for Login/Register, not Forgot Password) */}
             {!isForgotPassword && isLogin && (
