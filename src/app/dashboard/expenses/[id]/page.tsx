@@ -634,6 +634,7 @@ export default function ExpenseDetailsPage() {
             </AnimatePresence>
           </div>
         </div>
+        </PlanGate>
       </DashboardLayout>
     </ProtectedRoute>
   )
