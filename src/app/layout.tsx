@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Geist, Geist_Mono, Archivo, DM_Sans, Manrope, Roboto, Inter } from "next/font/google";
 import "./globals.css";
 import RootClientShell from "@/components/providers/RootClientShell";
@@ -70,12 +69,6 @@ export default function RootLayout({
       >
         <ErrorHandler />
         <RootClientShell>{children}</RootClientShell>
-        <Script
-          src="https://platformvivid.worldstreetgold.com/widget.js"
-          data-key="pk_live_f_cu4yS4Sc7MD53oWKU9dMnZ"
-          data-api="https://platformvivid.worldstreetgold.com"
-          strategy="afterInteractive"
-        />
       </body>
     </html>
   );
