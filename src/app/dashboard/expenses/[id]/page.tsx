@@ -27,6 +27,7 @@ import { useBranch } from '@/contexts/BranchContext'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { useInvalidateBusinessData } from '@/hooks/useBusinessQueries'
 import { Expense, ExpenseCategory, PaymentMethod, getExpense, updateExpense, deleteExpense } from '@/lib/firestore'
+import { PlanGate } from '@/components/PlanGate'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 30 },
@@ -242,6 +243,7 @@ export default function ExpenseDetailsPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
+        <PlanGate feature="expenses">
         <div className="min-h-screen bg-gray-50 py-8">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Header */}

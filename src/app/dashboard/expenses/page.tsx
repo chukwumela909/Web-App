@@ -25,6 +25,7 @@ import { useBranch } from '@/contexts/BranchContext'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { useInvalidateBusinessData } from '@/hooks/useBusinessQueries'
 import { Expense, ExpenseCategory, PaymentMethod, createExpense, getExpenses, deleteExpense } from '@/lib/firestore'
+import { PlanGate } from '@/components/PlanGate'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 60 },
@@ -166,6 +167,7 @@ function ExpensesPageContent() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
+        <PlanGate feature="expenses">
         <motion.div initial="initial" animate="animate" variants={fadeInUp} className="space-y-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -501,6 +503,7 @@ function ExpensesPageContent() {
             </div>
           </div>
         </motion.div>
+        </PlanGate>
       </DashboardLayout>
     </ProtectedRoute>
   )

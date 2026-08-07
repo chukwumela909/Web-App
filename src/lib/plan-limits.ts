@@ -13,6 +13,7 @@ export interface PlanLimits {
   suppliers: number | 'unlimited'
   debtors: number | 'unlimited'
   reports: boolean
+  expenses: boolean
 }
 
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
@@ -21,9 +22,10 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     dailySales: 5,
     branches: 1, // One included main branch; additional branches require Pro
     staff: 0, // No access
-    suppliers: 5,
-    debtors: 5,
+    suppliers: 0, // No access — Pro only (backend also 403s supplier routes for free accounts)
+    debtors: 0, // No access — Pro only (backend also 403s debtor routes for free accounts)
     reports: false,
+    expenses: false, // No access — Pro only (backend also 403s expense routes for free accounts)
   },
   pro: {
     products: 'unlimited',
@@ -33,6 +35,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     suppliers: 'unlimited',
     debtors: 'unlimited',
     reports: true,
+    expenses: true,
   },
 }
 
@@ -47,6 +50,7 @@ export const FEATURE_NAMES: Record<keyof PlanLimits, string> = {
   suppliers: 'Suppliers',
   debtors: 'Debtors',
   reports: 'Reports',
+  expenses: 'Expenses',
 }
 
 /**

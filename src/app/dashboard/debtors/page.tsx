@@ -38,6 +38,7 @@ import { isBackendApiError } from '@/lib/backend-api'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { UpgradeModal } from '@/components/UpgradeModal'
+import { PlanGate } from '@/components/PlanGate'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 60 },
@@ -439,6 +440,7 @@ export default function DebtorsPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
+        <PlanGate feature="debtors">
         <UpgradeModal
           open={showUpgradeModal}
           onOpenChange={setShowUpgradeModal}
@@ -974,6 +976,7 @@ export default function DebtorsPage() {
             )}
           </AnimatePresence>
         </motion.div>
+        </PlanGate>
       </DashboardLayout>
     </ProtectedRoute>
   )

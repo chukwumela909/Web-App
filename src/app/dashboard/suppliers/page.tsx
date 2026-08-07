@@ -23,6 +23,7 @@ import {
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { PlanGate } from '@/components/PlanGate'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import {
   createSupplier as createSupplierRecord,
@@ -635,7 +636,9 @@ export default function SuppliersPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <SuppliersContent />
+        <PlanGate feature="suppliers">
+          <SuppliersContent />
+        </PlanGate>
       </DashboardLayout>
     </ProtectedRoute>
   )

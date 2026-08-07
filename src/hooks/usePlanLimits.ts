@@ -22,6 +22,7 @@ interface UsePlanLimitsReturn {
   canAddSupplier: () => Promise<PlanLimitCheck>
   canAddDebtor: () => Promise<PlanLimitCheck>
   canAccessReports: () => PlanLimitCheck
+  canAccessExpenses: () => PlanLimitCheck
   refreshLimits: () => Promise<void>
 }
 
@@ -113,13 +114,25 @@ export function usePlanLimits(): UsePlanLimitsReturn {
         }
       }
 
-      if (feature === 'reports') {
+      if (feature === 'reports' || feature === 'expenses') {
         return {
           allowed: false,
           currentCount: 0,
           limit: 0,
           limitReached: true,
-          message: `${FEATURE_NAMES[feature]} are only available on the Pro plan. Upgrade to access detailed business reports.`,
+          message: `${FEATURE_NAMES[feature]} are only available on the Pro plan. Upgrade to unlock this feature.`,
+        }
+      }
+
+      // Zero-limit features (staff, debtors, suppliers on Free) are Pro-only: no need to
+      // fetch usage counts — the feature is simply inaccessible on this plan.
+      if (numericLimit === 0) {
+        return {
+          allowed: false,
+          currentCount: 0,
+          limit: 0,
+          limitReached: true,
+          message: `${FEATURE_NAMES[feature]} are only available on the Pro plan. Upgrade to unlock this feature.`,
         }
       }
 
@@ -186,6 +199,19 @@ export function usePlanLimits(): UsePlanLimitsReturn {
     }
   }, [planTier])
 
+  const canAccessExpenses = useCallback((): PlanLimitCheck => {
+    const hasAccess = planTier === 'pro'
+    return {
+      allowed: hasAccess,
+      currentCount: 0,
+      limit: hasAccess ? 'unlimited' : 0,
+      limitReached: !hasAccess,
+      message: hasAccess
+        ? undefined
+        : 'Expenses are only available on the Pro plan. Upgrade to track your business spending.',
+    }
+  }, [planTier])
+
   const refreshLimits = useCallback(async () => {
     setIsLoading(true)
     if (!effectiveUserId) {
@@ -223,6 +249,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
     canAddSupplier,
     canAddDebtor,
     canAccessReports,
+    canAccessExpenses,
     refreshLimits,
   }
 }

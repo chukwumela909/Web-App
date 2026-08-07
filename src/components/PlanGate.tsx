@@ -7,7 +7,7 @@ import { FEATURE_NAMES } from '@/lib/plan-limits'
 import { Loader2 } from 'lucide-react'
 
 interface PlanGateProps {
-  feature: 'branches' | 'staff' | 'reports'
+  feature: 'branches' | 'staff' | 'reports' | 'debtors' | 'suppliers' | 'expenses'
   children: React.ReactNode
   fallback?: React.ReactNode
 }
@@ -17,7 +17,7 @@ interface PlanGateProps {
  * Shows upgrade modal for free users, renders children for pro users
  */
 export function PlanGate({ feature, children, fallback }: PlanGateProps) {
-  const { planTier, isLoading, canAddBranch, canAddStaff, canAccessReports } = usePlanLimits()
+  const { planTier, isLoading, canAddBranch, canAddStaff, canAccessReports, canAddDebtor, canAddSupplier, canAccessExpenses } = usePlanLimits()
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [hasAccess, setHasAccess] = useState(false)
 
@@ -36,6 +36,15 @@ export function PlanGate({ feature, children, fallback }: PlanGateProps) {
         case 'reports':
           result = canAccessReports()
           break
+        case 'debtors':
+          result = await canAddDebtor()
+          break
+        case 'suppliers':
+          result = await canAddSupplier()
+          break
+        case 'expenses':
+          result = canAccessExpenses()
+          break
       }
 
       setHasAccess(result.allowed)
@@ -47,7 +56,7 @@ export function PlanGate({ feature, children, fallback }: PlanGateProps) {
     }
 
     checkAccess()
-  }, [feature, isLoading, planTier, canAddBranch, canAddStaff, canAccessReports])
+  }, [feature, isLoading, planTier, canAddBranch, canAddStaff, canAccessReports, canAddDebtor, canAddSupplier, canAccessExpenses])
 
   if (isLoading) {
     return (
@@ -64,7 +73,7 @@ export function PlanGate({ feature, children, fallback }: PlanGateProps) {
           open={showUpgradeModal}
           onOpenChange={setShowUpgradeModal}
           feature={feature}
-          message={`${FEATURE_NAMES[feature]} ${feature === 'reports' ? 'are' : 'is'} only available on the Pro plan. Upgrade now to unlock this powerful feature.`}
+          message={`${FEATURE_NAMES[feature]} ${['reports', 'debtors', 'suppliers', 'expenses'].includes(feature) ? 'are' : 'is'} only available on the Pro plan. Upgrade now to unlock this powerful feature.`}
         />
         {fallback || (
           <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center">
