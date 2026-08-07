@@ -12,7 +12,6 @@ import {
   TagIcon, 
   DocumentTextIcon, 
   BuildingStorefrontIcon,
-  EyeIcon,
   PencilIcon,
   TrashIcon,
   ChevronDownIcon,
@@ -478,13 +477,6 @@ function ExpensesPageContent() {
                           </div>
                           
                           <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => router.push(`/dashboard/expenses/${exp.id}`)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="View Details"
-                            >
-                              <EyeIcon className="h-4 w-4" />
-                            </button>
                             <button
                               onClick={() => router.push(`/dashboard/expenses/${exp.id}`)}
                               className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
