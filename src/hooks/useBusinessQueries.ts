@@ -78,7 +78,7 @@ export function useHeldSalesQuery({ userId, branchId, max = 50 }: BusinessQueryA
 export function useExpensesQuery({ userId, branchId, max = 500 }: BusinessQueryArgs & { max?: number }) {
   return useQuery<Expense[]>({
     queryKey: businessQueryKeys.expenses(userId, branchId, max),
-    queryFn: () => getExpenses(userId!, max),
+    queryFn: () => getExpenses(userId!, max, branchId),
     enabled: Boolean(userId),
     staleTime: 60 * 1000,
     placeholderData: previous => previous
@@ -104,7 +104,7 @@ export function useDashboardDataQuery({ userId, branchId }: BusinessQueryArgs) {
         getProducts(userId!, branchId),
         getSales(userId!, 2000, branchId),
         getMultiItemSales(userId!, 2000, branchId),
-        getExpenses(userId!, 500),
+        getExpenses(userId!, 500, branchId),
         getDebtors(userId!, branchId)
       ])
 

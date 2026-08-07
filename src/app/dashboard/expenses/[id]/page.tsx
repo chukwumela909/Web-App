@@ -23,7 +23,9 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/contexts/AuthContext'
+import { useBranch } from '@/contexts/BranchContext'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
+import { useInvalidateBusinessData } from '@/hooks/useBusinessQueries'
 import { Expense, ExpenseCategory, PaymentMethod, getExpense, updateExpense, deleteExpense } from '@/lib/firestore'
 
 const fadeInUp = {
@@ -47,6 +49,8 @@ export default function ExpenseDetailsPage() {
   const [showEdit, setShowEdit] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { user } = useAuth()
+  const { selectedBranchId } = useBranch()
+  const { invalidateAllBusinessData } = useInvalidateBusinessData()
   const { currency } = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
   const router = useRouter()
@@ -76,8 +80,10 @@ export default function ExpenseDetailsPage() {
       
       setLoading(true)
       try {
-        const expenseData = await getExpense(expenseId)
-        if (expenseData && expenseData.userId === user.uid) {
+        const expenseData = await getExpense(expenseId, selectedBranchId || undefined)
+        // Backend expenses carry no userId (branch access is enforced server-side);
+        // only enforce ownership on legacy Firestore records that do have one.
+        if (expenseData && (!expenseData.userId || expenseData.userId === user.uid)) {
           setExpense(expenseData)
           // Set edit form with current data
           setEditForm({
@@ -106,7 +112,7 @@ export default function ExpenseDetailsPage() {
     }
 
     fetchExpense()
-  }, [user, expenseId])
+  }, [user, expenseId, selectedBranchId])
 
   const handleEdit = () => {
     setShowEdit(true)
@@ -131,14 +137,15 @@ export default function ExpenseDetailsPage() {
         isTaxDeductible: editForm.isTaxDeductible,
         notes: editForm.notes || undefined,
         tags: editForm.tags || undefined
-      })
-      
+      }, selectedBranchId || undefined)
+
       // Refresh expense data
-      const updatedExpense = await getExpense(expenseId)
+      const updatedExpense = await getExpense(expenseId, selectedBranchId || undefined)
       if (updatedExpense) {
         setExpense(updatedExpense)
       }
-      
+      invalidateAllBusinessData()
+
       setShowEdit(false)
       setShowSuccess(true)
       setTimeout(() => setShowSuccess(false), 3000)
@@ -153,7 +160,8 @@ export default function ExpenseDetailsPage() {
     
     if (confirm('Are you sure you want to delete this expense? This action cannot be undone.')) {
       try {
-        await deleteExpense(expense.id)
+        await deleteExpense(expense.id, selectedBranchId || undefined)
+        invalidateAllBusinessData()
         router.push('/dashboard/expenses')
       } catch (error) {
         console.error('Failed to delete expense:', error)

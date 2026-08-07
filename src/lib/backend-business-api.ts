@@ -989,7 +989,7 @@ export async function updateBackendExpense(expenseId: string, data: Partial<Expe
       amount: data.amount,
       category: data.category,
       description: data.description,
-      paymentMethod: toBackendPaymentMethod(data.paymentMethod),
+      paymentMethod: data.paymentMethod ? toBackendPaymentMethod(data.paymentMethod) : undefined,
       vendor: data.vendor || undefined,
       receiptNumber: data.receiptNumber || undefined,
       attachmentUrl: data.attachmentUrl || undefined,

@@ -22,7 +22,9 @@ import {
 import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useBranch } from '@/contexts/BranchContext'
 import { useCurrency, getCurrencySymbol } from '@/hooks/useCurrency'
+import { useInvalidateBusinessData } from '@/hooks/useBusinessQueries'
 import { Expense, ExpenseCategory, PaymentMethod, createExpense, getExpenses, deleteExpense } from '@/lib/firestore'
 
 const fadeInUp = {
@@ -37,7 +39,10 @@ function ExpensesPageContent() {
   const searchParams = useSearchParams()
   const { currency } = useCurrency()
   const currencySymbol = getCurrencySymbol(currency)
+  const { selectedBranchId } = useBranch()
+  const { invalidateAllBusinessData } = useInvalidateBusinessData()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
@@ -62,14 +67,18 @@ function ExpensesPageContent() {
     if (!user) return
     setLoading(true)
     try {
-      const list = await getExpenses(user.uid, 200)
+      const list = await getExpenses(user.uid, 200, selectedBranchId || undefined)
       setExpenses(list)
+      setLoadError(null)
+    } catch (error) {
+      console.error('Failed to load expenses:', error)
+      setLoadError('Could not load expenses. Check your connection or permissions and try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { fetchData() }, [user])
+  useEffect(() => { fetchData() }, [user, selectedBranchId])
 
   useEffect(() => {
     if (searchParams?.get('new')) {
@@ -109,7 +118,7 @@ function ExpensesPageContent() {
         isTaxDeductible: expenseForm.isTaxDeductible,
         notes: expenseForm.notes || undefined,
         tags: expenseForm.tags || undefined
-      })
+      }, selectedBranchId || undefined)
       
       setShowAdd(false)
       setExpenseForm({ 
@@ -130,8 +139,9 @@ function ExpensesPageContent() {
       setSuccessMessage('Expense recorded successfully!')
       setShowSuccess(true)
       setTimeout(() => setShowSuccess(false), 4000)
-      
+
       fetchData()
+      invalidateAllBusinessData()
     } catch (error) {
       console.error('Failed to create expense:', error)
       alert('Failed to record expense. Please try again.')
@@ -141,11 +151,12 @@ function ExpensesPageContent() {
   const handleDeleteExpense = async (expense: Expense) => {
     if (confirm(`Are you sure you want to delete the expense "${expense.description}"? This action cannot be undone.`)) {
       try {
-        await deleteExpense(expense.id)
+        await deleteExpense(expense.id, selectedBranchId || undefined)
         setSuccessMessage('Expense deleted successfully!')
         setShowSuccess(true)
         setTimeout(() => setShowSuccess(false), 3000)
         fetchData()
+        invalidateAllBusinessData()
       } catch (error) {
         console.error('Failed to delete expense:', error)
         alert('Failed to delete expense. Please try again.')
@@ -199,6 +210,19 @@ function ExpensesPageContent() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Load Error */}
+          {loadError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+              <span className="text-red-800 font-medium">{loadError}</span>
+              <button
+                onClick={() => fetchData()}
+                className="ml-4 px-3 py-1.5 text-sm font-medium text-red-700 border border-red-300 rounded-lg hover:bg-red-100 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

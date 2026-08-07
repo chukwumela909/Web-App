@@ -993,10 +993,10 @@ export async function recordDebtorPayment(userId: string, data: Partial<DebtorPa
   }
 }
 
-export async function getExpenses(userId: string, max: number = 200): Promise<Expense[]> {
+export async function getExpenses(userId: string, max: number = 200, branchId?: string): Promise<Expense[]> {
   if (isBackendAvailable()) {
     try {
-      return (await getBackendExpenses()).slice(0, max)
+      return (await getBackendExpenses(branchId)).slice(0, max)
     } catch (error) {
       throw error
     }
@@ -1012,10 +1012,10 @@ export async function getExpenses(userId: string, max: number = 200): Promise<Ex
   return list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
 }
 
-export async function createExpense(userId: string, data: Partial<Expense>): Promise<void> {
+export async function createExpense(userId: string, data: Partial<Expense>, branchId?: string): Promise<void> {
   if (isBackendAvailable()) {
     try {
-      await createBackendExpense(data)
+      await createBackendExpense(data, branchId)
       return
     } catch (error) {
       throw error
@@ -1047,7 +1047,13 @@ export async function createExpense(userId: string, data: Partial<Expense>): Pro
   await setDoc(doc(db, 'expenses', id), { ...expense, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
 }
 
-export async function getExpense(expenseId: string): Promise<Expense | null> {
+export async function getExpense(expenseId: string, branchId?: string): Promise<Expense | null> {
+  if (isBackendAvailable()) {
+    // The backend has no GET /expenses/:id endpoint, so hydrate from the branch list.
+    const list = await getBackendExpenses(branchId)
+    return list.find(e => e.id === expenseId) || null
+  }
+
   const snap = await getDoc(doc(db, 'expenses', expenseId))
   if (snap.exists()) {
     return { id: snap.id, ...snap.data() } as Expense
@@ -1055,10 +1061,10 @@ export async function getExpense(expenseId: string): Promise<Expense | null> {
   return null
 }
 
-export async function updateExpense(expenseId: string, data: Partial<Expense>): Promise<void> {
+export async function updateExpense(expenseId: string, data: Partial<Expense>, branchId?: string): Promise<void> {
   if (isBackendAvailable()) {
     try {
-      await updateBackendExpense(expenseId, data)
+      await updateBackendExpense(expenseId, data, branchId)
       return
     } catch (error) {
       throw error
@@ -1074,10 +1080,10 @@ export async function updateExpense(expenseId: string, data: Partial<Expense>): 
   await updateDoc(doc(db, 'expenses', expenseId), updateData)
 }
 
-export async function deleteExpense(expenseId: string): Promise<void> {
+export async function deleteExpense(expenseId: string, branchId?: string): Promise<void> {
   if (isBackendAvailable()) {
     try {
-      await deleteBackendExpense(expenseId)
+      await deleteBackendExpense(expenseId, branchId)
       return
     } catch (error) {
       throw error
