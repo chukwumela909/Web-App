@@ -1837,6 +1837,26 @@ export async function acceptBackendStaffInvitation(token: string) {
   })
 }
 
+export interface BackendPendingInvitation {
+  id: string
+  businessName: string
+  role: 'manager' | 'cashier' | string
+  branchNames: string[]
+  expiresAt: string
+}
+
+// Pending invitations addressed to the signed-in user's own email (auth-only, no business
+// context). Used to keep invited staff out of the business-onboarding wizard.
+export async function listMyPendingBackendInvitations() {
+  return api<BackendPendingInvitation[]>('/staff/invitations/pending')
+}
+
+export async function resendMyBackendInvitation(invitationId: string) {
+  return api<{ emailSent: boolean }>(`/staff/invitations/pending/${encodeURIComponent(invitationId)}/resend`, {
+    method: 'POST'
+  })
+}
+
 export interface BackendInvitationLookup {
   email: string
   role: 'manager' | 'cashier' | string
