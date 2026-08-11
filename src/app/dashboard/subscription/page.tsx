@@ -258,12 +258,14 @@ export default function SubscriptionPage() {
     ]
 
     const freePlanFeatures = [
-        { text: 'Add up to 20 products', available: true },
+        { text: 'Add up to 10 products', available: true },
         { text: 'Inventory access', available: true },
-        { text: 'Record limited demo sales', available: true },
+        { text: 'Record up to 5 sales daily', available: true },
+        { text: 'One branch included', available: true },
         { text: 'Debtors record', available: false },
-        { text: 'Unlimited Branches', available: false },
-        { text: 'Advanced reports (Profit/Loss) ', available: false },
+        { text: 'Suppliers record', available: false },
+        { text: 'Expense tracking', available: false },
+        { text: 'Advanced reports (Profit/Loss)', available: false },
         { text: 'Staff Management & Permissions', available: false },
         { text: 'Sync across Mobile, Web, and Desktop', available: false }
     ]
@@ -272,8 +274,9 @@ export default function SubscriptionPage() {
         { text: 'Unlimited Products', available: true },
         { text: 'Inventory Access', available: true },
         { text: 'Debtors Record', available: true },
-        { text: 'Unlimited Branches', available: true },
+        { text: 'Multiple Branches', available: true },
         { text: 'Unlimited Suppliers', available: true },
+        { text: 'Expense Tracking', available: true },
         { text: 'Advanced Reports (Profit/Loss)', available: true },
         { text: 'Staff Management & Permissions', available: true },
         { text: 'Sync across Mobile, Web, and Desktop', available: true }

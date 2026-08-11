@@ -15,11 +15,13 @@ export default function PricingCards({ isYearly }: PricingCardsProps) {
   const { currency } = usePublicCurrency()
 
   const features = [
-    { name: "Add up to 20 products", free: true, pro: true },
+    { name: "Add up to 10 products (unlimited on Pro)", free: true, pro: true },
     { name: "Inventory access", free: true, pro: true },
-    { name: "Record limited demo sales", free: true, pro: true },
+    { name: "Record up to 5 sales daily (unlimited on Pro)", free: true, pro: true },
     { name: "Debtors record", free: false, pro: true },
-    { name: "Unlimited Branches", free: false, pro: true },
+    { name: "Suppliers record", free: false, pro: true },
+    { name: "Expense tracking", free: false, pro: true },
+    { name: "Multiple branches (Free plan: 1 branch)", free: false, pro: true },
     { name: "Advanced reports (Profit/Loss)", free: false, pro: true },
     { name: "Staff Management & Permissions", free: false, pro: true },
     { name: "Sync across Mobile, Web, and Desktop", free: false, pro: true },
