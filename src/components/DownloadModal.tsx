@@ -33,8 +33,8 @@ export function DownloadModal({ open, onOpenChange }: DownloadModalProps) {
 
   const handleWindowsDownload = () => {
     const link = document.createElement('a')
-    link.href = 'https://f005.backblazeb2.com/file/fahampesa/Fahampesa_0.1.11_x64-setup.exe'
-    link.download = 'Fahampesa_0.1.11_x64-setup.exe'
+    link.href = 'https://f005.backblazeb2.com/file/fahampesa/Fahampesa_0.1.13_x64-setup.exe'
+    link.download = 'Fahampesa_0.1.13_x64-setup.exe'
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
